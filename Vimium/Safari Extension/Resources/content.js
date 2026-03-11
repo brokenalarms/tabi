@@ -13,9 +13,8 @@
         if (active && active !== document.body) active.blur();
     });
 
-    // History navigation
-    keyHandler.on("goBack", () => history.back());
-    keyHandler.on("goForward", () => history.forward());
+    // Scroll and history navigation
+    const scrollController = new ScrollController(keyHandler);
 
     // Tab operations — delegate to background service worker
     const tabCommands = [
