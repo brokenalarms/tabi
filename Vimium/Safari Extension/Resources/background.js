@@ -4,6 +4,24 @@
 const MAX_CLOSED_TABS = 50;
 const closedTabStack = [];
 
+// Track which tabs have the extension active (not excluded by domain)
+const activeTabSet = new Set();
+
+async function updateIconState(tabId) {
+    try {
+        if (activeTabSet.has(tabId)) {
+            await browser.action.enable(tabId);
+            await browser.action.setBadgeText({ text: "", tabId });
+            await browser.action.setTitle({ title: "Vimium", tabId });
+        } else {
+            await browser.action.disable(tabId);
+            await browser.action.setTitle({ title: "Vimium (disabled on this site)", tabId });
+        }
+    } catch (_) {
+        // browser.action may not be available in all contexts
+    }
+}
+
 function pushClosedTab(url) {
     if (!url || url === "about:blank" || url === "about:newtab") return;
     closedTabStack.push(url);
@@ -16,7 +34,7 @@ function popClosedTab() {
     return closedTabStack.pop() || null;
 }
 
-async function handleCommand(command, sender) {
+async function handleCommand(command, sender, message) {
     switch (command) {
         case "createTab":
             await browser.tabs.create({});
@@ -87,8 +105,25 @@ async function handleCommand(command, sender) {
         }
 
         case "switchTab": {
-            if (message.tabId != null) {
-                await browser.tabs.update(message.tabId, { active: true });
+            const targetTabId = message && message.tabId;
+            if (targetTabId != null) {
+                await browser.tabs.update(targetTabId, { active: true });
+            }
+            break;
+        }
+
+        case "extensionActive": {
+            if (sender.tab) {
+                activeTabSet.add(sender.tab.id);
+                await updateIconState(sender.tab.id);
+            }
+            break;
+        }
+
+        case "extensionInactive": {
+            if (sender.tab) {
+                activeTabSet.delete(sender.tab.id);
+                await updateIconState(sender.tab.id);
             }
             break;
         }
@@ -118,13 +153,18 @@ async function syncExcludedDomains() {
 // Sync on service worker startup
 syncExcludedDomains();
 
+// Clean up activeTabSet when tabs are removed
+browser.tabs.onRemoved.addListener((tabId) => {
+    activeTabSet.delete(tabId);
+});
+
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message || !message.command) {
         sendResponse({ status: "error", reason: "missing command" });
         return;
     }
 
-    handleCommand(message.command, sender)
+    handleCommand(message.command, sender, message)
         .then(result => sendResponse(result))
         .catch(err => {
             console.error("Vimium background error:", err);
@@ -137,5 +177,5 @@ browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
 // Export internals for testing
 if (typeof module !== "undefined" && module.exports) {
-    module.exports = { closedTabStack, pushClosedTab, popClosedTab, handleCommand, MAX_CLOSED_TABS };
+    module.exports = { closedTabStack, pushClosedTab, popClosedTab, handleCommand, MAX_CLOSED_TABS, activeTabSet, updateIconState };
 }
