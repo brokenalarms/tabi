@@ -1,0 +1,38 @@
+.vimium-find-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 2147483647;
+    display: flex;
+    align-items: center;
+    padding: 6px 12px;
+    background: #333;
+    border-top: 1px solid #555;
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.vimium-find-bar input {
+    flex: 1;
+    padding: 4px 8px;
+    border: 1px solid #666;
+    border-radius: 3px;
+    background: #1a1a1a;
+    color: #eee;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+}
+
+.vimium-find-bar input:focus {
+    border-color: #4a9eff;
+}
+
+.vimium-find-bar .vimium-find-count {
+    margin-left: 8px;
+    color: #aaa;
+    font-size: 12px;
+    white-space: nowrap;
+}
