@@ -15,6 +15,9 @@
     // In-page find
     const findMode = new FindMode(keyHandler);
 
+    // Tab search overlay
+    const tabSearch = new TabSearch(keyHandler);
+
     // Default exitToNormal handler restores NORMAL mode
     keyHandler.on("exitToNormal", () => {
         if (keyHandler.getMode() === Mode.HINTS && hintMode.isActive()) {
@@ -23,6 +26,10 @@
         }
         if (keyHandler.getMode() === Mode.FIND && findMode.isActive()) {
             findMode.deactivate(true);
+            return;
+        }
+        if (keyHandler.getMode() === Mode.TAB_SEARCH && tabSearch.isActive()) {
+            tabSearch.deactivate();
             return;
         }
         keyHandler.setMode(Mode.NORMAL);

@@ -18,8 +18,8 @@
     "content_scripts": [
         {
             "matches": ["<all_urls>"],
-            "js": ["modules/KeyHandler.js", "modules/ScrollController.js", "modules/HintMode.js", "modules/FindMode.js", "content.js"],
-            "css": ["styles/hints.css", "styles/find.css"],
+            "js": ["modules/KeyHandler.js", "modules/ScrollController.js", "modules/HintMode.js", "modules/FindMode.js", "modules/TabSearch.js", "content.js"],
+            "css": ["styles/hints.css", "styles/find.css", "styles/tab-search.css"],
             "run_at": "document_idle",
             "all_frames": false
         }

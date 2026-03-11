@@ -81,6 +81,13 @@ async function handleCommand(command, sender) {
             return tabs.map(t => ({ id: t.id, title: t.title, url: t.url, active: t.active }));
         }
 
+        case "switchTab": {
+            if (message.tabId != null) {
+                await browser.tabs.update(message.tabId, { active: true });
+            }
+            break;
+        }
+
         default:
             return { status: "unknown_command" };
     }
