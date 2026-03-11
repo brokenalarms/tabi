@@ -111,6 +111,9 @@ function setupDOM(elements = []) {
             createdEls.push(el);
             return el;
         },
+        createTextNode(text) {
+            return { nodeType: 3, textContent: text };
+        },
     };
 
     // Make body appendable
