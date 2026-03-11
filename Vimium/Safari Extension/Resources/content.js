@@ -6,15 +6,22 @@
 
     const keyHandler = new KeyHandler();
 
+    // Scroll and history navigation
+    const scrollController = new ScrollController(keyHandler);
+
+    // Link hint navigation
+    const hintMode = new HintMode(keyHandler);
+
     // Default exitToNormal handler restores NORMAL mode
     keyHandler.on("exitToNormal", () => {
+        if (keyHandler.getMode() === Mode.HINTS && hintMode.isActive()) {
+            hintMode.deactivate();
+            return;
+        }
         keyHandler.setMode(Mode.NORMAL);
         const active = document.activeElement;
         if (active && active !== document.body) active.blur();
     });
-
-    // Scroll and history navigation
-    const scrollController = new ScrollController(keyHandler);
 
     // Tab operations — delegate to background service worker
     const tabCommands = [
@@ -28,6 +35,6 @@
         });
     }
 
-    // Expose for other modules (HintMode, FindMode, TabSearch, ScrollController)
+    // Expose for other modules (FindMode, TabSearch)
     window.__vimiumKeyHandler = keyHandler;
 })();
