@@ -81,6 +81,11 @@ async function handleCommand(command, sender) {
             return tabs.map(t => ({ id: t.id, title: t.title, url: t.url, active: t.active }));
         }
 
+        case "syncSettings": {
+            await syncExcludedDomains();
+            return { status: "ok" };
+        }
+
         case "switchTab": {
             if (message.tabId != null) {
                 await browser.tabs.update(message.tabId, { active: true });
@@ -94,6 +99,24 @@ async function handleCommand(command, sender) {
 
     return { status: "ok" };
 }
+
+// Sync excluded domains from native settings to browser.storage.local
+async function syncExcludedDomains() {
+    try {
+        const response = await browser.runtime.sendNativeMessage(
+            "com.anthropic.Vimium",
+            { command: "getExcludedDomains" }
+        );
+        if (response && response.excludedDomains) {
+            await browser.storage.local.set({ excludedDomains: response.excludedDomains });
+        }
+    } catch (err) {
+        console.error("Vimium: failed to sync excluded domains:", err);
+    }
+}
+
+// Sync on service worker startup
+syncExcludedDomains();
 
 browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!message || !message.command) {

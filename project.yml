@@ -16,6 +16,7 @@ targets:
     platform: macOS
     sources:
       - path: Vimium/Host App
+      - path: Vimium/Shared
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.anthropic.Vimium
@@ -38,6 +39,7 @@ targets:
       - path: Vimium/Safari Extension
         excludes:
           - "Resources/**"
+      - path: Vimium/Shared
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.anthropic.Vimium.Extension
