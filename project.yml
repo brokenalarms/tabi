@@ -1,0 +1,51 @@
+name: Vimium
+options:
+  bundleIdPrefix: com.anthropic
+  deploymentTarget:
+    macOS: "13.0"
+  xcodeVersion: "16.3"
+
+settings:
+  base:
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  Vimium:
+    type: application
+    platform: macOS
+    sources:
+      - path: Vimium/Host App
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.anthropic.Vimium
+        CODE_SIGN_ENTITLEMENTS: Vimium/Host App/Vimium.entitlements
+        INFOPLIST_KEY_CFBundleDisplayName: Vimium
+        GENERATE_INFOPLIST_FILE: true
+        ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
+    dependencies:
+      - target: Vimium Extension
+        embed: true
+        codeSign: true
+        copy:
+          destination: plugins
+          subpath: ""
+
+  Vimium Extension:
+    type: app-extension
+    platform: macOS
+    sources:
+      - path: Vimium/Safari Extension
+        excludes:
+          - "Resources/**"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.anthropic.Vimium.Extension
+        CODE_SIGN_ENTITLEMENTS: Vimium/Safari Extension/VimiumExtension.entitlements
+        GENERATE_INFOPLIST_FILE: true
+        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.Safari.web-extension
+        INFOPLIST_KEY_NSExtension_NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).SafariWebExtensionHandler"
+        OTHER_LDFLAGS: ["-framework", "SafariServices"]
+    resources:
+      - path: Vimium/Safari Extension/Resources
+        buildPhase: resources

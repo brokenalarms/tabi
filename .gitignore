@@ -1,5 +1,12 @@
 .ralph
 
+# Xcode
+*.xcodeproj/
+xcuserdata/
+DerivedData/
+build/
+*.xcworkspace
+
 # Dolt database files (added by bd init)
 .dolt/
 *.db
