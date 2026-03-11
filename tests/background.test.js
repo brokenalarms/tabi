@@ -12,6 +12,8 @@ let mockTabs;
 let createdTabs;
 let removedTabIds;
 let activatedTabId;
+let actionState;
+let tabRemovedListeners;
 
 function resetBrowserShim() {
     mockTabs = [
@@ -22,6 +24,8 @@ function resetBrowserShim() {
     createdTabs = [];
     removedTabIds = [];
     activatedTabId = null;
+    actionState = {};
+    tabRemovedListeners = [];
 
     global.browser = {
         tabs: {
@@ -40,6 +44,29 @@ function resetBrowserShim() {
             },
             async query(_opts) {
                 return [...mockTabs];
+            },
+            onRemoved: {
+                addListener(fn) { tabRemovedListeners.push(fn); },
+            },
+        },
+        action: {
+            async enable(tabId) {
+                if (!actionState[tabId]) actionState[tabId] = {};
+                actionState[tabId].enabled = true;
+            },
+            async disable(tabId) {
+                if (!actionState[tabId]) actionState[tabId] = {};
+                actionState[tabId].enabled = false;
+            },
+            async setBadgeText(opts) {
+                const id = opts.tabId;
+                if (!actionState[id]) actionState[id] = {};
+                actionState[id].badgeText = opts.text;
+            },
+            async setTitle(opts) {
+                const id = opts.tabId;
+                if (!actionState[id]) actionState[id] = {};
+                actionState[id].title = opts.title;
             },
         },
         runtime: {
@@ -205,6 +232,52 @@ describe("background.js tab management", () => {
         it("returns unknown_command status", async () => {
             const result = await bgModule.handleCommand("nonsense", {});
             assert.equal(result.status, "unknown_command");
+        });
+    });
+
+    describe("toolbar icon state", () => {
+        // Verifies that extensionActive marks the tab active and enables the icon.
+        it("extensionActive enables icon for the tab", async () => {
+            const sender = makeSender(2);
+            await bgModule.handleCommand("extensionActive", sender, {});
+            assert.equal(bgModule.activeTabSet.has(2), true);
+            assert.equal(actionState[2].enabled, true);
+            assert.equal(actionState[2].title, "Vimium");
+        });
+
+        // Verifies that extensionInactive disables the icon for the tab.
+        it("extensionInactive disables icon for the tab", async () => {
+            const sender = makeSender(3);
+            bgModule.activeTabSet.add(3);
+            await bgModule.handleCommand("extensionInactive", sender, {});
+            assert.equal(bgModule.activeTabSet.has(3), false);
+            assert.equal(actionState[3].enabled, false);
+            assert.equal(actionState[3].title, "Vimium (disabled on this site)");
+        });
+
+        // Verifies that closing a tab cleans up its entry from activeTabSet.
+        it("tab removal cleans up activeTabSet", () => {
+            bgModule.activeTabSet.add(5);
+            assert.equal(bgModule.activeTabSet.has(5), true);
+            // Simulate tab removal by calling registered listeners
+            for (const fn of tabRemovedListeners) fn(5);
+            assert.equal(bgModule.activeTabSet.has(5), false);
+        });
+    });
+
+    describe("switchTab command", () => {
+        // Verifies that switchTab activates the specified tab by ID.
+        it("activates the specified tab", async () => {
+            const result = await bgModule.handleCommand("switchTab", {}, { tabId: 3 });
+            assert.equal(result.status, "ok");
+            assert.equal(activatedTabId, 3);
+        });
+
+        // Verifies that switchTab does nothing when no tabId is provided.
+        it("does nothing without tabId", async () => {
+            const result = await bgModule.handleCommand("switchTab", {}, {});
+            assert.equal(result.status, "ok");
+            assert.equal(activatedTabId, null);
         });
     });
 });

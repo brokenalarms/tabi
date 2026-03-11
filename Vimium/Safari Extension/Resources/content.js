@@ -60,6 +60,18 @@
             });
         }
 
+        // Clean up all mode overlays on navigation (page unload)
+        function cleanupModes() {
+            if (hintMode.isActive()) hintMode.deactivate();
+            if (findMode.isActive()) findMode.deactivate(true);
+            if (tabSearch.isActive()) tabSearch.deactivate();
+        }
+        window.addEventListener("beforeunload", cleanupModes);
+        window.addEventListener("pagehide", cleanupModes);
+
+        // Notify background that extension is active on this tab
+        browser.runtime.sendMessage({ command: "extensionActive" });
+
         // Expose for other modules (FindMode, TabSearch)
         window.__vimiumKeyHandler = keyHandler;
     }
@@ -67,7 +79,9 @@
     // Check exclusion list before activating
     browser.storage.local.get("excludedDomains").then((result) => {
         const excluded = result.excludedDomains || [];
-        if (!isDomainExcluded(excluded)) {
+        if (isDomainExcluded(excluded)) {
+            browser.runtime.sendMessage({ command: "extensionInactive" });
+        } else {
             initialize();
         }
     }).catch(() => {
