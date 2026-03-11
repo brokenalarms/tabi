@@ -2,6 +2,22 @@ import SafariServices
 import SwiftUI
 
 struct ContentView: View {
+    var body: some View {
+        TabView {
+            SetupTab()
+                .tabItem {
+                    Label("Setup", systemImage: "safari")
+                }
+            SettingsTab()
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape")
+                }
+        }
+        .frame(minWidth: 520, minHeight: 400)
+    }
+}
+
+struct SetupTab: View {
     @State private var extensionEnabled: Bool?
 
     var body: some View {
@@ -34,7 +50,6 @@ struct ContentView: View {
             }
         }
         .padding(40)
-        .frame(minWidth: 480, minHeight: 360)
         .onAppear(perform: checkExtensionState)
     }
 
@@ -64,5 +79,76 @@ struct ContentView: View {
                 extensionEnabled = state?.isEnabled ?? false
             }
         }
+    }
+}
+
+struct SettingsTab: View {
+    @State private var excludedDomains: [String] = []
+    @State private var newDomain: String = ""
+
+    private let settings = SettingsManager.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Excluded Domains")
+                .font(.headline)
+
+            Text("Vimium will be disabled on these domains.")
+                .foregroundStyle(.secondary)
+                .font(.subheadline)
+
+            List {
+                ForEach(excludedDomains, id: \.self) { domain in
+                    HStack {
+                        Text(domain)
+                            .font(.body.monospaced())
+                        Spacer()
+                        Button {
+                            removeDomain(domain)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .listStyle(.bordered)
+            .frame(minHeight: 150)
+
+            HStack {
+                TextField("example.com", text: $newDomain)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit(addDomain)
+
+                Button("Add", action: addDomain)
+                    .disabled(newDomain.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(24)
+        .onAppear {
+            excludedDomains = settings.excludedDomains
+        }
+    }
+
+    private func addDomain() {
+        let domain = newDomain
+            .trimmingCharacters(in: .whitespaces)
+            .lowercased()
+            .replacingOccurrences(of: "https://", with: "")
+            .replacingOccurrences(of: "http://", with: "")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+
+        guard !domain.isEmpty, !excludedDomains.contains(domain) else { return }
+
+        excludedDomains.append(domain)
+        excludedDomains.sort()
+        settings.excludedDomains = excludedDomains
+        newDomain = ""
+    }
+
+    private func removeDomain(_ domain: String) {
+        excludedDomains.removeAll { $0 == domain }
+        settings.excludedDomains = excludedDomains
     }
 }
