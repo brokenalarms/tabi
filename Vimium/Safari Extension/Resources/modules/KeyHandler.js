@@ -10,6 +10,9 @@ const Mode = Object.freeze({
 });
 
 const INPUT_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
+const NON_TEXT_INPUT_TYPES = new Set([
+    "checkbox", "radio", "submit", "button", "reset", "file", "image", "color", "range",
+]);
 const KEY_TIMEOUT_MS = 500;
 
 class KeyHandler {
@@ -178,8 +181,7 @@ class KeyHandler {
         if (INPUT_TAGS.has(el.tagName)) {
             if (el.tagName === "INPUT") {
                 const type = (el.type || "text").toLowerCase();
-                const nonText = new Set(["checkbox", "radio", "submit", "button", "reset", "file", "image", "color", "range"]);
-                return !nonText.has(type);
+                return !NON_TEXT_INPUT_TYPES.has(type);
             }
             return true;
         }
@@ -193,19 +195,9 @@ class KeyHandler {
             return;
         }
 
-        // In INSERT mode, only handle Escape
-        if (this.mode === Mode.INSERT) {
-            if (event.code === "Escape") {
-                event.preventDefault();
-                event.stopPropagation();
-                this._dispatch("exitToNormal");
-            }
-            return;
-        }
-
-        // In passthrough modes (HINTS, FIND, TAB_SEARCH), only handle Escape
-        // Other keys are consumed by those mode's own UI
-        if (this.mode === Mode.HINTS || this.mode === Mode.FIND || this.mode === Mode.TAB_SEARCH) {
+        // In non-NORMAL modes, only handle Escape — other keys are consumed
+        // by the mode's own UI (input fields, hint filter, find bar)
+        if (this.mode !== Mode.NORMAL) {
             if (event.code === "Escape") {
                 event.preventDefault();
                 event.stopPropagation();
