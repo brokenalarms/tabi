@@ -12,10 +12,17 @@
     // Link hint navigation
     const hintMode = new HintMode(keyHandler);
 
+    // In-page find
+    const findMode = new FindMode(keyHandler);
+
     // Default exitToNormal handler restores NORMAL mode
     keyHandler.on("exitToNormal", () => {
         if (keyHandler.getMode() === Mode.HINTS && hintMode.isActive()) {
             hintMode.deactivate();
+            return;
+        }
+        if (keyHandler.getMode() === Mode.FIND && findMode.isActive()) {
+            findMode.deactivate(true);
             return;
         }
         keyHandler.setMode(Mode.NORMAL);
