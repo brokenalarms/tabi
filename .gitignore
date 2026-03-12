@@ -7,6 +7,9 @@ DerivedData/
 build/
 *.xcworkspace
 
+# Node
+node_modules/
+
 # Dolt database files (added by bd init)
 .dolt/
 *.db
