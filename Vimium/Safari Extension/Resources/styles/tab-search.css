@@ -5,7 +5,7 @@
     right: 0;
     bottom: 0;
     z-index: 2147483647;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--vimium-tab-overlay-bg);
     display: flex;
     justify-content: center;
     align-items: flex-start;
@@ -16,9 +16,9 @@
 .vimium-tab-search-modal {
     width: 500px;
     max-width: 90vw;
-    background: #2a2a2a;
+    background: var(--vimium-tab-modal-bg);
     border-radius: 8px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    box-shadow: var(--vimium-tab-modal-shadow);
     overflow: hidden;
 }
 
@@ -26,9 +26,9 @@
     width: 100%;
     padding: 12px 16px;
     border: none;
-    border-bottom: 1px solid #444;
-    background: #333;
-    color: #eee;
+    border-bottom: 1px solid var(--vimium-tab-input-border);
+    background: var(--vimium-tab-input-bg);
+    color: var(--vimium-tab-input-color);
     font-size: 16px;
     font-family: inherit;
     outline: none;
@@ -36,7 +36,7 @@
 }
 
 .vimium-tab-search-modal input::placeholder {
-    color: #888;
+    color: var(--vimium-tab-placeholder-color);
 }
 
 .vimium-tab-search-results {
@@ -47,7 +47,7 @@
 .vimium-tab-search-item {
     padding: 8px 16px;
     cursor: pointer;
-    border-bottom: 1px solid #333;
+    border-bottom: 1px solid var(--vimium-tab-item-border);
 }
 
 .vimium-tab-search-item:last-child {
@@ -55,11 +55,11 @@
 }
 
 .vimium-tab-search-item.selected {
-    background: #4a9eff33;
+    background: var(--vimium-tab-item-selected-bg);
 }
 
 .vimium-tab-search-item-title {
-    color: #eee;
+    color: var(--vimium-tab-title-color);
     font-size: 14px;
     white-space: nowrap;
     overflow: hidden;
@@ -67,7 +67,7 @@
 }
 
 .vimium-tab-search-item-url {
-    color: #888;
+    color: var(--vimium-tab-url-color);
     font-size: 12px;
     white-space: nowrap;
     overflow: hidden;
@@ -77,7 +77,7 @@
 
 .vimium-tab-search-empty {
     padding: 16px;
-    color: #888;
+    color: var(--vimium-tab-empty-color);
     text-align: center;
     font-size: 14px;
 }

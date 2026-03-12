@@ -12,11 +12,11 @@
     position: fixed;
     z-index: 2147483647;
     padding: 1px 3px;
-    background: linear-gradient(to bottom, #fff785, #ffc542);
-    border: 1px solid #c38a22;
+    background: var(--vimium-hint-bg);
+    border: 1px solid var(--vimium-hint-border);
     border-radius: 3px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-    color: #302505;
+    box-shadow: var(--vimium-hint-shadow);
+    color: var(--vimium-hint-color);
     font: bold 12px/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif;
     text-transform: uppercase;
     pointer-events: none;
@@ -24,5 +24,5 @@
 }
 
 .vimium-hint .vimium-hint-matched {
-    opacity: 0.4;
+    opacity: var(--vimium-hint-matched-opacity);
 }
