@@ -72,6 +72,7 @@ targets:
           - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/KeyHandler.js
           - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/ScrollController.js
           - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/TabSearch.js
-    resources:
+    sources:
       - path: Vimium/Safari Extension/Resources
         buildPhase: resources
+        type: folder
