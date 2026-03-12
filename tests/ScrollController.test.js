@@ -55,6 +55,7 @@ function setupDOM() {
 
     global.getComputedStyle = (el) => el._style;
     global.history = { back: mock.fn(), forward: mock.fn() };
+    global.location = { reload: mock.fn() };
     global.clearTimeout = clearTimeout;
     global.setTimeout = setTimeout;
 }
@@ -234,6 +235,14 @@ describe("ScrollController", () => {
         it("L goes forward", () => {
             fireKeyDown(makeKeyEvent("KeyL", { shift: true }));
             assert.equal(global.history.forward.mock.callCount(), 1);
+        });
+    });
+
+    describe("Page refresh (r)", () => {
+        // Pressing r reloads the current page
+        it("r refreshes the page", () => {
+            fireKeyDown(makeKeyEvent("KeyR"));
+            assert.equal(global.location.reload.mock.callCount(), 1);
         });
     });
 

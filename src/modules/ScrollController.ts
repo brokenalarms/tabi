@@ -95,6 +95,7 @@ class ScrollController {
 
     kh.on("goBack", () => history.back());
     kh.on("goForward", () => history.forward());
+    kh.on("pageRefresh", () => location.reload());
   }
 
   destroy(): void {
@@ -102,7 +103,7 @@ class ScrollController {
       "scrollDown", "scrollUp", "scrollRight", "scrollLeft",
       "scrollHalfPageDown", "scrollHalfPageUp",
       "scrollToTop", "scrollToBottom",
-      "goBack", "goForward",
+      "goBack", "goForward", "pageRefresh",
     ];
     for (const cmd of commands) {
       this._keyHandler.off(cmd);
