@@ -7,32 +7,32 @@
     display: flex;
     align-items: center;
     padding: 6px 12px;
-    background: #333;
-    border-top: 1px solid #555;
+    background: var(--vimium-find-bg);
+    border-top: 1px solid var(--vimium-find-border);
     font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
     font-size: 14px;
-    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--vimium-find-shadow);
 }
 
 .vimium-find-bar input {
     flex: 1;
     padding: 4px 8px;
-    border: 1px solid #666;
+    border: 1px solid var(--vimium-find-input-border);
     border-radius: 3px;
-    background: #1a1a1a;
-    color: #eee;
+    background: var(--vimium-find-input-bg);
+    color: var(--vimium-find-input-color);
     font-size: 14px;
     font-family: inherit;
     outline: none;
 }
 
 .vimium-find-bar input:focus {
-    border-color: #4a9eff;
+    border-color: var(--vimium-find-input-focus-border);
 }
 
 .vimium-find-bar .vimium-find-count {
     margin-left: 8px;
-    color: #aaa;
+    color: var(--vimium-find-count-color);
     font-size: 12px;
     white-space: nowrap;
 }
