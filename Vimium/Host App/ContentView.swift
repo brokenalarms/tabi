@@ -82,14 +82,84 @@ struct SetupTab: View {
     }
 }
 
+private let extensionIdentifier = "com.anthropic.Vimium.Extension"
+
 struct SettingsTab: View {
+    @State private var keyBindingMode: String = "location"
+    @State private var theme: String = "yellow"
     @State private var excludedDomains: [String] = []
     @State private var newDomain: String = ""
 
     private let settings = SettingsManager.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 24) {
+                keyBindingSection
+                Divider()
+                themeSection
+                Divider()
+                excludedDomainsSection
+                Divider()
+                safariTip
+            }
+            .padding(24)
+        }
+        .onAppear {
+            keyBindingMode = settings.keyBindingMode
+            theme = settings.theme
+            excludedDomains = settings.excludedDomains
+        }
+    }
+
+    // MARK: - Key Binding Mode
+
+    private var keyBindingSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Key Binding Mode")
+                .font(.headline)
+
+            Picker("Key Binding Mode", selection: $keyBindingMode) {
+                Text("By Position").tag("location")
+                Text("By Character").tag("character")
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: keyBindingMode) { newValue in
+                settings.keyBindingMode = newValue
+                notifyExtension()
+            }
+
+            Text("Position matches physical key location (same across layouts). Character matches what you type (for Dvorak, Colemak, etc.).")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: - Theme
+
+    private var themeSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Theme")
+                .font(.headline)
+
+            Picker("Theme", selection: $theme) {
+                Text("Yellow").tag("yellow")
+                Text("Dark").tag("dark")
+                Text("Light").tag("light")
+                Text("Auto").tag("auto")
+            }
+            .pickerStyle(.segmented)
+            .onChange(of: theme) { newValue in
+                settings.theme = newValue
+                notifyExtension()
+            }
+        }
+    }
+
+    // MARK: - Excluded Domains
+
+    private var excludedDomainsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
             Text("Excluded Domains")
                 .font(.headline)
 
@@ -125,11 +195,21 @@ struct SettingsTab: View {
                     .disabled(newDomain.trimmingCharacters(in: .whitespaces).isEmpty)
             }
         }
-        .padding(24)
-        .onAppear {
-            excludedDomains = settings.excludedDomains
+    }
+
+    // MARK: - Safari Tip
+
+    private var safariTip: some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "info.circle")
+                .foregroundStyle(.secondary)
+            Text("Safari may also prompt you to allow Vimium on each site individually. You can grant access for all websites in Safari → Settings → Extensions → Vimium.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
         }
     }
+
+    // MARK: - Actions
 
     private func addDomain() {
         let domain = newDomain
@@ -145,10 +225,19 @@ struct SettingsTab: View {
         excludedDomains.sort()
         settings.excludedDomains = excludedDomains
         newDomain = ""
+        notifyExtension()
     }
 
     private func removeDomain(_ domain: String) {
         excludedDomains.removeAll { $0 == domain }
         settings.excludedDomains = excludedDomains
+        notifyExtension()
+    }
+
+    private func notifyExtension() {
+        SFSafariApplication.dispatchMessage(
+            withName: "settingsChanged",
+            toExtensionWithIdentifier: extensionIdentifier
+        )
     }
 }
