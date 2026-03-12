@@ -55,8 +55,21 @@ function makeElement(tag, opts = {}) {
             }
             return false;
         },
+        closest(sel) {
+            // Minimal closest shim — supports "[inert]" and "label"
+            let node = this;
+            while (node) {
+                if (sel === "[inert]" && node._attrs && node._attrs["inert"] != null) return node;
+                if (sel === "label" && node.tagName === "LABEL") return node;
+                node = node.parentElement;
+            }
+            return null;
+        },
         focus: mock.fn(),
         click: mock.fn(),
+        addEventListener(type, fn) {
+            if (type === "animationend" || type === "transitionend") fn();
+        },
         querySelector(sel) {
             const matches = this.querySelectorAll(sel);
             return matches.length > 0 ? matches[0] : null;
@@ -134,6 +147,10 @@ function setupDOM(elements = []) {
                     contains(c) { return classes.has(c); },
                 },
                 offsetHeight: 0,
+                // Fire animation/transition listeners synchronously (no real animations in tests)
+                addEventListener(type, fn) {
+                    if (type === "animationend" || type === "transitionend") fn();
+                },
                 appendChild(child) {
                     this.children.push(child);
                     child.parentNode = this;
@@ -162,6 +179,22 @@ function setupDOM(elements = []) {
             }
             return best;
         },
+        elementsFromPoint(x, y) {
+            // Return all elements whose rect contains the point, smallest first
+            const hits = [];
+            for (const el of elements) {
+                const rect = el.getBoundingClientRect();
+                if (x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom) {
+                    hits.push(el);
+                }
+            }
+            hits.sort((a, b) => {
+                const ra = a.getBoundingClientRect();
+                const rb = b.getBoundingClientRect();
+                return (ra.width * ra.height) - (rb.width * rb.height);
+            });
+            return hits;
+        },
     };
 
     // Make body appendable
@@ -187,7 +220,6 @@ function setupDOM(elements = []) {
     };
     global.getComputedStyle = (el) => el._style || { visibility: "visible", display: "block", opacity: "1", cursor: "default" };
     global.clearTimeout = clearTimeout;
-    global.setTimeout = setTimeout;
     global.browser = {
         runtime: { sendMessage: mock.fn() },
     };
@@ -344,10 +376,13 @@ describe("HintMode", () => {
 
             loadModules([wrapper, textarea]);
 
-            // Need elementFromPoint to return the element itself for visibility
+            // Need elementFromPoint/elementsFromPoint to return the element itself for visibility
             global.document.elementFromPoint = (x, y) => {
                 // Return the textarea for any point check (both are at same position)
                 return textarea;
+            };
+            global.document.elementsFromPoint = (x, y) => {
+                return [textarea, wrapper];
             };
 
             hintMode.activate(false);

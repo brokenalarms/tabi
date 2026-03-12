@@ -555,23 +555,27 @@ class HintMode {
 
   private _activateHint(hint: Hint): void {
     const element = hint.element;
-    const targetEl = this._getHintTargetElement(element);
 
     this._activating = true;
 
-    // Flash the matched hint tag
-    if (hint.div.classList) hint.div.classList.add("vimium-hint-active");
-
-    // Highlight the resolved target element (same area the tag points to)
-    if (targetEl.classList) {
-      targetEl.classList.add("vimium-target-flash");
-      setTimeout(() => {
-        targetEl.classList.remove("vimium-target-flash");
-      }, 300);
+    // Hide all other hints, animate only the matched one
+    for (const h of this._hints) {
+      if (h !== hint) h.div.style.display = "none";
     }
 
-    // Delay deactivation so the tag animation is visible
-    setTimeout(() => {
+    // Compute offset from tag toward center of the target element
+    const targetRect = this._getHintRect(element);
+    const tagRect = hint.div.getBoundingClientRect ? hint.div.getBoundingClientRect() : null;
+    if (tagRect && tagRect.width > 0) {
+      const dx = (targetRect.left + targetRect.width / 2) - (tagRect.left + tagRect.width / 2);
+      const dy = (targetRect.top + targetRect.height / 2) - (tagRect.top + tagRect.height / 2);
+      hint.div.style.setProperty("--poof-x", dx + "px");
+      hint.div.style.setProperty("--poof-y", dy + "px");
+    }
+
+    if (hint.div.classList) hint.div.classList.add("vimium-hint-active");
+
+    const afterCollapse = (): void => {
       this._deactivate();
 
       if (this._newTab && element.tagName === "A" && (element as HTMLAnchorElement).href) {
@@ -583,7 +587,13 @@ class HintMode {
         element.focus();
         element.click();
       }
-    }, 120);
+    };
+
+    if (HINT_ANIMATE && hint.div.addEventListener) {
+      hint.div.addEventListener("animationend", afterCollapse, { once: true });
+    } else {
+      afterCollapse();
+    }
   }
 
   // --- Cleanup ---
@@ -600,9 +610,9 @@ class HintMode {
     if (HINT_ANIMATE && this._overlay) {
       this._overlay.classList.remove("visible");
       const overlay = this._overlay;
-      setTimeout(() => {
+      overlay.addEventListener("transitionend", () => {
         if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-      }, 80);
+      }, { once: true });
       this._overlay = null;
     } else if (this._overlay && this._overlay.parentNode) {
       this._overlay.parentNode.removeChild(this._overlay);
