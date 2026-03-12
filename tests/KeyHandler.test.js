@@ -18,6 +18,7 @@ class FakeElement {
 function makeKeyEvent(code, opts = {}) {
     return {
         code,
+        key: opts.key || "",
         shiftKey: opts.shift || false,
         ctrlKey: opts.ctrl || false,
         altKey: opts.alt || false,
@@ -348,6 +349,69 @@ describe("KeyHandler", () => {
             const ev = makeKeyEvent("KeyJ");
             fireKeyDown(ev);
             assert.equal(ev.preventDefault.mock.callCount(), 0);
+        });
+    });
+
+    describe("Key binding mode — character mode", () => {
+        // Verifies that character mode maps event.key letters to KeyX codes
+        // so Dvorak/Colemak users get bindings based on character, not position
+        it("maps lowercase letter via event.key in character mode", () => {
+            // Dvorak: physical KeyS produces 'o' — character mode should normalize to KeyO
+            const ev = makeKeyEvent("KeyS", { key: "o" });
+            assert.equal(KeyHandler.normalizeKey(ev, "character"), "KeyO");
+        });
+
+        it("maps uppercase letter with Shift in character mode", () => {
+            const ev = makeKeyEvent("KeyS", { key: "O", shift: true });
+            assert.equal(KeyHandler.normalizeKey(ev, "character"), "Shift-KeyO");
+        });
+
+        it("maps digit via event.key in character mode", () => {
+            const ev = makeKeyEvent("Digit5", { key: "5" });
+            assert.equal(KeyHandler.normalizeKey(ev, "character"), "Digit5");
+        });
+
+        it("falls back to event.code for symbols in character mode", () => {
+            // Shift+Digit4 produces '$' — should use event.code
+            const ev = makeKeyEvent("Digit4", { key: "$", shift: true });
+            assert.equal(KeyHandler.normalizeKey(ev, "character"), "Shift-Digit4");
+        });
+
+        it("falls back to event.code for special keys in character mode", () => {
+            const ev = makeKeyEvent("Escape", { key: "Escape" });
+            assert.equal(KeyHandler.normalizeKey(ev, "character"), "Escape");
+        });
+
+        it("uses event.code in location mode (default)", () => {
+            // In location mode, event.key is ignored — physical position matters
+            const ev = makeKeyEvent("KeyS", { key: "o" });
+            assert.equal(KeyHandler.normalizeKey(ev, "location"), "KeyS");
+        });
+
+        it("defaults to location mode when no mode specified", () => {
+            const ev = makeKeyEvent("KeyS", { key: "o" });
+            assert.equal(KeyHandler.normalizeKey(ev), "KeyS");
+        });
+
+        // Verifies that setKeyBindingMode affects key dispatch
+        it("dispatches based on character when mode is set to character", () => {
+            let called = false;
+            keyHandler.setKeyBindingMode("character");
+            keyHandler.on("scrollDown", () => { called = true; });
+            // Simulate Dvorak: physical KeyH produces 'j' character
+            const ev = makeKeyEvent("KeyH", { key: "j" });
+            fireKeyDown(ev);
+            assert.ok(called, "scrollDown should fire for 'j' character on Dvorak layout");
+        });
+
+        it("dispatches based on position when mode is location", () => {
+            let called = false;
+            keyHandler.setKeyBindingMode("location");
+            keyHandler.on("scrollDown", () => { called = true; });
+            // Physical KeyJ, even if key is something else
+            const ev = makeKeyEvent("KeyJ", { key: "c" });
+            fireKeyDown(ev);
+            assert.ok(called, "scrollDown should fire for physical KeyJ in location mode");
         });
     });
 });

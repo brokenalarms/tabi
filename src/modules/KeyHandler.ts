@@ -1,7 +1,7 @@
 // KeyHandler — mode-aware keyboard event router for Vimium
 // Uses event.code for positional key bindings (layout-independent).
 
-import type { ModeValue } from "../types";
+import type { KeyBindingMode, ModeValue } from "../types";
 
 const Mode = {
   NORMAL: "NORMAL",
@@ -21,6 +21,7 @@ type ModeListener = (newMode: ModeValue, prevMode: ModeValue) => void;
 
 class KeyHandler {
   mode: ModeValue;
+  private _keyBindingMode: KeyBindingMode;
   private _keyBuffer: string;
   private _keyTimer: ReturnType<typeof setTimeout> | null;
   private _bindings: Map<string, Map<string, string>>;
@@ -34,6 +35,7 @@ class KeyHandler {
 
   constructor() {
     this.mode = Mode.NORMAL;
+    this._keyBindingMode = "location";
     this._keyBuffer = "";
     this._keyTimer = null;
     this._bindings = new Map();
@@ -67,6 +69,10 @@ class KeyHandler {
     this._modeListeners.push(fn);
   }
 
+  setKeyBindingMode(mode: KeyBindingMode): void {
+    this._keyBindingMode = mode;
+  }
+
   on(commandName: string, callback: () => void): void {
     this._commands.set(commandName, callback);
   }
@@ -97,13 +103,35 @@ class KeyHandler {
 
   // --- Key normalization ---
 
-  static normalizeKey(event: KeyboardEvent): string {
+  static normalizeKey(event: KeyboardEvent, keyBindingMode: KeyBindingMode = "location"): string {
     const parts: string[] = [];
     if (event.ctrlKey) parts.push("Ctrl");
     if (event.altKey) parts.push("Alt");
     if (event.metaKey) parts.push("Meta");
-    if (event.shiftKey) parts.push("Shift");
-    parts.push(event.code);
+
+    let code: string;
+    if (keyBindingMode === "character") {
+      const key = event.key;
+      if (key.length === 1 && key >= "a" && key <= "z") {
+        if (event.shiftKey) parts.push("Shift");
+        code = "Key" + key.toUpperCase();
+      } else if (key.length === 1 && key >= "A" && key <= "Z") {
+        if (event.shiftKey) parts.push("Shift");
+        code = "Key" + key;
+      } else if (key.length === 1 && key >= "0" && key <= "9") {
+        if (event.shiftKey) parts.push("Shift");
+        code = "Digit" + key;
+      } else {
+        // Symbols, special keys: use event.code directly
+        if (event.shiftKey) parts.push("Shift");
+        code = event.code;
+      }
+    } else {
+      if (event.shiftKey) parts.push("Shift");
+      code = event.code;
+    }
+
+    parts.push(code);
     return parts.join("-");
   }
 
@@ -223,7 +251,7 @@ class KeyHandler {
     }
 
     // NORMAL mode key processing
-    const key = KeyHandler.normalizeKey(event);
+    const key = KeyHandler.normalizeKey(event, this._keyBindingMode);
     const candidate = this._keyBuffer ? this._keyBuffer + " " + key : key;
 
     const modeBindings = this._bindings.get(this.mode);
