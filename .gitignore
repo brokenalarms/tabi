@@ -1,6 +1,7 @@
 .ralph
 .claude
 .beads
+.DS_Store
 
 # Xcode
 *.xcodeproj/
