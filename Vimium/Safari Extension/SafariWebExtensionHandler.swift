@@ -27,6 +27,12 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         switch command {
         case "getExcludedDomains":
             responseData = ["excludedDomains": settings.excludedDomains]
+        case "getSettings":
+            responseData = [
+                "excludedDomains": settings.excludedDomains,
+                "keyBindingMode": settings.keyBindingMode,
+                "theme": settings.theme,
+            ]
         default:
             responseData = ["status": "ok"]
         }
