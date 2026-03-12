@@ -6,7 +6,6 @@ export type Theme = "classic" | "dark" | "light" | "auto";
 export interface VimiumSettings {
   keyBindingMode: KeyBindingMode;
   theme: Theme;
-  enableHints: string;
   enablePointerTails: string;
 }
 

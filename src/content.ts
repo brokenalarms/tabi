@@ -134,9 +134,7 @@ function initialize(settings: Partial<VimiumSettings>): void {
 
   // Link hint navigation
   const hintMode = new HintMode(keyHandler);
-  if (settings.enableHints !== "false") {
-    hintMode.wireCommands();
-  }
+  hintMode.wireCommands();
   if (settings.enablePointerTails === "true") {
     hintMode.setPointerTails(true);
   }
@@ -159,14 +157,6 @@ function initialize(settings: Partial<VimiumSettings>): void {
     }
     if (changes.theme?.newValue) {
       applyTheme(changes.theme.newValue as Theme);
-    }
-    if (changes.enableHints) {
-      if (changes.enableHints.newValue === "false") {
-        hintMode.unwireCommands();
-        if (hintMode.isActive()) hintMode.deactivate();
-      } else {
-        hintMode.wireCommands();
-      }
     }
     if (changes.enablePointerTails) {
       hintMode.setPointerTails(changes.enablePointerTails.newValue === "true");
@@ -264,7 +254,7 @@ function initialize(settings: Partial<VimiumSettings>): void {
 }
 
 // Read all settings and initialize
-browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme", "enableHints", "enablePointerTails"]).then((result) => {
+browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme", "enablePointerTails"]).then((result) => {
   const excluded = (result.excludedDomains as string[]) || [];
   if (isDomainExcluded(excluded)) {
     browser.runtime.sendMessage({ command: "extensionInactive" });
@@ -272,7 +262,6 @@ browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme", "enable
     initialize({
       keyBindingMode: result.keyBindingMode as KeyBindingMode | undefined,
       theme: result.theme as Theme | undefined,
-      enableHints: result.enableHints as string | undefined,
       enablePointerTails: result.enablePointerTails as string | undefined,
     });
   }

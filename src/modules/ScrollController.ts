@@ -10,9 +10,16 @@ interface KeyHandlerLike {
   off(command: string): void;
 }
 
-const SCROLL_STEP = 60;
-const SCROLL_DURATION_MS = 150;
-const SCROLL_JUMP_MAX_MS = 380;
+const ScrollConfig = {
+  /** Pixels per j/k keystroke */
+  scrollStep: 60,
+  /** Animation duration (ms) for j/k step scrolls */
+  scrollDurationMs: 150,
+  /** Max animation duration (ms) for gg/G jump scrolls */
+  jumpMaxMs: 500,
+  /** Log-scale factor for jump duration — higher = longer animation for large distances */
+  jumpLogScale: 20,
+};
 
 class ScrollController {
   private _keyHandler: KeyHandlerLike;
@@ -68,7 +75,7 @@ class ScrollController {
     target: Element,
     deltaX: number,
     deltaY: number,
-    duration: number = SCROLL_DURATION_MS,
+    duration: number = ScrollConfig.scrollDurationMs,
   ): void {
     const existing = ScrollController._activeAnimations.get(target);
     if (existing) cancelAnimationFrame(existing);
@@ -107,7 +114,7 @@ class ScrollController {
   private static _jumpDuration(distance: number): number {
     if (distance === 0) return 0;
     // Scale duration with distance: short jumps stay snappy, long jumps ease in smoothly
-    return Math.min(SCROLL_DURATION_MS + Math.log2(1 + Math.abs(distance)) * 20, SCROLL_JUMP_MAX_MS);
+    return Math.min(ScrollConfig.scrollDurationMs + Math.log2(1 + Math.abs(distance)) * ScrollConfig.jumpLogScale, ScrollConfig.jumpMaxMs);
   }
 
   static scrollToTop(): void {
@@ -127,10 +134,10 @@ class ScrollController {
   private _wireCommands(): void {
     const kh = this._keyHandler;
 
-    kh.on("scrollDown", () => ScrollController.scrollBy("y", SCROLL_STEP));
-    kh.on("scrollUp", () => ScrollController.scrollBy("y", -SCROLL_STEP));
-    kh.on("scrollRight", () => ScrollController.scrollBy("x", SCROLL_STEP));
-    kh.on("scrollLeft", () => ScrollController.scrollBy("x", -SCROLL_STEP));
+    kh.on("scrollDown", () => ScrollController.scrollBy("y", ScrollConfig.scrollStep));
+    kh.on("scrollUp", () => ScrollController.scrollBy("y", -ScrollConfig.scrollStep));
+    kh.on("scrollRight", () => ScrollController.scrollBy("x", ScrollConfig.scrollStep));
+    kh.on("scrollLeft", () => ScrollController.scrollBy("x", -ScrollConfig.scrollStep));
 
     kh.on("scrollHalfPageDown", () => {
       const target = ScrollController.findScrollTarget("y");
@@ -165,5 +172,5 @@ class ScrollController {
 // Export for Node.js tests; no-op in browser content script context
 if (typeof globalThis !== "undefined") {
   (globalThis as Record<string, unknown>).ScrollController = ScrollController;
-  (globalThis as Record<string, unknown>).SCROLL_STEP = SCROLL_STEP;
+  (globalThis as Record<string, unknown>).ScrollConfig = ScrollConfig;
 }

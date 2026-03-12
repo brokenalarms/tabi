@@ -185,36 +185,36 @@ describe("ScrollController", () => {
     });
 
     describe("Step scroll (j/k/h/l)", () => {
-        // Pressing j smooth-scrolls the document down by SCROLL_STEP pixels
+        // Pressing j smooth-scrolls the document down by ScrollConfig.scrollStep pixels
         it("j scrolls down", () => {
             fireKeyDown(makeKeyEvent("KeyJ"));
             // Flush animation to completion (timestamp well past duration)
             flushRAF(1000);
-            assert.equal(documentScrollingElement.scrollTop, SCROLL_STEP);
+            assert.equal(documentScrollingElement.scrollTop, ScrollConfig.scrollStep);
             assert.equal(documentScrollingElement.scrollLeft, 0);
         });
 
-        // Pressing k smooth-scrolls the document up by SCROLL_STEP pixels
+        // Pressing k smooth-scrolls the document up by ScrollConfig.scrollStep pixels
         it("k scrolls up", () => {
             documentScrollingElement.scrollTop = 200;
             fireKeyDown(makeKeyEvent("KeyK"));
             flushRAF(1000);
-            assert.equal(documentScrollingElement.scrollTop, 200 - SCROLL_STEP);
+            assert.equal(documentScrollingElement.scrollTop, 200 - ScrollConfig.scrollStep);
         });
 
-        // Pressing l smooth-scrolls right by SCROLL_STEP pixels
+        // Pressing l smooth-scrolls right by ScrollConfig.scrollStep pixels
         it("l scrolls right", () => {
             fireKeyDown(makeKeyEvent("KeyL"));
             flushRAF(1000);
-            assert.equal(documentScrollingElement.scrollLeft, SCROLL_STEP);
+            assert.equal(documentScrollingElement.scrollLeft, ScrollConfig.scrollStep);
         });
 
-        // Pressing h smooth-scrolls left by SCROLL_STEP pixels
+        // Pressing h smooth-scrolls left by ScrollConfig.scrollStep pixels
         it("h scrolls left", () => {
             documentScrollingElement.scrollLeft = 200;
             fireKeyDown(makeKeyEvent("KeyH"));
             flushRAF(1000);
-            assert.equal(documentScrollingElement.scrollLeft, 200 - SCROLL_STEP);
+            assert.equal(documentScrollingElement.scrollLeft, 200 - ScrollConfig.scrollStep);
         });
     });
 
@@ -269,7 +269,7 @@ describe("ScrollController", () => {
             fireKeyDown(makeKeyEvent("KeyJ"));
             // Flush at half the duration (75ms) — easeOut(0.5) = 0.75
             flushRAF(75);
-            const expected = SCROLL_STEP * 0.75;
+            const expected = ScrollConfig.scrollStep * 0.75;
             assert.ok(
                 Math.abs(documentScrollingElement.scrollTop - expected) < 1,
                 `expected ~${expected}, got ${documentScrollingElement.scrollTop}`,
@@ -283,8 +283,8 @@ describe("ScrollController", () => {
             documentScrollingElement.scrollTop = 30; // simulate partial progress
             fireKeyDown(makeKeyEvent("KeyJ"));
             flushRAF(1000);
-            // Should have scrolled SCROLL_STEP from the position at the time of the second press (30)
-            assert.equal(documentScrollingElement.scrollTop, 30 + SCROLL_STEP);
+            // Should have scrolled ScrollConfig.scrollStep from the position at the time of the second press (30)
+            assert.equal(documentScrollingElement.scrollTop, 30 + ScrollConfig.scrollStep);
         });
     });
 
