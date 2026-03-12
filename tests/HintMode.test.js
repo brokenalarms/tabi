@@ -400,6 +400,64 @@ describe("HintMode", () => {
         });
     });
 
+    describe("Disclosure trigger dedup", () => {
+        // Disclosure button filtered when sibling link exists
+        it("filters disclosure button when sibling link exists", () => {
+            const parent = makeElement("LI", { top: 0, left: 0 });
+            const link = makeElement("A", { href: "#", top: 10, left: 0 });
+            const btn = makeElement("BUTTON", {
+                top: 10, left: 0,
+                attrs: { "aria-expanded": "false", "aria-controls": "submenu-1" },
+            });
+            link.parentElement = parent;
+            btn.parentElement = parent;
+
+            loadModules([link, btn]);
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive());
+            // 1 hint → single-char label "s"; typing "s" activates it
+            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
+            assert.ok(!hintMode.isActive(), "Expected 1 hint (link only), disclosure button should be filtered");
+        });
+
+        // Disclosure button kept when alone in parent (accordion pattern)
+        it("keeps disclosure button when alone in parent", () => {
+            const parent = makeElement("DIV", { top: 0, left: 0 });
+            const btn = makeElement("BUTTON", {
+                top: 10, left: 0,
+                attrs: { "aria-expanded": "false", "aria-controls": "panel-1" },
+            });
+            btn.parentElement = parent;
+
+            loadModules([btn]);
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive());
+            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
+            assert.ok(!hintMode.isActive(), "Expected 1 hint (lone disclosure button should be kept)");
+        });
+
+        // Regular button without aria-expanded is not affected
+        it("does not filter regular button without aria-expanded", () => {
+            const parent = makeElement("LI", { top: 0, left: 0 });
+            const link = makeElement("A", { href: "#", top: 10, left: 0 });
+            const btn = makeElement("BUTTON", { top: 10, left: 50 });
+            link.parentElement = parent;
+            btn.parentElement = parent;
+
+            loadModules([link, btn]);
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive());
+            // 2 hints → single-char labels "s" and "a"
+            // Type "s" to activate link, then reactivate and type "a" to activate button
+            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
+            assert.equal(link.click.mock.callCount(), 1, "Link hint should work");
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive(), "Should reactivate with 2 hints (button not filtered)");
+            fireKeyDown(makeKeyEvent("KeyA", { key: "a" }));
+            assert.equal(btn.click.mock.callCount(), 1, "Button hint should work (not filtered)");
+        });
+    });
+
     describe("Progressive filtering", () => {
         // Typing a label character narrows visible hints
         it("hides non-matching hints as user types", () => {

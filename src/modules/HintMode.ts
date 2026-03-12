@@ -197,6 +197,25 @@ class HintMode {
       }
     }
 
+    // Dedup 4: Remove disclosure triggers (aria-expanded + aria-controls)
+    // when a sibling candidate exists. These are hover-activated submenu
+    // buttons that are visually hidden but have DOM dimensions.
+    for (const el of result) {
+      if (toRemove.has(el)) continue;
+      if (el.getAttribute("aria-expanded") == null) continue;
+      if (!el.getAttribute("aria-controls")) continue;
+
+      const parent = el.parentElement;
+      if (!parent) continue;
+
+      for (const sibling of result) {
+        if (sibling !== el && !toRemove.has(sibling) && sibling.parentElement === parent) {
+          toRemove.add(el);
+          break;
+        }
+      }
+    }
+
     return result.filter(el => !toRemove.has(el));
   }
 
@@ -339,13 +358,13 @@ class HintMode {
     }
 
     if (rect.width > window.innerWidth * 0.25) {
-      const child = el.querySelector(
+      const children = el.querySelectorAll(
         "h1, h2, h3, h4, h5, h6, button, svg, [role='button'], [class*='icon'], [class*='chevron'], [class*='arrow']"
       );
-      if (child) {
-        const cr = child.getBoundingClientRect();
+      for (let i = 0; i < children.length; i++) {
+        const cr = children[i].getBoundingClientRect();
         if (cr.width > 0 && cr.height > 0 && cr.width < rect.width * 0.5) {
-          return child as HTMLElement;
+          return children[i] as HTMLElement;
         }
       }
     }

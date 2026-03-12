@@ -25,6 +25,7 @@ The hint system discovers clickable elements, computes their visual position, an
 - **Ancestor removal** — When both a container and its descendant are candidates, remove the container (the descendant is the real target).
 - **Label/input dedup** — When both a `<label for="X">` and `<input id="X">` are candidates, keep only the input (its hint already uses the label's position via `_findAssociatedLabel`).
 - **Hash-link/label dedup** — CSS checkbox hacks use both `<a href="#X">` and `<label for="X">` to control the same toggle. When the label is a candidate, remove the hash-link anchor. The anchor is typically a wide overlay with screen-reader-only text, producing a mispositioned hint; the label has the correct visual position.
+- **Disclosure trigger dedup** — WAI-ARIA disclosure buttons (`[aria-expanded][aria-controls]`) are hover-activated submenu triggers that are visually hidden but have DOM dimensions. When a sibling candidate exists in the same parent, remove the disclosure button (the sibling link is the real target). Preserves lone disclosure buttons (accordion headers) where the toggle IS the primary interaction.
 
 ## Overlay & positioning strategy
 
