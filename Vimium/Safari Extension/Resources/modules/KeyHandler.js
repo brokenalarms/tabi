@@ -21,6 +21,7 @@ const KEY_TIMEOUT_MS = 500;
 class KeyHandler {
   constructor() {
     this.mode = Mode.NORMAL;
+    this._keyBindingMode = "location";
     this._keyBuffer = "";
     this._keyTimer = null;
     this._bindings = /* @__PURE__ */ new Map();
@@ -47,6 +48,9 @@ class KeyHandler {
   onModeChange(fn) {
     this._modeListeners.push(fn);
   }
+  setKeyBindingMode(mode) {
+    this._keyBindingMode = mode;
+  }
   on(commandName, callback) {
     this._commands.set(commandName, callback);
   }
@@ -71,13 +75,32 @@ class KeyHandler {
     this._rebuildPrefixes(mode);
   }
   // --- Key normalization ---
-  static normalizeKey(event) {
+  static normalizeKey(event, keyBindingMode = "location") {
     const parts = [];
     if (event.ctrlKey) parts.push("Ctrl");
     if (event.altKey) parts.push("Alt");
     if (event.metaKey) parts.push("Meta");
-    if (event.shiftKey) parts.push("Shift");
-    parts.push(event.code);
+    let code;
+    if (keyBindingMode === "character") {
+      const key = event.key;
+      if (key.length === 1 && key >= "a" && key <= "z") {
+        if (event.shiftKey) parts.push("Shift");
+        code = "Key" + key.toUpperCase();
+      } else if (key.length === 1 && key >= "A" && key <= "Z") {
+        if (event.shiftKey) parts.push("Shift");
+        code = "Key" + key;
+      } else if (key.length === 1 && key >= "0" && key <= "9") {
+        if (event.shiftKey) parts.push("Shift");
+        code = "Digit" + key;
+      } else {
+        if (event.shiftKey) parts.push("Shift");
+        code = event.code;
+      }
+    } else {
+      if (event.shiftKey) parts.push("Shift");
+      code = event.code;
+    }
+    parts.push(code);
     return parts.join("-");
   }
   // --- Internals ---
@@ -176,7 +199,7 @@ class KeyHandler {
       }
       return;
     }
-    const key = KeyHandler.normalizeKey(event);
+    const key = KeyHandler.normalizeKey(event, this._keyBindingMode);
     const candidate = this._keyBuffer ? this._keyBuffer + " " + key : key;
     const modeBindings = this._bindings.get(this.mode);
     const modePrefixes = this._prefixes.get(this.mode);
