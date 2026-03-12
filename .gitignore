@@ -8,6 +8,9 @@ DerivedData/
 build/
 *.xcworkspace
 
+# Build output (compiled from src/*.ts)
+Vimium/Safari Extension/Resources/**/*.js
+
 # Node
 node_modules/
 

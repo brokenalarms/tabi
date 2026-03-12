@@ -48,6 +48,30 @@ targets:
         INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.Safari.web-extension
         INFOPLIST_KEY_NSExtension_NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).SafariWebExtensionHandler"
         OTHER_LDFLAGS: ["-framework", "SafariServices"]
+    preBuildScripts:
+      - name: Compile TypeScript
+        script: |
+          cd "$PROJECT_DIR"
+          export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+          npm run build
+        inputFiles:
+          - $(PROJECT_DIR)/src/background.ts
+          - $(PROJECT_DIR)/src/content.ts
+          - $(PROJECT_DIR)/src/types.ts
+          - $(PROJECT_DIR)/src/modules/FindMode.ts
+          - $(PROJECT_DIR)/src/modules/HintMode.ts
+          - $(PROJECT_DIR)/src/modules/KeyHandler.ts
+          - $(PROJECT_DIR)/src/modules/ScrollController.ts
+          - $(PROJECT_DIR)/src/modules/TabSearch.ts
+        outputFiles:
+          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/background.js
+          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/content.js
+          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/types.js
+          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/FindMode.js
+          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/HintMode.js
+          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/KeyHandler.js
+          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/ScrollController.js
+          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/TabSearch.js
     resources:
       - path: Vimium/Safari Extension/Resources
         buildPhase: resources
