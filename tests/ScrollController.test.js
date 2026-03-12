@@ -100,10 +100,13 @@ function flushRAF(timestamp) {
 function loadModules() {
     setupDOM();
     const path = require("node:path");
+    const cmdPath = path.resolve(__dirname, "../Vimium/Safari Extension/Resources/commands.js");
     const khPath = path.resolve(__dirname, "../Vimium/Safari Extension/Resources/modules/KeyHandler.js");
     const scPath = path.resolve(__dirname, "../Vimium/Safari Extension/Resources/modules/ScrollController.js");
+    delete require.cache[cmdPath];
     delete require.cache[khPath];
     delete require.cache[scPath];
+    require(cmdPath);
     require(khPath);
     require(scPath);
     keyHandler = new global.KeyHandler();

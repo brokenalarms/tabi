@@ -5,13 +5,13 @@ import type { KeyBindingMode, ModeValue } from "../types";
 
 declare const COMMANDS: Record<string, string>;
 
-const Mode = {
-  NORMAL: "NORMAL",
-  INSERT: "INSERT",
-  HINTS: "HINTS",
-  FIND: "FIND",
-  TAB_SEARCH: "TAB_SEARCH",
-} as const;
+declare const Mode: {
+  readonly NORMAL: "NORMAL";
+  readonly INSERT: "INSERT";
+  readonly HINTS: "HINTS";
+  readonly FIND: "FIND";
+  readonly TAB_SEARCH: "TAB_SEARCH";
+};
 
 const INPUT_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
 const NON_TEXT_INPUT_TYPES = new Set([
@@ -367,6 +367,5 @@ class KeyHandler {
 
 // Export for Node.js tests; no-op in browser content script context
 if (typeof globalThis !== "undefined") {
-  (globalThis as Record<string, unknown>).Mode = Mode;
   (globalThis as Record<string, unknown>).KeyHandler = KeyHandler;
 }

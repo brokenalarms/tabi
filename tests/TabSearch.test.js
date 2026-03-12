@@ -133,6 +133,7 @@ function fireKeyDown(code, opts = {}) {
 
 // --- Load modules ---
 
+require("../Vimium/Safari Extension/Resources/commands.js");
 require("../Vimium/Safari Extension/Resources/modules/KeyHandler.js");
 require("../Vimium/Safari Extension/Resources/modules/TabSearch.js");
 

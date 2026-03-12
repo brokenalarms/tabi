@@ -476,6 +476,18 @@ class HintMode {
 
   private _activateHint(hint: Hint): void {
     const element = hint.element;
+
+    // Flash the matched hint tag
+    if (hint.div.classList) hint.div.classList.add("vimium-hint-active");
+
+    // Highlight the target element
+    if (element.classList) {
+      element.classList.add("vimium-target-flash");
+      setTimeout(() => {
+        element.classList.remove("vimium-target-flash");
+      }, 300);
+    }
+
     this._deactivate();
 
     if (this._newTab && element.tagName === "A" && (element as HTMLAnchorElement).href) {

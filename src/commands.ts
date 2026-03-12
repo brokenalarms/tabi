@@ -1,5 +1,13 @@
-// Single source of truth for command labels.
-// Used by HelpOverlay (display) and KeyHandler (validation).
+// Single source of truth for global constants.
+// Loaded first in manifest.json — all other content scripts access via globalThis.
+
+const Mode = {
+  NORMAL: "NORMAL",
+  INSERT: "INSERT",
+  HINTS: "HINTS",
+  FIND: "FIND",
+  TAB_SEARCH: "TAB_SEARCH",
+} as const;
 
 const COMMANDS: Record<string, string> = {
   scrollDown: "Scroll down",
@@ -34,5 +42,6 @@ const COMMANDS: Record<string, string> = {
 
 // Export for Node.js tests and content script global access
 if (typeof globalThis !== "undefined") {
+  (globalThis as Record<string, unknown>).Mode = Mode;
   (globalThis as Record<string, unknown>).COMMANDS = COMMANDS;
 }

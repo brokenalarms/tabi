@@ -33,12 +33,4 @@ export type CommandMessage =
   | { command: "extensionActive" }
   | { command: "extensionInactive" };
 
-export const Mode = {
-  NORMAL: "NORMAL",
-  INSERT: "INSERT",
-  HINTS: "HINTS",
-  FIND: "FIND",
-  TAB_SEARCH: "TAB_SEARCH",
-} as const;
-
-export type ModeValue = (typeof Mode)[keyof typeof Mode];
+export type ModeValue = "NORMAL" | "INSERT" | "HINTS" | "FIND" | "TAB_SEARCH";

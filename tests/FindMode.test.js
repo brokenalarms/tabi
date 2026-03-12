@@ -1,6 +1,6 @@
 // FindMode unit tests — using Node.js built-in test runner
-// Tests smartcase detection, find bar lifecycle, search invocation,
-// n/N navigation, Enter to close on match, Escape to close and clear.
+// FindMode is a thin wrapper that dispatches Cmd+F to trigger Safari's
+// native find bar. Tests verify command wiring, lifecycle, and cleanup.
 
 const { describe, it, beforeEach, afterEach, mock } = require("node:test");
 const assert = require("node:assert/strict");
@@ -8,8 +8,8 @@ const assert = require("node:assert/strict");
 // --- Minimal DOM shim ---
 
 let capturedListeners, keyHandler, findMode;
-let bodyEl, headEl, selectionObj;
-let lastWindowFind;
+let bodyEl;
+let dispatchedEvents;
 
 function makeElement(tag, opts = {}) {
     return {
@@ -42,19 +42,14 @@ function makeElement(tag, opts = {}) {
 
 function setupDOM() {
     capturedListeners = {};
-    lastWindowFind = { calls: [] };
+    dispatchedEvents = [];
 
     bodyEl = makeElement("BODY");
     bodyEl.parentNode = null;
-    headEl = makeElement("HEAD");
-
-    selectionObj = {
-        removeAllRanges: mock.fn(),
-    };
 
     globalThis.document = {
         body: bodyEl,
-        head: headEl,
+        head: makeElement("HEAD"),
         documentElement: makeElement("HTML"),
         activeElement: bodyEl,
         createElement(tag) {
@@ -67,17 +62,27 @@ function setupDOM() {
             if (capturedListeners[type] === fn) delete capturedListeners[type];
         },
         querySelectorAll() { return []; },
+        dispatchEvent(event) {
+            dispatchedEvents.push(event);
+        },
     };
 
     globalThis.window = {
         innerWidth: 1024,
         innerHeight: 768,
-        find(query, caseSensitive, backward, wrapAround) {
-            lastWindowFind.calls.push({ query, caseSensitive, backward, wrapAround });
-            // Return true unless query is "notfound"
-            return query !== "notfound";
-        },
-        getSelection() { return selectionObj; },
+        find() { return true; },
+        getSelection() { return { removeAllRanges() {} }; },
+    };
+
+    globalThis.KeyboardEvent = class KeyboardEvent {
+        constructor(type, init = {}) {
+            this.type = type;
+            this.key = init.key || "";
+            this.code = init.code || "";
+            this.metaKey = init.metaKey || false;
+            this.bubbles = init.bubbles || false;
+            this.cancelable = init.cancelable || false;
+        }
     };
 
     globalThis.getComputedStyle = () => ({
@@ -91,6 +96,7 @@ function setupDOM() {
 function teardownDOM() {
     delete globalThis.document;
     delete globalThis.window;
+    delete globalThis.KeyboardEvent;
     delete globalThis.getComputedStyle;
 }
 
@@ -115,6 +121,7 @@ function fireKeyDown(code, opts = {}) {
 
 // --- Load modules ---
 
+require("../Vimium/Safari Extension/Resources/commands.js");
 require("../Vimium/Safari Extension/Resources/modules/KeyHandler.js");
 require("../Vimium/Safari Extension/Resources/modules/FindMode.js");
 
@@ -123,12 +130,9 @@ require("../Vimium/Safari Extension/Resources/modules/FindMode.js");
 describe("FindMode", () => {
     beforeEach(() => {
         setupDOM();
+        dispatchedEvents = [];
         keyHandler = new KeyHandler();
         findMode = new FindMode(keyHandler);
-        keyHandler.on("exitToNormal", () => {
-            if (findMode.isActive()) findMode.deactivate(true);
-            keyHandler.setMode(Mode.NORMAL);
-        });
     });
 
     afterEach(() => {
@@ -137,206 +141,51 @@ describe("FindMode", () => {
         teardownDOM();
     });
 
-    describe("smartcase detection", () => {
-        // Verifies that all-lowercase queries trigger case-insensitive search
-        it("treats all-lowercase as case-insensitive", () => {
-            assert.equal(FindMode.isSmartCaseSensitive("hello"), false);
-        });
-
-        // Verifies that mixed-case queries trigger case-sensitive search
-        it("treats mixed-case as case-sensitive", () => {
-            assert.equal(FindMode.isSmartCaseSensitive("Hello"), true);
-        });
-
-        // Verifies that queries with only uppercase are case-sensitive
-        it("treats all-uppercase as case-sensitive", () => {
-            assert.equal(FindMode.isSmartCaseSensitive("HELLO"), true);
-        });
-
-        // Verifies that queries with numbers but no uppercase stay insensitive
-        it("treats lowercase with numbers as case-insensitive", () => {
-            assert.equal(FindMode.isSmartCaseSensitive("test123"), false);
-        });
-    });
-
-    describe("activation and deactivation", () => {
-        // Verifies that activating creates the find bar UI and enters FIND mode
-        it("creates find bar on activate and sets FIND mode", () => {
-            findMode.activate();
-            assert.equal(findMode.isActive(), true);
-            assert.equal(keyHandler.getMode(), Mode.FIND);
-            // Bar should be appended to body
-            assert.equal(bodyEl._children.length, 1);
-            assert.equal(bodyEl._children[0].className, "vimium-find-bar");
-        });
-
-        // Verifies that deactivation removes the find bar and returns to NORMAL
-        it("removes find bar on deactivate and returns to NORMAL", () => {
-            findMode.activate();
-            findMode.deactivate(false);
-            assert.equal(findMode.isActive(), false);
-            assert.equal(keyHandler.getMode(), Mode.NORMAL);
-            assert.equal(bodyEl._children.length, 0);
-        });
-
-        // Verifies that double-activate is idempotent
-        it("ignores double activate", () => {
-            findMode.activate();
-            findMode.activate();
-            assert.equal(bodyEl._children.length, 1);
-        });
-    });
-
-    describe("Escape key", () => {
-        // Verifies that Escape closes find bar and clears the last query
-        it("closes find bar and clears query on Escape", () => {
-            findMode.activate();
-            findMode._lastQuery = "test";
-            fireKeyDown("Escape");
-            assert.equal(findMode.isActive(), false);
-            assert.equal(findMode.getLastQuery(), "");
-        });
-    });
-
-    describe("Enter key", () => {
-        // Verifies that Enter closes the find bar but preserves the match
-        it("closes find bar but preserves query on Enter", () => {
-            findMode.activate();
-            findMode._lastQuery = "hello";
-            findMode._inputEl.value = "hello";
-            fireKeyDown("Enter");
-            assert.equal(findMode.isActive(), false);
-            assert.equal(findMode.getLastQuery(), "hello");
-        });
-
-        // Verifies that Shift+Enter finds previous match without closing
-        it("finds previous match on Shift+Enter", () => {
-            findMode.activate();
-            findMode._lastQuery = "hello";
-            findMode._inputEl.value = "hello";
-            const before = lastWindowFind.calls.length;
-            fireKeyDown("Enter", { shiftKey: true });
-            // Should still be active (Shift+Enter doesn't close)
-            assert.equal(findMode.isActive(), true);
-            // Should have called findPrev
-            const call = lastWindowFind.calls[lastWindowFind.calls.length - 1];
-            assert.equal(call.backward, true);
-        });
-    });
-
-    describe("search via input", () => {
-        // Verifies that typing in the input triggers window.find
-        it("calls window.find on input change", () => {
-            findMode.activate();
-            findMode._inputEl.value = "searchterm";
-            // Simulate input event
-            findMode._inputEl._listeners.input();
-            const call = lastWindowFind.calls[lastWindowFind.calls.length - 1];
-            assert.equal(call.query, "searchterm");
-            assert.equal(call.caseSensitive, false);
-            assert.equal(call.backward, false);
-            assert.equal(call.wrapAround, true);
-        });
-
-        // Verifies smartcase integration — uppercase triggers case-sensitive
-        it("passes caseSensitive=true for mixed-case query", () => {
-            findMode.activate();
-            findMode._inputEl.value = "SearchTerm";
-            findMode._inputEl._listeners.input();
-            const call = lastWindowFind.calls[lastWindowFind.calls.length - 1];
-            assert.equal(call.caseSensitive, true);
-        });
-
-        // Verifies that "no matches" text shows for unfound queries
-        it("shows 'No matches' for unfound query", () => {
-            findMode.activate();
-            findMode._inputEl.value = "notfound";
-            findMode._inputEl._listeners.input();
-            assert.equal(findMode._countEl.textContent, "No matches");
-        });
-    });
-
-    describe("findNext / findPrev from NORMAL mode", () => {
-        // Verifies that n repeats the last search forward
-        it("n repeats the last search forward", () => {
-            findMode._lastQuery = "test";
-            findMode._caseSensitive = false;
-            findMode._findNext();
-            const call = lastWindowFind.calls[lastWindowFind.calls.length - 1];
-            assert.equal(call.query, "test");
-            assert.equal(call.backward, false);
-        });
-
-        // Verifies that N repeats the last search backward
-        it("N repeats the last search backward", () => {
-            findMode._lastQuery = "test";
-            findMode._caseSensitive = false;
-            findMode._findPrev();
-            const call = lastWindowFind.calls[lastWindowFind.calls.length - 1];
-            assert.equal(call.query, "test");
-            assert.equal(call.backward, true);
-        });
-
-        // Verifies that findNext with no prior query does nothing
-        it("does nothing with no prior query", () => {
-            const before = lastWindowFind.calls.length;
-            findMode._findNext();
-            assert.equal(lastWindowFind.calls.length, before);
-        });
-    });
-
-    describe("last query preservation", () => {
-        // Verifies that reopening find bar pre-fills the last query
-        it("pre-fills input with last query on reactivation", () => {
-            findMode.activate();
-            findMode._inputEl.value = "previous";
-            findMode._lastQuery = "previous";
-            findMode.deactivate(false);
-
-            findMode.activate();
-            assert.equal(findMode._inputEl.value, "previous");
-        });
-
-        // Verifies that Escape clears the last query for fresh start
-        it("clears last query after Escape", () => {
-            findMode.activate();
-            findMode._lastQuery = "cleared";
-            findMode._inputEl.value = "cleared";
-            fireKeyDown("Escape");
-
-            assert.equal(findMode.getLastQuery(), "");
-        });
-    });
-
-    describe("command wiring", () => {
-        // Verifies that enterFindMode command activates find mode
-        it("enterFindMode command activates", () => {
+    describe("native find dispatch", () => {
+        it("dispatches Cmd+F KeyboardEvent on enterFindMode", () => {
             keyHandler._dispatch("enterFindMode");
-            assert.equal(findMode.isActive(), true);
+            assert.equal(dispatchedEvents.length, 1);
+            const evt = dispatchedEvents[0];
+            assert.equal(evt.type, "keydown");
+            assert.equal(evt.key, "f");
+            assert.equal(evt.code, "KeyF");
+            assert.equal(evt.metaKey, true);
+            assert.equal(evt.bubbles, true);
         });
 
-        // Verifies that destroy unwires commands
-        it("destroy unwires commands", () => {
+        it("dispatches on repeated invocations", () => {
+            keyHandler._dispatch("enterFindMode");
+            keyHandler._dispatch("enterFindMode");
+            assert.equal(dispatchedEvents.length, 2);
+        });
+    });
+
+    describe("isActive", () => {
+        it("always returns false (native find manages lifecycle)", () => {
+            assert.equal(findMode.isActive(), false);
+        });
+    });
+
+    describe("deactivate", () => {
+        it("is a no-op and does not throw", () => {
+            assert.doesNotThrow(() => findMode.deactivate(true));
+            assert.doesNotThrow(() => findMode.deactivate(false));
+        });
+    });
+
+    describe("destroy", () => {
+        it("unwires enterFindMode command", () => {
             findMode.destroy();
-            // After destroy, enterFindMode should be a no-op
+            // After destroy, enterFindMode should not dispatch
             keyHandler._dispatch("enterFindMode");
-            assert.equal(findMode.isActive(), false);
-        });
-    });
-
-    describe("key event isolation", () => {
-        // Verifies that non-special keys are stopped from propagating to KeyHandler
-        it("stops propagation for regular keys in find mode", () => {
-            findMode.activate();
-            const event = fireKeyDown("KeyA", { key: "a" });
-            assert.equal(event._stopped, true);
+            assert.equal(dispatchedEvents.length, 0);
         });
 
-        // Verifies Escape prevents default
-        it("prevents default for Escape", () => {
-            findMode.activate();
-            const event = fireKeyDown("Escape");
-            assert.equal(event._prevented, true);
+        it("can be called multiple times without error", () => {
+            assert.doesNotThrow(() => {
+                findMode.destroy();
+                findMode.destroy();
+            });
         });
     });
 });
