@@ -11,12 +11,12 @@
     <h1>Vimium</h1>
 
     <div class="setting">
-      <label class="setting-label">Key Binding Mode</label>
+      <label class="setting-label">Vim Keys Binding Mode</label>
       <div class="segmented" id="keyBindingMode">
         <button data-value="location" class="active">By Position</button>
         <button data-value="character">By Character</button>
       </div>
-      <p class="hint">Position matches physical key location. Character matches what you type.</p>
+      <p class="hint">Position matches by physical key location. Character matches what you type for non-QWERTY layouts.</p>
     </div>
 
     <hr>
@@ -27,6 +27,7 @@
         <button data-value="true" class="active">On</button>
         <button data-value="false">Off</button>
       </div>
+      <p class="hint">Display 2-character shortcut bubbles over each link. Disable if you prefer using a single OS-level hinter for browsing.</p>
     </div>
 
     <hr>
@@ -34,10 +35,10 @@
     <div class="setting">
       <label class="setting-label">Hint Style</label>
       <div class="segmented" id="enablePointerTails">
-        <button data-value="false" class="active">Inline</button>
+        <button data-value="false" class="active">Classic</button>
         <button data-value="true">Floating</button>
       </div>
-      <p class="hint">Inline places hints over text. Floating adds connector tails below links.</p>
+      <p class="hint">Classic places hints inline over the start of each link. Floating displays them underneath and centered, with connector tails.</p>
     </div>
 
     <hr>
@@ -50,7 +51,7 @@
         <button data-value="light">Light</button>
         <button data-value="auto" class="active">Auto</button>
       </div>
-      <p class="hint">Classic yellow, dark, light, or auto (matches page background).</p>
+      <p class="hint">Auto selects light or dark in order to best contrast with page background.</p>
     </div>
   </div>
   <script src="popup.js"></script>
