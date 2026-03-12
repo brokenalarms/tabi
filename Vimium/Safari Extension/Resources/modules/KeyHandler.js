@@ -116,6 +116,7 @@ class KeyHandler {
     this.bind(n, "KeyG KeyG", "scrollToTop");
     this.bind(n, "Shift-KeyH", "goBack");
     this.bind(n, "Shift-KeyL", "goForward");
+    this.bind(n, "KeyR", "pageRefresh");
     this.bind(n, "KeyF", "activateHints");
     this.bind(n, "Shift-KeyF", "activateHintsNewTab");
     this.bind(n, "Slash", "enterFindMode");

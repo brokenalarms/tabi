@@ -1,5 +1,7 @@
 // ScrollController — scroll target detection and scroll commands for Vimium
 // Finds the correct scrollable element and performs directional/absolute scrolling.
+// Uses requestAnimationFrame-based easing for smooth scrolling, since Safari does
+// not reliably support CSS `behavior: "smooth"` on all elements.
 
 type Axis = "x" | "y";
 
@@ -9,9 +11,11 @@ interface KeyHandlerLike {
 }
 
 const SCROLL_STEP = 60;
+const SCROLL_DURATION_MS = 150;
 
 class ScrollController {
   private _keyHandler: KeyHandlerLike;
+  private static _activeAnimations = new Map<Element, number>();
 
   constructor(keyHandler: KeyHandlerLike) {
     this._keyHandler = keyHandler;
@@ -48,27 +52,67 @@ class ScrollController {
     return el.scrollHeight > el.clientHeight;
   }
 
+  // --- Easing ---
+  // Quadratic ease-out for a natural deceleration feel.
+
+  private static _easeOut(t: number): number {
+    return t * (2 - t);
+  }
+
+  // --- Smooth scroll via requestAnimationFrame ---
+  // Cancels any in-flight animation on the same element before starting a new
+  // one, so rapid key-repeat feels responsive rather than queuing up animations.
+
+  private static _smoothScroll(
+    target: Element,
+    deltaX: number,
+    deltaY: number,
+    duration: number = SCROLL_DURATION_MS,
+  ): void {
+    const existing = ScrollController._activeAnimations.get(target);
+    if (existing) cancelAnimationFrame(existing);
+
+    const startX = target.scrollLeft;
+    const startY = target.scrollTop;
+    const startTime = performance.now();
+
+    function step(now: number) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const eased = ScrollController._easeOut(progress);
+
+      target.scrollLeft = startX + deltaX * eased;
+      target.scrollTop = startY + deltaY * eased;
+
+      if (progress < 1) {
+        ScrollController._activeAnimations.set(target, requestAnimationFrame(step));
+      } else {
+        ScrollController._activeAnimations.delete(target);
+      }
+    }
+
+    ScrollController._activeAnimations.set(target, requestAnimationFrame(step));
+  }
+
   // --- Scroll operations ---
 
   static scrollBy(axis: Axis, delta: number): void {
     const target = ScrollController.findScrollTarget(axis);
-    const opts: ScrollToOptions = { behavior: "auto" };
-    if (axis === "x") {
-      opts.left = delta;
-    } else {
-      opts.top = delta;
-    }
-    target.scrollBy(opts);
+    const dx = axis === "x" ? delta : 0;
+    const dy = axis === "y" ? delta : 0;
+    ScrollController._smoothScroll(target, dx, dy);
   }
 
   static scrollToTop(): void {
     const target = ScrollController.findScrollTarget("y");
-    target.scrollTo({ top: 0, behavior: "auto" });
+    const dy = -target.scrollTop;
+    ScrollController._smoothScroll(target, 0, dy);
   }
 
   static scrollToBottom(): void {
     const target = ScrollController.findScrollTarget("y");
-    target.scrollTo({ top: target.scrollHeight, behavior: "auto" });
+    const dy = target.scrollHeight - target.clientHeight - target.scrollTop;
+    ScrollController._smoothScroll(target, 0, dy);
   }
 
   // --- Command wiring ---
