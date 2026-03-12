@@ -2,8 +2,6 @@
 
 ## Safari Extension Build Requirements
 
-**CRITICAL: Do not break the extension's ability to load in Safari.** These are the most common causes of silent failure (extension just doesn't appear — no error):
-
 1. **NSExtension in Info.plist** — The file `Vimium/Safari Extension/Info.plist` MUST contain an `NSExtension` dictionary with `NSExtensionPointIdentifier` and `NSExtensionPrincipalClass`. Xcode's `INFOPLIST_KEY_NSExtension_*` build settings DO NOT WORK for this — they silently produce an Info.plist without the NSExtension dictionary. Always use the explicit Info.plist file.
 
 2. **Resources must be copied into the bundle with directory structure preserved** — The extension's manifest.json references files in subdirectories (`modules/`, `styles/`, `images/`). xcodegen's `resources:` key does not actually copy files. The `postBuildScripts` rsync step in `project.yml` handles this — do not remove it.
@@ -15,41 +13,22 @@
 
 4. **TypeScript sources** live in `src/`. The JS files in `Vimium/Safari Extension/Resources/` are build output (gitignored). The "Compile TypeScript" pre-build script generates them via esbuild.
 
-This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
+## Issue Tracking
 
-## Quick Reference
+This project uses **bd (beads)** for issue tracking.
+Run `bd prime` for workflow context, or install hooks (`bd hooks install`) for auto-injection.
 
-```bash
-bd ready              # Find available work
-bd show <id>          # View issue details
-bd update <id> --claim  # Claim work atomically
-bd close <id>         # Complete work
-bd sync               # Sync with git
-```
+**Quick reference:**
+- `bd ready` - Find unblocked work
+- `bd create "Title" --type task --priority 2` - Create issue
+- `bd close <id>` - Complete work
+- `bd dolt push` - Push beads to remote
 
-## Non-Interactive Shell Commands
+For full workflow details: `bd prime`
 
-**ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.
+## Architecture
 
-Shell commands like `cp`, `mv`, and `rm` may be aliased to include `-i` (interactive) mode on some systems, causing the agent to hang indefinitely waiting for y/n input.
-
-**Use these forms instead:**
-```bash
-# Force overwrite without prompting
-cp -f source dest           # NOT: cp source dest
-mv -f source dest           # NOT: mv source dest
-rm -f file                  # NOT: rm file
-
-# For recursive operations
-rm -rf directory            # NOT: rm -r directory
-cp -rf source dest          # NOT: cp -r source dest
-```
-
-**Other commands that may prompt:**
-- `scp` - use `-o BatchMode=yes` for non-interactive
-- `ssh` - use `-o BatchMode=yes` to fail instead of prompting
-- `apt-get` - use `-y` flag
-- `brew` - use `HOMEBREW_NO_AUTO_UPDATE=1` env var
+See [docs/architecture.md](docs/architecture.md) for permanent reference on how HintMode element detection, visibility, positioning, and deduplication work — including the edge cases each method handles.
 
 <!-- BEGIN BEADS INTEGRATION -->
 ## Issue Tracking with bd (beads)
