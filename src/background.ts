@@ -80,9 +80,11 @@ function popClosedTab(): string | null {
 
 async function handleCommand(command: Command, sender: MessageSender, message?: Record<string, unknown>): Promise<CommandResponse> {
   switch (command) {
-    case "createTab":
-      await browser.tabs.create({});
+    case "createTab": {
+      const url = message && typeof message.url === "string" ? message.url : undefined;
+      await browser.tabs.create(url ? { url } : {});
       break;
+    }
 
     case "closeTab": {
       if (!sender.tab) break;

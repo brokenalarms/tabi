@@ -26,3 +26,15 @@
 .vimium-hint .vimium-hint-matched {
     opacity: var(--vimium-hint-matched-opacity);
 }
+
+.vimium-hint-tail {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 4px solid var(--vimium-hint-border);
+}

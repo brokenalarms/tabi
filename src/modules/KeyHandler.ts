@@ -92,6 +92,14 @@ class KeyHandler {
     this._commands.delete(commandName);
   }
 
+  resetBuffer(): void {
+    this._resetBuffer();
+  }
+
+  getBindings(): Map<string, Map<string, string>> {
+    return this._bindings;
+  }
+
   destroy(): void {
     this._detach();
     this._resetBuffer();
@@ -188,6 +196,13 @@ class KeyHandler {
 
     // Tab search
     this.bind(n, "Shift-KeyT", "openTabSearch");
+
+    // Navigation
+    this.bind(n, "KeyG KeyI", "focusInput");
+    this.bind(n, "KeyG KeyU", "goUpUrl");
+
+    // Help
+    this.bind(n, "Shift-Slash", "showHelp");
 
     // Mode escape — works in all non-NORMAL modes
     for (const mode of [Mode.INSERT, Mode.HINTS, Mode.FIND, Mode.TAB_SEARCH]) {

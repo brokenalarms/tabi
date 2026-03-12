@@ -188,8 +188,9 @@ class FindMode {
       return true;
     }
 
-    // Let input handle all other keys — stop propagation but not default so keys reach input
-    event.stopPropagation();
+    // Let event reach the input naturally — returning true tells KeyHandler
+    // not to process it further, and without stopPropagation the event
+    // continues from capture phase down to the input element.
     return true;
   }
 

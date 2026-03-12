@@ -37,6 +37,7 @@ declare class KeyHandler {
   getMode(): ModeValue;
   setMode(mode: ModeValue): void;
   setKeyBindingMode(mode: KeyBindingMode): void;
+  resetBuffer(): void;
   on(command: string, callback: () => void): void;
 }
 
@@ -48,6 +49,9 @@ declare class HintMode {
   constructor(keyHandler: KeyHandler);
   isActive(): boolean;
   deactivate(): void;
+  wireCommands(): void;
+  unwireCommands(): void;
+  setPointerTails(enabled: boolean): void;
 }
 
 declare class FindMode {
@@ -60,6 +64,11 @@ declare class TabSearch {
   constructor(keyHandler: KeyHandler);
   isActive(): boolean;
   deactivate(): void;
+}
+
+declare class HelpOverlay {
+  constructor(keyHandler: KeyHandler);
+  destroy(): void;
 }
 
 declare global {
@@ -78,8 +87,38 @@ function isDomainExcluded(excludedDomains: string[]): boolean {
   return false;
 }
 
+function parseRgba(color: string): { r: number; g: number; b: number; a: number } | null {
+  const rgbaMatch = color.match(/rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)(?:\s*,\s*([\d.]+))?\s*\)/);
+  if (!rgbaMatch) return null;
+  return {
+    r: parseFloat(rgbaMatch[1]),
+    g: parseFloat(rgbaMatch[2]),
+    b: parseFloat(rgbaMatch[3]),
+    a: rgbaMatch[4] !== undefined ? parseFloat(rgbaMatch[4]) : 1,
+  };
+}
+
+function detectPageBackground(): "dark" | "light" {
+  // Sample background color from body and html element
+  for (const el of [document.body, document.documentElement]) {
+    if (!el) continue;
+    const bg = getComputedStyle(el).backgroundColor;
+    const rgba = parseRgba(bg);
+    if (!rgba || rgba.a < 0.1) continue;
+    const luminance = (0.299 * rgba.r + 0.587 * rgba.g + 0.114 * rgba.b) / 255;
+    // Light page → dark hints for contrast; dark page → light hints
+    return luminance > 0.5 ? "dark" : "light";
+  }
+  // Default: assume light page → dark hints
+  return "dark";
+}
+
 function applyTheme(theme: Theme): void {
-  document.documentElement.setAttribute("data-vimium-theme", theme);
+  if (theme === "auto") {
+    document.documentElement.setAttribute("data-vimium-theme", detectPageBackground());
+  } else {
+    document.documentElement.setAttribute("data-vimium-theme", theme);
+  }
 }
 
 function initialize(settings: Partial<VimiumSettings>): void {
@@ -89,9 +128,28 @@ function initialize(settings: Partial<VimiumSettings>): void {
   if (settings.keyBindingMode) {
     keyHandler.setKeyBindingMode(settings.keyBindingMode);
   }
-  if (settings.theme) {
-    applyTheme(settings.theme);
+  applyTheme(settings.theme || "auto");
+
+  // Scroll and history navigation
+  const scrollController = new ScrollController(keyHandler);
+
+  // Link hint navigation
+  const hintMode = new HintMode(keyHandler);
+  if (settings.enableHints !== "false") {
+    hintMode.wireCommands();
   }
+  if (settings.enablePointerTails === "true") {
+    hintMode.setPointerTails(true);
+  }
+
+  // In-page find
+  const findMode = new FindMode(keyHandler);
+
+  // Tab search overlay
+  const tabSearch = new TabSearch(keyHandler);
+
+  // Help overlay
+  const helpOverlay = new HelpOverlay(keyHandler);
 
   // Listen for live settings changes from browser.storage
   browser.storage.onChanged.addListener((changes, areaName) => {
@@ -103,19 +161,18 @@ function initialize(settings: Partial<VimiumSettings>): void {
     if (changes.theme?.newValue) {
       applyTheme(changes.theme.newValue as Theme);
     }
+    if (changes.enableHints) {
+      if (changes.enableHints.newValue === "false") {
+        hintMode.unwireCommands();
+        if (hintMode.isActive()) hintMode.deactivate();
+      } else {
+        hintMode.wireCommands();
+      }
+    }
+    if (changes.enablePointerTails) {
+      hintMode.setPointerTails(changes.enablePointerTails.newValue === "true");
+    }
   });
-
-  // Scroll and history navigation
-  const scrollController = new ScrollController(keyHandler);
-
-  // Link hint navigation
-  const hintMode = new HintMode(keyHandler);
-
-  // In-page find
-  const findMode = new FindMode(keyHandler);
-
-  // Tab search overlay
-  const tabSearch = new TabSearch(keyHandler);
 
   // Default exitToNormal handler restores NORMAL mode
   keyHandler.on("exitToNormal", () => {
@@ -148,6 +205,31 @@ function initialize(settings: Partial<VimiumSettings>): void {
     });
   }
 
+  // Focus first text input on the page (gi). Tab cycles through inputs.
+  keyHandler.on("focusInput", () => {
+    const inputs = document.querySelectorAll<HTMLElement>(
+      'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="file"]):not([type="image"]):not([type="color"]):not([type="range"]), textarea, [contenteditable="true"]',
+    );
+    for (const el of inputs) {
+      if (el.offsetWidth > 0 && el.offsetHeight > 0) {
+        el.focus();
+        break;
+      }
+    }
+  });
+
+  // Go up one level in the URL hierarchy (gu)
+  keyHandler.on("goUpUrl", () => {
+    const url = new URL(window.location.href);
+    if (url.pathname.length > 1) {
+      // Strip last path segment
+      url.pathname = url.pathname.replace(/\/[^/]*\/?$/, "") || "/";
+      url.search = "";
+      url.hash = "";
+      window.location.href = url.toString();
+    }
+  });
+
   // Clean up all mode overlays on navigation (page unload)
   function cleanupModes(): void {
     if (hintMode.isActive()) hintMode.deactivate();
@@ -157,6 +239,20 @@ function initialize(settings: Partial<VimiumSettings>): void {
   window.addEventListener("beforeunload", cleanupModes);
   window.addEventListener("pagehide", cleanupModes);
 
+  // Restore focus after popup/DevTools close — Safari doesn't always
+  // re-deliver keyboard events to the content script until the page
+  // regains explicit focus.
+  function restoreFocus(): void {
+    window.focus();
+    if (keyHandler.getMode() === Mode.NORMAL) {
+      keyHandler.resetBuffer();
+    }
+  }
+  window.addEventListener("focus", restoreFocus);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") restoreFocus();
+  });
+
   // Notify background that extension is active on this tab
   browser.runtime.sendMessage({ command: "extensionActive" });
 
@@ -165,10 +261,11 @@ function initialize(settings: Partial<VimiumSettings>): void {
 
   // Suppress unused-variable warnings — these are used via their constructors
   void scrollController;
+  void helpOverlay;
 }
 
 // Read all settings and initialize
-browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme"]).then((result) => {
+browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme", "enableHints", "enablePointerTails"]).then((result) => {
   const excluded = (result.excludedDomains as string[]) || [];
   if (isDomainExcluded(excluded)) {
     browser.runtime.sendMessage({ command: "extensionInactive" });
@@ -176,6 +273,8 @@ browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme"]).then((
     initialize({
       keyBindingMode: result.keyBindingMode as KeyBindingMode | undefined,
       theme: result.theme as Theme | undefined,
+      enableHints: result.enableHints as string | undefined,
+      enablePointerTails: result.enablePointerTails as string | undefined,
     });
   }
 }).catch(() => {

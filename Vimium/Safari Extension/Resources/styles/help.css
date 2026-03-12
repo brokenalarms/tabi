@@ -1,0 +1,65 @@
+.vimium-help-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2147483647;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.vimium-help-modal {
+    background: #2a2a2a;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 520px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    color: #eee;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+}
+
+.vimium-help-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0 0 16px;
+    text-align: center;
+}
+
+.vimium-help-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 16px;
+}
+
+.vimium-help-row {
+    display: contents;
+}
+
+.vimium-help-key {
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 12px;
+    background: #444;
+    border-radius: 4px;
+    padding: 2px 6px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.vimium-help-desc {
+    font-size: 13px;
+    color: #ccc;
+    line-height: 1.8;
+}
+
+.vimium-help-hint {
+    text-align: center;
+    font-size: 11px;
+    color: #888;
+    margin-top: 16px;
+}

@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width">
+  <meta name="color-scheme" content="light dark">
   <link rel="stylesheet" href="styles/popup.css">
 </head>
 <body>
@@ -21,13 +22,35 @@
     <hr>
 
     <div class="setting">
+      <label class="setting-label">Hints (f / F)</label>
+      <div class="segmented" id="enableHints">
+        <button data-value="true" class="active">On</button>
+        <button data-value="false">Off</button>
+      </div>
+    </div>
+
+    <hr>
+
+    <div class="setting">
+      <label class="setting-label">Hint Style</label>
+      <div class="segmented" id="enablePointerTails">
+        <button data-value="false" class="active">Inline</button>
+        <button data-value="true">Floating</button>
+      </div>
+      <p class="hint">Inline places hints over text. Floating adds connector tails below links.</p>
+    </div>
+
+    <hr>
+
+    <div class="setting">
       <label class="setting-label">Theme</label>
       <div class="segmented" id="theme">
-        <button data-value="classic" class="active">Classic</button>
+        <button data-value="classic">Classic</button>
         <button data-value="dark">Dark</button>
         <button data-value="light">Light</button>
-        <button data-value="auto">Auto</button>
+        <button data-value="auto" class="active">Auto</button>
       </div>
+      <p class="hint">Classic yellow, dark, light, or auto (contrasts with page background).</p>
     </div>
   </div>
   <script src="popup.js"></script>

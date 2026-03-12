@@ -24,7 +24,10 @@ function makeElement(tag, opts = {}) {
         display: opts.display || "block",
         opacity: opts.opacity ?? "1",
         cursor: opts.cursor || "default",
+        overflow: opts.overflow || "visible",
+        paddingTop: opts.paddingTop || "0px",
     };
+    const children = opts.children || [];
     return {
         tagName: tag,
         href: opts.href || "",
@@ -32,11 +35,30 @@ function makeElement(tag, opts = {}) {
         isContentEditable: false,
         shadowRoot: opts.shadowRoot || null,
         parentNode: opts.parentNode || null,
+        parentElement: opts.parentElement || null,
+        firstElementChild: children[0] || null,
+        children: children,
         getBoundingClientRect: () => rect,
+        getClientRects: () => {
+            if (rect.width > 1 && rect.height > 1) return [rect];
+            return [];
+        },
         _style: style,
-        _children: opts.children || [],
+        _children: children,
+        contains(other) {
+            let node = other;
+            while (node) {
+                if (node === this) return true;
+                node = node.parentElement;
+            }
+            return false;
+        },
         focus: mock.fn(),
         click: mock.fn(),
+        querySelector(sel) {
+            const matches = this.querySelectorAll(sel);
+            return matches.length > 0 ? matches[0] : null;
+        },
         querySelectorAll(sel) {
             // Return children that match (simplified: return all children)
             if (sel === "*") return this._children;
@@ -83,11 +105,15 @@ function setupDOM(elements = []) {
         body: bodyEl,
         documentElement: htmlEl,
         head: htmlEl,
+        visibilityState: "visible",
         querySelectorAll(sel) {
             if (sel === "*") return elements;
             return elements.filter((e) => {
                 const clickableTags = ["A", "BUTTON", "INPUT", "TEXTAREA", "SELECT", "SUMMARY", "DETAILS"];
-                return clickableTags.includes(e.tagName);
+                if (clickableTags.includes(e.tagName)) return true;
+                // Match elements with tabindex (mimics [tabindex]:not([tabindex='-1']))
+                if (e._tabindex !== undefined && e._tabindex !== "-1") return true;
+                return false;
             });
         },
         createElement(tag) {
@@ -114,6 +140,10 @@ function setupDOM(elements = []) {
         createTextNode(text) {
             return { nodeType: 3, textContent: text };
         },
+        elementFromPoint(x, y) {
+            // Default: return the first element (good enough for most tests)
+            return elements.length > 0 ? elements[0] : null;
+        },
     };
 
     // Make body appendable
@@ -133,6 +163,8 @@ function setupDOM(elements = []) {
     global.window = {
         innerWidth: 1024,
         innerHeight: 768,
+        focus: mock.fn(),
+        addEventListener: mock.fn(),
     };
     global.getComputedStyle = (el) => el._style || { visibility: "visible", display: "block", opacity: "1", cursor: "default" };
     global.clearTimeout = clearTimeout;
@@ -153,6 +185,7 @@ function loadModules(elements = []) {
     require(hmPath);
     keyHandler = new global.KeyHandler();
     hintMode = new global.HintMode(keyHandler);
+    hintMode.wireCommands();
     keyHandler.on("exitToNormal", () => {
         if (hintMode.isActive()) hintMode.deactivate();
         keyHandler.setMode(global.Mode.NORMAL);
@@ -162,6 +195,11 @@ function loadModules(elements = []) {
 function fireKeyDown(event) {
     const listeners = capturedListeners["keydown"] || [];
     for (const fn of [...listeners]) fn(event);
+}
+
+function fireMouseDown() {
+    const listeners = capturedListeners["mousedown"] || [];
+    for (const fn of [...listeners]) fn({});
 }
 
 describe("HintMode", () => {
@@ -263,12 +301,45 @@ describe("HintMode", () => {
             assert.ok(!hintMode.isActive());
         });
 
-        // Discovers cursor:pointer elements
-        it("discovers cursor:pointer elements", () => {
-            const div = makeElement("DIV", { cursor: "pointer", top: 10, left: 0 });
-            loadModules([div]);
+        // Zero-size <a> with visible child falls back to child rect
+        it("falls back to firstElementChild for zero-size anchors", () => {
+            const child = makeElement("H3", { top: 10, left: 20, width: 200, height: 24 });
+            const anchor = makeElement("A", { href: "#", width: 0, height: 0, top: 0, left: 0, children: [child] });
+            loadModules([anchor]);
             hintMode.activate(false);
             assert.ok(hintMode.isActive());
+        });
+
+        // Wrapper div with tabindex containing a textarea — only textarea gets a hint
+        it("filters out ancestor wrapper when descendant is also a candidate", () => {
+            const textarea = makeElement("TEXTAREA", { top: 10, left: 10 });
+            const wrapper = makeElement("DIV", { top: 10, left: 10 });
+            wrapper._tabindex = "0";
+            textarea.parentElement = wrapper;
+            textarea.parentNode = wrapper;
+            wrapper._children = [textarea];
+            wrapper.children = [textarea];
+
+            loadModules([wrapper, textarea]);
+
+            // Need elementFromPoint to return the element itself for visibility
+            global.document.elementFromPoint = (x, y) => {
+                // Return the textarea for any point check (both are at same position)
+                return textarea;
+            };
+
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive());
+            // Access internal hints via the overlay children count
+            // Only 1 hint (textarea), not 2 (wrapper filtered out)
+            const overlay = global.document.body.children
+                ? global.document.body.children[0]
+                : null;
+            // hintMode._hints is private, so check via label: with 1 element, label is "s"
+            // Type "s" to activate — if there were 2 hints, labels would be "ss","sa" (2-char)
+            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
+            // If only 1 hint, typing "s" activates it and deactivates hint mode
+            assert.ok(!hintMode.isActive(), "Expected 1 hint (textarea only), but got more — wrapper was not filtered");
         });
     });
 
@@ -313,6 +384,28 @@ describe("HintMode", () => {
             fireKeyDown(makeKeyEvent("Backspace"));
             // Still active after backspace — all hints visible again
             assert.ok(hintMode.isActive());
+        });
+
+        // Any non-hint key dismisses hints
+        it("deactivates on non-hint key", () => {
+            const link = makeElement("A", { href: "#", top: 10, left: 0 });
+            loadModules([link]);
+            hintMode.activate(false);
+
+            fireKeyDown(makeKeyEvent("KeyZ", { key: "z" }));
+            assert.ok(!hintMode.isActive());
+            assert.equal(keyHandler.getMode(), "NORMAL");
+        });
+
+        // Mouse click dismisses hints
+        it("deactivates on mousedown", () => {
+            const link = makeElement("A", { href: "#", top: 10, left: 0 });
+            loadModules([link]);
+            hintMode.activate(false);
+
+            fireMouseDown();
+            assert.ok(!hintMode.isActive());
+            assert.equal(keyHandler.getMode(), "NORMAL");
         });
     });
 
@@ -372,6 +465,27 @@ describe("HintMode", () => {
             loadModules([link]);
 
             fireKeyDown(makeKeyEvent("KeyF", { shift: true }));
+            assert.ok(hintMode.isActive());
+        });
+
+        // unwireCommands prevents f from activating hints
+        it("unwireCommands disables hint activation", () => {
+            const link = makeElement("A", { href: "#", top: 10, left: 0 });
+            loadModules([link]);
+            hintMode.unwireCommands();
+
+            fireKeyDown(makeKeyEvent("KeyF"));
+            assert.ok(!hintMode.isActive());
+        });
+
+        // wireCommands re-enables after unwire
+        it("wireCommands re-enables hint activation", () => {
+            const link = makeElement("A", { href: "#", top: 10, left: 0 });
+            loadModules([link]);
+            hintMode.unwireCommands();
+            hintMode.wireCommands();
+
+            fireKeyDown(makeKeyEvent("KeyF"));
             assert.ok(hintMode.isActive());
         });
     });

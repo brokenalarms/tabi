@@ -207,7 +207,7 @@ class TabSearch {
       title.textContent = tab.title || "(Untitled)";
 
       const url = document.createElement("div");
-      url.className = "vimium-tab-search-item-url";
+      url.className = "vimium-tab-sear ch-item-url";
       url.textContent = tab.url || "";
 
       item.appendChild(title);

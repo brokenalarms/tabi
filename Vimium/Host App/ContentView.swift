@@ -10,6 +10,7 @@ struct ContentView: View {
 
 struct SetupTab: View {
     @State private var extensionEnabled: Bool?
+    @State private var showPrefsFailedAlert = false
 
     var body: some View {
         VStack(spacing: 24) {
@@ -49,6 +50,11 @@ struct SetupTab: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             checkExtensionState()
         }
+        .alert("Could not open Safari Extensions", isPresented: $showPrefsFailedAlert) {
+            Button("OK") {}
+        } message: {
+            Text("Open Safari, then go to Safari → Settings → Extensions to enable vimium-mac.")
+        }
     }
 
     private var enableInstructions: some View {
@@ -61,11 +67,21 @@ struct SetupTab: View {
                 .foregroundStyle(.secondary)
 
             Button("Open Safari Extension Preferences…") {
-                SFSafariApplication.showPreferencesForExtension(
-                    withIdentifier: "com.brokenalarms.Vimium.Extension"
-                )
+                openExtensionPreferences()
             }
             .controlSize(.large)
+        }
+    }
+
+    private func openExtensionPreferences() {
+        SFSafariApplication.showPreferencesForExtension(
+            withIdentifier: "com.brokenalarms.Vimium.Extension"
+        ) { error in
+            if error != nil {
+                DispatchQueue.main.async {
+                    showPrefsFailedAlert = true
+                }
+            }
         }
     }
 
