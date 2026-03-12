@@ -150,9 +150,10 @@ class KeyHandler {
     this.bind(n, "Shift-KeyG", "scrollToBottom");
     this.bind(n, "KeyG KeyG", "scrollToTop");
 
-    // History
+    // History / navigation
     this.bind(n, "Shift-KeyH", "goBack");
     this.bind(n, "Shift-KeyL", "goForward");
+    this.bind(n, "KeyR", "pageRefresh");
 
     // Hints
     this.bind(n, "KeyF", "activateHints");
