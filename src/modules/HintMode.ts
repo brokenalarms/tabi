@@ -37,7 +37,7 @@ const HINT_ANIMATE = true;
 
 const CLICKABLE_SELECTOR = [
   "a", "button", "input", "textarea", "select",
-  "summary", "details",
+  "summary", "details", "label[for]",
   "[role='button']", "[role='link']", "[role='tab']",
   "[role='menuitem']", "[role='option']", "[role='checkbox']",
   "[role='radio']", "[role='switch']",
@@ -53,6 +53,7 @@ class HintMode {
   private _typed: string;
   private _overlay: HTMLDivElement | null;
   private _pointerTails: boolean;
+  private _activating: boolean;
   private readonly _onMouseDown: () => void;
   private readonly _onScroll: () => void;
 
@@ -64,6 +65,7 @@ class HintMode {
     this._typed = "";
     this._overlay = null;
     this._pointerTails = false;
+    this._activating = false;
     this._onMouseDown = this._deactivate.bind(this);
     this._onScroll = this._deactivate.bind(this);
   }
@@ -166,6 +168,35 @@ class HintMode {
         ancestor = ancestor.parentElement;
       }
     }
+
+    // Deduplicate labels and their associated controls:
+    // - Remove label[for] when its associated input is already a candidate
+    //   (the input's hint already targets the label's position via _findAssociatedLabel)
+    // - Remove hash-link anchors (href="#X") when a label[for="X"] is a candidate
+    //   (CSS checkbox hack pattern — both control the same toggle)
+    const labelForIds = new Set<string>();
+    for (const el of result) {
+      if (el.tagName === "LABEL" && (el as HTMLLabelElement).htmlFor) {
+        const forId = (el as HTMLLabelElement).htmlFor;
+        const input = document.getElementById(forId);
+        if (input && resultSet.has(input as HTMLElement)) {
+          toRemove.add(el);
+        } else {
+          labelForIds.add(forId);
+        }
+      }
+    }
+    if (labelForIds.size > 0) {
+      for (const el of result) {
+        if (el.tagName === "A") {
+          const href = el.getAttribute("href");
+          if (href && href.charAt(0) === "#" && labelForIds.has(href.slice(1))) {
+            toRemove.add(el);
+          }
+        }
+      }
+    }
+
     return result.filter(el => !toRemove.has(el));
   }
 
@@ -176,11 +207,13 @@ class HintMode {
     // Disabled elements and aria-hidden trees are never interactive
     if ((el as HTMLButtonElement).disabled) return false;
     if (el.getAttribute("aria-hidden") === "true") return false;
+    // Elements inside an inert subtree are non-interactive
+    if (el.closest("[inert]")) return false;
 
     const tag = el.tagName;
     if (tag === "A" || tag === "BUTTON" || tag === "INPUT" ||
         tag === "TEXTAREA" || tag === "SELECT" ||
-        tag === "SUMMARY" || tag === "DETAILS") {
+        tag === "SUMMARY" || tag === "DETAILS" || tag === "LABEL") {
       return true;
     }
     // ARIA widget roles indicate intentional interactivity
@@ -257,20 +290,30 @@ class HintMode {
       ancestor = ancestor.parentElement;
     }
 
-    // Check if element is actually reachable (not covered by another element)
+    // Check if element is actually reachable (not fully covered by another element).
+    // Use elementsFromPoint (plural) so elements behind transparent overlays
+    // (e.g. anchor overlays on top of labels) are still detected.
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
     // Clamp to viewport
     const px = Math.min(Math.max(centerX, 0), window.innerWidth - 1);
     const py = Math.min(Math.max(centerY, 0), window.innerHeight - 1);
-    const topEl = document.elementFromPoint(px, py);
-    if (topEl && !el.contains(topEl) && !topEl.contains(el)) {
+
+    const elMatchesPoint = (point: Element[]): boolean => {
+      for (const hit of point) {
+        if (el.contains(hit) || hit.contains(el)) return true;
+      }
+      return false;
+    };
+
+    const centerHits = document.elementsFromPoint(px, py);
+    if (centerHits.length > 0 && !elMatchesPoint(centerHits)) {
       // Also try the top-left corner in case the center is covered
-      const tlEl = document.elementFromPoint(
+      const tlHits = document.elementsFromPoint(
         Math.min(Math.max(rect.left + 2, 0), window.innerWidth - 1),
         Math.min(Math.max(rect.top + 2, 0), window.innerHeight - 1)
       );
-      if (!tlEl || (!el.contains(tlEl) && !tlEl.contains(el))) {
+      if (tlHits.length === 0 || !elMatchesPoint(tlHits)) {
         return false;
       }
     }
@@ -280,7 +323,9 @@ class HintMode {
 
   // --- Hint rect fallback for zero-size anchors ---
 
-  private _getHintRect(el: HTMLElement): DOMRect {
+  // Returns the best visual target element for a hint — the element whose
+  // bounding area the tag points to. Used for both tag placement and selection flash.
+  private _getHintTargetElement(el: HTMLElement): HTMLElement {
     const rect = el.getBoundingClientRect();
 
     if (el.tagName === "INPUT") {
@@ -288,15 +333,11 @@ class HintMode {
       if (type === "radio" || type === "checkbox") {
         if ((rect.width === 0 && rect.height === 0) || parseFloat(getComputedStyle(el).opacity) === 0) {
           const label = this._findAssociatedLabel(el);
-          if (label) return label.getBoundingClientRect();
+          if (label) return label;
         }
       }
     }
 
-    // For elements wider than 25% of the viewport, find the most relevant
-    // child to anchor the hint on — a heading, button, icon, or chevron.
-    // Places the hint where the user's eye is naturally drawn rather than
-    // at the top-left of a wide container.
     if (rect.width > window.innerWidth * 0.25) {
       const child = el.querySelector(
         "h1, h2, h3, h4, h5, h6, button, svg, [role='button'], [class*='icon'], [class*='chevron'], [class*='arrow']"
@@ -304,31 +345,41 @@ class HintMode {
       if (child) {
         const cr = child.getBoundingClientRect();
         if (cr.width > 0 && cr.height > 0 && cr.width < rect.width * 0.5) {
-          const paddingTop = parseFloat(getComputedStyle(child).paddingTop) || 0;
-          if (paddingTop > 0) {
-            return new DOMRect(cr.left, cr.top + paddingTop, cr.width, cr.height - paddingTop);
-          }
-          return cr;
+          return child as HTMLElement;
         }
+      }
+    }
+
+    if (el.tagName === "A" && rect.width === 0 && rect.height === 0) {
+      for (const child of el.children) {
+        const cr = (child as HTMLElement).getBoundingClientRect();
+        if (cr.width > 0 && cr.height > 0) return child as HTMLElement;
+      }
+    }
+
+    return el;
+  }
+
+  private _getHintRect(el: HTMLElement): DOMRect {
+    const target = this._getHintTargetElement(el);
+    const rect = target.getBoundingClientRect();
+
+    // For wide-element children, adjust for padding
+    if (el !== target && el.getBoundingClientRect().width > window.innerWidth * 0.25) {
+      const paddingTop = parseFloat(getComputedStyle(target).paddingTop) || 0;
+      if (paddingTop > 0) {
+        return new DOMRect(rect.left, rect.top + paddingTop, rect.width, rect.height - paddingTop);
       }
     }
 
     if (el.tagName === "A") {
       // Use getClientRects() for inline elements — gives per-line-box rects,
       // avoiding inflated bounding rects from visually-hidden child spans
-      const clientRects = el.getClientRects();
+      const clientRects = (el === target ? el : target).getClientRects();
       if (clientRects.length > 0) {
         for (let i = 0; i < clientRects.length; i++) {
           const cr = clientRects[i];
           if (cr.width > 1 && cr.height > 1) return cr;
-        }
-      }
-
-      // Zero-size anchor fallback (display:contents) — find first visible child
-      if (rect.width === 0 && rect.height === 0) {
-        for (const child of el.children) {
-          const cr = (child as HTMLElement).getBoundingClientRect();
-          if (cr.width > 0 && cr.height > 0) return cr;
         }
       }
     }
@@ -368,11 +419,30 @@ class HintMode {
 
   // --- Overlay rendering ---
 
+  // Convert viewport-relative rect to document-relative coordinates
+  private _viewportToDocument(x: number, y: number): { x: number; y: number } {
+    const docEl = document.documentElement;
+    const rect = docEl.getBoundingClientRect();
+    const style = getComputedStyle(docEl);
+    // Match Vimium's getViewportTopLeft approach
+    if (style.position === "static" && !/content|paint|strict/.test(style.contain || "")) {
+      const marginTop = parseFloat(style.marginTop) || 0;
+      const marginLeft = parseFloat(style.marginLeft) || 0;
+      return { x: x - rect.left + marginLeft, y: y - rect.top + marginTop };
+    } else {
+      const clientTop = docEl.clientTop;
+      const clientLeft = docEl.clientLeft;
+      return { x: x - rect.left - clientLeft, y: y - rect.top - clientTop };
+    }
+  }
+
   private _createOverlay(): void {
     this._overlay = document.createElement("div") as HTMLDivElement;
     this._overlay.className = "vimium-hint-overlay";
     if (HINT_ANIMATE) this._overlay.classList.add("vimium-hint-animate");
-    document.body.appendChild(this._overlay);
+    // Append to documentElement (not body) to avoid containing-block issues
+    // from transforms/filters on body that break position:fixed
+    document.documentElement.appendChild(this._overlay);
     if (HINT_ANIMATE) {
       void this._overlay.offsetHeight;
       this._overlay.classList.add("visible");
@@ -386,16 +456,18 @@ class HintMode {
     div.textContent = label;
     if (this._pointerTails) {
       // Floating mode: centered below element, tail points up
-      div.style.left = Math.max(0, rect.left + rect.width / 2) + "px";
-      div.style.top = Math.max(0, rect.bottom + 2) + "px";
+      const pos = this._viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
+      div.style.left = Math.max(0, pos.x) + "px";
+      div.style.top = Math.max(0, pos.y) + "px";
       div.style.transform = "translateX(-50%)";
       const tail = document.createElement("div");
       tail.className = "vimium-hint-tail";
       div.appendChild(tail);
     } else {
       // Inline mode: at left edge of element, overlapping text
-      div.style.left = Math.max(0, rect.left) + "px";
-      div.style.top = Math.max(0, rect.top) + "px";
+      const pos = this._viewportToDocument(rect.left, rect.top);
+      div.style.left = Math.max(0, pos.x) + "px";
+      div.style.top = Math.max(0, pos.y) + "px";
     }
 
     if (this._overlay) this._overlay.appendChild(div);
@@ -406,6 +478,13 @@ class HintMode {
 
   private _handleKey(event: KeyboardEvent): boolean {
     if (!this._active) return false;
+
+    // Swallow all keys while a hint is activating (animation in progress)
+    if (this._activating) {
+      event.preventDefault();
+      event.stopPropagation();
+      return true;
+    }
 
     // 'f' with no modifiers toggles hints off
     if (event.code === "KeyF" && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
@@ -476,29 +555,35 @@ class HintMode {
 
   private _activateHint(hint: Hint): void {
     const element = hint.element;
+    const targetEl = this._getHintTargetElement(element);
+
+    this._activating = true;
 
     // Flash the matched hint tag
     if (hint.div.classList) hint.div.classList.add("vimium-hint-active");
 
-    // Highlight the target element
-    if (element.classList) {
-      element.classList.add("vimium-target-flash");
+    // Highlight the resolved target element (same area the tag points to)
+    if (targetEl.classList) {
+      targetEl.classList.add("vimium-target-flash");
       setTimeout(() => {
-        element.classList.remove("vimium-target-flash");
+        targetEl.classList.remove("vimium-target-flash");
       }, 300);
     }
 
-    this._deactivate();
+    // Delay deactivation so the tag animation is visible
+    setTimeout(() => {
+      this._deactivate();
 
-    if (this._newTab && element.tagName === "A" && (element as HTMLAnchorElement).href) {
-      browser.runtime.sendMessage({
-        command: "createTab",
-        url: (element as HTMLAnchorElement).href,
-      });
-    } else {
-      element.focus();
-      element.click();
-    }
+      if (this._newTab && element.tagName === "A" && (element as HTMLAnchorElement).href) {
+        browser.runtime.sendMessage({
+          command: "createTab",
+          url: (element as HTMLAnchorElement).href,
+        });
+      } else {
+        element.focus();
+        element.click();
+      }
+    }, 120);
   }
 
   // --- Cleanup ---
@@ -507,6 +592,7 @@ class HintMode {
     if (!this._active) return;
     this._active = false;
     this._typed = "";
+    this._activating = false;
     this._keyHandler.clearModeKeyDelegate();
     document.removeEventListener("mousedown", this._onMouseDown, true);
     window.removeEventListener("scroll", this._onScroll, true);
