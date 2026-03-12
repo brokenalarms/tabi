@@ -7,8 +7,30 @@ function isDomainExcluded(excludedDomains) {
   }
   return false;
 }
-function initialize() {
+function applyTheme(theme) {
+  if (theme === "auto") {
+    document.documentElement.removeAttribute("data-vimium-theme");
+  } else {
+    document.documentElement.setAttribute("data-vimium-theme", theme);
+  }
+}
+function initialize(settings) {
   const keyHandler = new KeyHandler();
+  if (settings.keyBindingMode) {
+    keyHandler.setKeyBindingMode(settings.keyBindingMode);
+  }
+  if (settings.theme) {
+    applyTheme(settings.theme);
+  }
+  browser.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local") return;
+    if (changes.keyBindingMode?.newValue) {
+      keyHandler.setKeyBindingMode(changes.keyBindingMode.newValue);
+    }
+    if (changes.theme?.newValue) {
+      applyTheme(changes.theme.newValue);
+    }
+  });
   const scrollController = new ScrollController(keyHandler);
   const hintMode = new HintMode(keyHandler);
   const findMode = new FindMode(keyHandler);
@@ -57,16 +79,20 @@ function initialize() {
   window.__vimiumKeyHandler = keyHandler;
   void scrollController;
 }
-browser.storage.local.get("excludedDomains").then((result) => {
+browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme"]).then((result) => {
   const excluded = result.excludedDomains || [];
   if (isDomainExcluded(excluded)) {
     browser.runtime.sendMessage({ command: "extensionInactive" });
   } else {
-    initialize();
+    initialize({
+      keyBindingMode: result.keyBindingMode,
+      theme: result.theme
+    });
   }
 }).catch(() => {
-  initialize();
+  initialize({});
 });
 if (typeof globalThis !== "undefined") {
   globalThis.isDomainExcluded = isDomainExcluded;
+  globalThis.applyTheme = applyTheme;
 }

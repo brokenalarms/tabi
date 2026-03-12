@@ -1,7 +1,7 @@
 // Vimium content script
 // Runs on every page to handle keyboard navigation
 
-import type { ModeValue } from "./types";
+import type { KeyBindingMode, ModeValue, Theme, VimiumSettings } from "./types";
 
 // Browser API (Safari Web Extension)
 declare const browser: {
@@ -10,7 +10,15 @@ declare const browser: {
   };
   storage: {
     local: {
-      get(key: string): Promise<Record<string, unknown>>;
+      get(keys: string[]): Promise<Record<string, unknown>>;
+    };
+    onChanged: {
+      addListener(
+        callback: (
+          changes: Record<string, { oldValue?: unknown; newValue?: unknown }>,
+          areaName: string,
+        ) => void,
+      ): void;
     };
   };
 };
@@ -28,6 +36,7 @@ declare class KeyHandler {
   mode: ModeValue;
   getMode(): ModeValue;
   setMode(mode: ModeValue): void;
+  setKeyBindingMode(mode: KeyBindingMode): void;
   on(command: string, callback: () => void): void;
 }
 
@@ -69,8 +78,36 @@ function isDomainExcluded(excludedDomains: string[]): boolean {
   return false;
 }
 
-function initialize(): void {
+function applyTheme(theme: Theme): void {
+  if (theme === "auto") {
+    document.documentElement.removeAttribute("data-vimium-theme");
+  } else {
+    document.documentElement.setAttribute("data-vimium-theme", theme);
+  }
+}
+
+function initialize(settings: Partial<VimiumSettings>): void {
   const keyHandler = new KeyHandler();
+
+  // Apply initial settings
+  if (settings.keyBindingMode) {
+    keyHandler.setKeyBindingMode(settings.keyBindingMode);
+  }
+  if (settings.theme) {
+    applyTheme(settings.theme);
+  }
+
+  // Listen for live settings changes from browser.storage
+  browser.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local") return;
+
+    if (changes.keyBindingMode?.newValue) {
+      keyHandler.setKeyBindingMode(changes.keyBindingMode.newValue as KeyBindingMode);
+    }
+    if (changes.theme?.newValue) {
+      applyTheme(changes.theme.newValue as Theme);
+    }
+  });
 
   // Scroll and history navigation
   const scrollController = new ScrollController(keyHandler);
@@ -134,20 +171,24 @@ function initialize(): void {
   void scrollController;
 }
 
-// Check exclusion list before activating
-browser.storage.local.get("excludedDomains").then((result) => {
+// Read all settings and initialize
+browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme"]).then((result) => {
   const excluded = (result.excludedDomains as string[]) || [];
   if (isDomainExcluded(excluded)) {
     browser.runtime.sendMessage({ command: "extensionInactive" });
   } else {
-    initialize();
+    initialize({
+      keyBindingMode: result.keyBindingMode as KeyBindingMode | undefined,
+      theme: result.theme as Theme | undefined,
+    });
   }
 }).catch(() => {
-  // If storage read fails, initialize anyway
-  initialize();
+  // If storage read fails, initialize with defaults
+  initialize({});
 });
 
 // Export for testing via globalThis
 if (typeof globalThis !== "undefined") {
   (globalThis as Record<string, unknown>).isDomainExcluded = isDomainExcluded;
+  (globalThis as Record<string, unknown>).applyTheme = applyTheme;
 }
