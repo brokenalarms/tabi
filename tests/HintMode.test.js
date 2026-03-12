@@ -153,6 +153,10 @@ function loadModules(elements = []) {
     require(hmPath);
     keyHandler = new global.KeyHandler();
     hintMode = new global.HintMode(keyHandler);
+    keyHandler.on("exitToNormal", () => {
+        if (hintMode.isActive()) hintMode.deactivate();
+        keyHandler.setMode(global.Mode.NORMAL);
+    });
 }
 
 function fireKeyDown(event) {

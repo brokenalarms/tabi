@@ -1,0 +1,111 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  color: #333;
+  background: #fff;
+  min-width: 280px;
+}
+
+@media (prefers-color-scheme: dark) {
+  body {
+    background: #1e1e1e;
+    color: #e0e0e0;
+  }
+  hr {
+    border-color: #333;
+  }
+  .segmented button {
+    background: #2a2a2a;
+    border-color: #444;
+    color: #ccc;
+  }
+  .segmented button:hover {
+    background: #333;
+  }
+  .segmented button.active {
+    background: #0a84ff;
+    border-color: #0a84ff;
+    color: #fff;
+  }
+  .hint {
+    color: #888;
+  }
+}
+
+.popup {
+  padding: 16px;
+}
+
+h1 {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.setting {
+  margin-bottom: 12px;
+}
+
+.setting-label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+
+.segmented {
+  display: flex;
+  gap: 0;
+}
+
+.segmented button {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  border: 1px solid #ccc;
+  background: #f5f5f5;
+  color: #333;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.segmented button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.segmented button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.segmented button:not(:first-child) {
+  border-left: none;
+}
+
+.segmented button:hover {
+  background: #e8e8e8;
+}
+
+.segmented button.active {
+  background: #007aff;
+  border-color: #007aff;
+  color: #fff;
+}
+
+.hint {
+  margin-top: 4px;
+  font-size: 11px;
+  color: #888;
+  line-height: 1.4;
+}
+
+hr {
+  border: none;
+  border-top: 1px solid #e0e0e0;
+  margin: 12px 0;
+}

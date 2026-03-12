@@ -1,6 +1,6 @@
 name: Vimium
 options:
-  bundleIdPrefix: com.anthropic
+  bundleIdPrefix: com.brokenalarms
   deploymentTarget:
     macOS: "13.0"
   xcodeVersion: "16.3"
@@ -9,6 +9,16 @@ settings:
   base:
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
+    DEVELOPMENT_TEAM: F73P768296
+
+schemes:
+  Vimium:
+    build:
+      targets:
+        Vimium: all
+        Vimium Extension: all
+    run:
+      executable: Vimium
 
 targets:
   Vimium:
@@ -19,8 +29,9 @@ targets:
       - path: Vimium/Shared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.anthropic.Vimium
+        PRODUCT_BUNDLE_IDENTIFIER: com.brokenalarms.Vimium
         CODE_SIGN_ENTITLEMENTS: Vimium/Host App/Vimium.entitlements
+        CODE_SIGN_STYLE: Automatic
         INFOPLIST_KEY_CFBundleDisplayName: Vimium
         GENERATE_INFOPLIST_FILE: true
         ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
@@ -39,17 +50,14 @@ targets:
       - path: Vimium/Safari Extension
         excludes:
           - "Resources/**"
-      - path: Vimium/Safari Extension/Resources
-        group: Vimium/Safari Extension/Resources
-        buildPhase: resources
       - path: Vimium/Shared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.anthropic.Vimium.Extension
+        PRODUCT_BUNDLE_IDENTIFIER: com.brokenalarms.Vimium.Extension
         CODE_SIGN_ENTITLEMENTS: Vimium/Safari Extension/VimiumExtension.entitlements
+        CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: true
-        INFOPLIST_KEY_NSExtension_NSExtensionPointIdentifier: com.apple.Safari.web-extension
-        INFOPLIST_KEY_NSExtension_NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).SafariWebExtensionHandler"
+        INFOPLIST_FILE: Vimium/Safari Extension/Info.plist
         OTHER_LDFLAGS: ["-framework", "SafariServices"]
     preBuildScripts:
       - name: Compile TypeScript
@@ -75,3 +83,27 @@ targets:
           - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/KeyHandler.js
           - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/ScrollController.js
           - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/TabSearch.js
+    postBuildScripts:
+      - name: Copy Extension Resources
+        script: |
+          rsync -a --delete "${PROJECT_DIR}/Vimium/Safari Extension/Resources/" "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/"
+        inputFiles:
+          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/
+        outputFiles:
+          - $(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/manifest.json
+      - name: Validate Extension Bundle
+        script: |
+          PLIST="${BUILT_PRODUCTS_DIR}/${INFOPLIST_PATH}"
+          # NSExtension dictionary is required for Safari to recognize the extension
+          if ! /usr/libexec/PlistBuddy -c "Print :NSExtension:NSExtensionPointIdentifier" "$PLIST" &>/dev/null; then
+            echo "error: NSExtension dictionary missing from extension Info.plist. Safari will silently ignore this extension."
+            echo "error: Ensure Vimium/Safari Extension/Info.plist exists and contains the NSExtension dictionary."
+            exit 1
+          fi
+          # Verify manifest.json was copied
+          RESOURCES_DIR="${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}"
+          if [ ! -f "$RESOURCES_DIR/manifest.json" ]; then
+            echo "error: manifest.json missing from extension bundle Resources. The extension will not load in Safari."
+            exit 1
+          fi
+          echo "Extension bundle validation passed."

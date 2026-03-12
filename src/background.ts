@@ -1,14 +1,11 @@
 // Vimium background service worker
 // Handles tab management and messaging with content scripts
 
-import type { VimiumSettings, KeyBindingMode, Theme } from "./types";
-
 // Command names handled by the background service worker
 type Command =
-  | "createTab" | "closeTab" | "switchTab" | "queryTabs" | "syncSettings"
+  | "createTab" | "closeTab" | "switchTab" | "queryTabs"
   | "restoreTab" | "tabLeft" | "tabRight" | "tabNext" | "tabPrev"
-  | "firstTab" | "lastTab" | "extensionActive" | "extensionInactive"
-  | "settingsChanged";
+  | "firstTab" | "lastTab" | "extensionActive" | "extensionInactive";
 
 interface TabInfo {
   id: number;
@@ -24,6 +21,7 @@ declare const browser: {
     update(tabId: number, props: { active: boolean }): Promise<unknown>;
     query(opts: { currentWindow: boolean }): Promise<Array<{ id: number; title: string; url: string; active: boolean }>>;
     onRemoved: { addListener(fn: (tabId: number) => void): void };
+    onUpdated: { addListener(fn: (tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string }) => void): void };
   };
   action: {
     enable(tabId: number): Promise<void>;
@@ -34,12 +32,6 @@ declare const browser: {
   runtime: {
     onMessage: {
       addListener(fn: (message: unknown, sender: MessageSender, sendResponse: (response: unknown) => void) => boolean | void): void;
-    };
-    sendNativeMessage(appId: string, message: unknown): Promise<Record<string, unknown>>;
-  };
-  storage: {
-    local: {
-      set(items: Record<string, unknown>): Promise<void>;
     };
   };
 };
@@ -56,15 +48,18 @@ const closedTabStack: string[] = [];
 // Track which tabs have the extension active (not excluded by domain)
 const activeTabSet = new Set<number>();
 
+// Cache tab URLs so onRemoved can record closed tabs (the tab is already gone by then)
+const tabUrlCache = new Map<number, string>();
+
 async function updateIconState(tabId: number): Promise<void> {
   try {
     if (activeTabSet.has(tabId)) {
       await browser.action.enable(tabId);
       await browser.action.setBadgeText({ text: "", tabId });
-      await browser.action.setTitle({ title: "Vimium", tabId });
+      await browser.action.setTitle({ title: "vimium-mac", tabId });
     } else {
       await browser.action.disable(tabId);
-      await browser.action.setTitle({ title: "Vimium (disabled on this site)", tabId });
+      await browser.action.setTitle({ title: "vimium-mac (disabled on this site)", tabId });
     }
   } catch (_) {
     // browser.action may not be available in all contexts
@@ -91,9 +86,7 @@ async function handleCommand(command: Command, sender: MessageSender, message?: 
 
     case "closeTab": {
       if (!sender.tab) break;
-      const tab = sender.tab;
-      pushClosedTab(tab.url);
-      await browser.tabs.remove(tab.id);
+      await browser.tabs.remove(sender.tab.id);
       break;
     }
 
@@ -148,12 +141,6 @@ async function handleCommand(command: Command, sender: MessageSender, message?: 
       return tabs.map(t => ({ id: t.id, title: t.title, url: t.url, active: t.active }));
     }
 
-    case "syncSettings":
-    case "settingsChanged": {
-      await syncSettings();
-      return { status: "ok" };
-    }
-
     case "switchTab": {
       const targetTabId = message && message.tabId != null ? message.tabId as number : undefined;
       if (targetTabId != null) {
@@ -185,52 +172,27 @@ async function handleCommand(command: Command, sender: MessageSender, message?: 
   return { status: "ok" };
 }
 
-const VALID_KEY_BINDING_MODES: KeyBindingMode[] = ["location", "character"];
-const VALID_THEMES: Theme[] = ["yellow", "dark", "light", "auto"];
-
-const DEFAULT_SETTINGS: VimiumSettings = {
-  excludedDomains: [],
-  keyBindingMode: "location",
-  theme: "yellow",
-};
-
-function validateSettings(raw: Record<string, unknown>): VimiumSettings {
-  const excludedDomains = Array.isArray(raw.excludedDomains)
-    ? raw.excludedDomains.filter((d): d is string => typeof d === "string")
-    : DEFAULT_SETTINGS.excludedDomains;
-
-  const keyBindingMode = VALID_KEY_BINDING_MODES.includes(raw.keyBindingMode as KeyBindingMode)
-    ? (raw.keyBindingMode as KeyBindingMode)
-    : DEFAULT_SETTINGS.keyBindingMode;
-
-  const theme = VALID_THEMES.includes(raw.theme as Theme)
-    ? (raw.theme as Theme)
-    : DEFAULT_SETTINGS.theme;
-
-  return { excludedDomains, keyBindingMode, theme };
-}
-
-// Sync all settings from native app to browser.storage.local
-async function syncSettings(): Promise<void> {
-  try {
-    const response = await browser.runtime.sendNativeMessage(
-      "com.anthropic.Vimium",
-      { command: "getSettings" }
-    );
-    const settings = validateSettings(response ?? {});
-    await browser.storage.local.set(settings as unknown as Record<string, unknown>);
-  } catch (err) {
-    console.error("Vimium: failed to sync settings:", err);
+// Track tab URLs for closed-tab restore
+browser.tabs.onUpdated.addListener((tabId: number, changeInfo: { url?: string }) => {
+  if (changeInfo.url) {
+    tabUrlCache.set(tabId, changeInfo.url);
   }
-}
+});
 
-// Sync on service worker startup
-syncSettings();
-
-// Clean up activeTabSet when tabs are removed
+// Clean up activeTabSet and record closed tabs for restore
 browser.tabs.onRemoved.addListener((tabId: number) => {
+  const url = tabUrlCache.get(tabId);
+  if (url) pushClosedTab(url);
+  tabUrlCache.delete(tabId);
   activeTabSet.delete(tabId);
 });
+
+// Populate URL cache on startup
+browser.tabs.query({ currentWindow: true }).then(tabs => {
+  for (const tab of tabs) {
+    if (tab.url) tabUrlCache.set(tab.id, tab.url);
+  }
+}).catch(() => {});
 
 browser.runtime.onMessage.addListener((message: unknown, sender: MessageSender, sendResponse: (response: unknown) => void) => {
   const msg = message as Record<string, unknown> | null;
@@ -242,7 +204,7 @@ browser.runtime.onMessage.addListener((message: unknown, sender: MessageSender, 
   handleCommand(msg.command as Command, sender, msg as Record<string, unknown>)
     .then(result => sendResponse(result))
     .catch(err => {
-      console.error("Vimium background error:", err);
+      console.error("vimium-mac background error:", err);
       sendResponse({ status: "error", reason: (err as Error).message });
     });
 
@@ -259,8 +221,6 @@ if (typeof globalThis !== "undefined") {
   g.handleCommand = handleCommand;
   g.MAX_CLOSED_TABS = MAX_CLOSED_TABS;
   g.activeTabSet = activeTabSet;
+  g.tabUrlCache = tabUrlCache;
   g.updateIconState = updateIconState;
-  g.syncSettings = syncSettings;
-  g.validateSettings = validateSettings;
-  g.DEFAULT_SETTINGS = DEFAULT_SETTINGS;
 }

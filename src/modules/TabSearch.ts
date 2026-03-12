@@ -22,6 +22,8 @@ declare const Mode: {
 
 interface KeyHandlerLike {
   setMode(mode: ModeValue): void;
+  setModeKeyDelegate(handler: (event: KeyboardEvent) => boolean): void;
+  clearModeKeyDelegate(): void;
   on(command: string, callback: () => void): void;
   off(command: string): void;
 }
@@ -41,7 +43,6 @@ class TabSearch {
   private _tabs: TabInfo[];
   private _filtered: TabInfo[];
   private _selectedIndex: number;
-  private readonly _onKeyDown: (event: KeyboardEvent) => void;
   private readonly _onInput: () => void;
 
   constructor(keyHandler: KeyHandlerLike) {
@@ -53,7 +54,6 @@ class TabSearch {
     this._tabs = [];
     this._filtered = [];
     this._selectedIndex = 0;
-    this._onKeyDown = this._handleKeyDown.bind(this);
     this._onInput = this._handleInput.bind(this);
     this._wireCommands();
   }
@@ -70,13 +70,13 @@ class TabSearch {
     this._createOverlay();
     this._renderResults();
     this._inputEl!.focus();
-    document.addEventListener("keydown", this._onKeyDown, true);
+    this._keyHandler.setModeKeyDelegate(this._handleKey.bind(this));
   }
 
   deactivate(): void {
     if (!this._active) return;
     this._active = false;
-    document.removeEventListener("keydown", this._onKeyDown, true);
+    this._keyHandler.clearModeKeyDelegate();
     if (this._overlayEl && this._overlayEl.parentNode) {
       this._overlayEl.parentNode.removeChild(this._overlayEl);
     }
@@ -224,23 +224,19 @@ class TabSearch {
     this._renderResults();
   }
 
-  // --- Keyboard navigation ---
+  // --- Keyboard navigation (called via KeyHandler delegate) ---
 
-  private _handleKeyDown(event: KeyboardEvent): void {
-    if (!this._active) return;
+  private _handleKey(event: KeyboardEvent): boolean {
+    if (!this._active) return false;
 
-    if (event.code === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      this.deactivate();
-      return;
-    }
+    // Let Escape fall through to KeyHandler's exitToNormal dispatch
+    if (event.code === "Escape") return false;
 
     if (event.code === "Enter") {
       event.preventDefault();
       event.stopPropagation();
       this._switchToSelected();
-      return;
+      return true;
     }
 
     // Down: ArrowDown or Ctrl-j
@@ -251,7 +247,7 @@ class TabSearch {
         this._selectedIndex = (this._selectedIndex + 1) % this._filtered.length;
         this._renderResults();
       }
-      return;
+      return true;
     }
 
     // Up: ArrowUp or Ctrl-k
@@ -262,11 +258,12 @@ class TabSearch {
         this._selectedIndex = (this._selectedIndex - 1 + this._filtered.length) % this._filtered.length;
         this._renderResults();
       }
-      return;
+      return true;
     }
 
-    // Let input handle all other keys — don't propagate to KeyHandler
+    // Let input handle all other keys — stop propagation but not default so keys reach input
     event.stopPropagation();
+    return true;
   }
 
   private _switchToSelected(): void {

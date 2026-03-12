@@ -1,10 +1,9 @@
 // Shared types for Vimium — used across all modules.
 
 export type KeyBindingMode = "location" | "character";
-export type Theme = "yellow" | "dark" | "light" | "auto";
+export type Theme = "classic" | "dark" | "light" | "auto";
 
 export interface VimiumSettings {
-  excludedDomains: string[];
   keyBindingMode: KeyBindingMode;
   theme: Theme;
 }

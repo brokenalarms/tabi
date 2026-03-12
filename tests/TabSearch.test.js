@@ -143,6 +143,10 @@ describe("TabSearch", () => {
         setupDOM();
         keyHandler = new KeyHandler();
         tabSearch = new TabSearch(keyHandler);
+        keyHandler.on("exitToNormal", () => {
+            if (tabSearch.isActive()) tabSearch.deactivate();
+            keyHandler.setMode(Mode.NORMAL);
+        });
     });
 
     afterEach(() => {

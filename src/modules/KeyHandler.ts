@@ -28,6 +28,7 @@ class KeyHandler {
   private _commands: Map<string, () => void>;
   private _prefixes: Map<string, Set<string>>;
   private _modeListeners: ModeListener[];
+  private _modeKeyDelegate: ((event: KeyboardEvent) => boolean) | null;
 
   private readonly _onKeyDown: (event: KeyboardEvent) => void;
   private readonly _onFocusIn: (event: FocusEvent) => void;
@@ -42,6 +43,7 @@ class KeyHandler {
     this._commands = new Map();
     this._prefixes = new Map();
     this._modeListeners = [];
+    this._modeKeyDelegate = null;
 
     this._onKeyDown = this._handleKeyDown.bind(this);
     this._onFocusIn = this._handleFocusIn.bind(this);
@@ -71,6 +73,15 @@ class KeyHandler {
 
   setKeyBindingMode(mode: KeyBindingMode): void {
     this._keyBindingMode = mode;
+    this._resetBuffer();
+  }
+
+  setModeKeyDelegate(handler: (event: KeyboardEvent) => boolean): void {
+    this._modeKeyDelegate = handler;
+  }
+
+  clearModeKeyDelegate(): void {
+    this._modeKeyDelegate = null;
   }
 
   on(commandName: string, callback: () => void): void {
@@ -240,9 +251,13 @@ class KeyHandler {
       return;
     }
 
-    // In non-NORMAL modes, only handle Escape — other keys are consumed
-    // by the mode's own UI (input fields, hint filter, find bar)
+    // In non-NORMAL modes, delegate to the active mode's key handler first
     if (this.mode !== Mode.NORMAL) {
+      if (this._modeKeyDelegate) {
+        const handled = this._modeKeyDelegate(event);
+        if (handled) return;
+      }
+      // Fall through to Escape handling
       if (event.code === "Escape") {
         event.preventDefault();
         event.stopPropagation();

@@ -21,6 +21,8 @@ declare global {
 
 interface KeyHandlerLike {
   setMode(mode: ModeValue): void;
+  setModeKeyDelegate(handler: (event: KeyboardEvent) => boolean): void;
+  clearModeKeyDelegate(): void;
   on(command: string, callback: () => void): void;
   off(command: string): void;
 }
@@ -31,10 +33,8 @@ class FindMode {
   private _barEl: HTMLDivElement | null;
   private _inputEl: HTMLInputElement | null;
   private _countEl: HTMLSpanElement | null;
-  private _styleEl: HTMLStyleElement | null;
   private _lastQuery: string;
   private _caseSensitive: boolean;
-  private readonly _onKeyDown: (event: KeyboardEvent) => void;
   private readonly _onInput: () => void;
 
   constructor(keyHandler: KeyHandlerLike) {
@@ -43,10 +43,8 @@ class FindMode {
     this._barEl = null;
     this._inputEl = null;
     this._countEl = null;
-    this._styleEl = null;
     this._lastQuery = "";
     this._caseSensitive = false;
-    this._onKeyDown = this._handleKeyDown.bind(this);
     this._onInput = this._handleInput.bind(this);
     this._wireCommands();
   }
@@ -57,16 +55,15 @@ class FindMode {
     if (this._active) return;
     this._active = true;
     this._keyHandler.setMode(Mode.FIND);
-    this._injectStyles();
     this._createBar();
     this._inputEl!.focus();
-    document.addEventListener("keydown", this._onKeyDown, true);
+    this._keyHandler.setModeKeyDelegate(this._handleKey.bind(this));
   }
 
   deactivate(clearHighlight: boolean): void {
     if (!this._active) return;
     this._active = false;
-    document.removeEventListener("keydown", this._onKeyDown, true);
+    this._keyHandler.clearModeKeyDelegate();
 
     if (clearHighlight) {
       this._clearSelection();
@@ -79,11 +76,6 @@ class FindMode {
     this._barEl = null;
     this._inputEl = null;
     this._countEl = null;
-
-    if (this._styleEl && this._styleEl.parentNode) {
-      this._styleEl.parentNode.removeChild(this._styleEl);
-    }
-    this._styleEl = null;
 
     this._keyHandler.setMode(Mode.NORMAL);
   }
@@ -137,49 +129,6 @@ class FindMode {
 
   // --- UI ---
 
-  private _injectStyles(): void {
-    if (this._styleEl) return;
-    this._styleEl = document.createElement("style");
-    this._styleEl.textContent = `
-.vimium-find-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 2147483647;
-    display: flex;
-    align-items: center;
-    padding: 6px 12px;
-    background: #333;
-    border-top: 1px solid #555;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
-    font-size: 14px;
-    box-shadow: 0 -2px 8px rgba(0,0,0,0.3);
-}
-.vimium-find-bar input {
-    flex: 1;
-    padding: 4px 8px;
-    border: 1px solid #666;
-    border-radius: 3px;
-    background: #1a1a1a;
-    color: #eee;
-    font-size: 14px;
-    font-family: inherit;
-    outline: none;
-}
-.vimium-find-bar input:focus {
-    border-color: #4a9eff;
-}
-.vimium-find-bar .vimium-find-count {
-    margin-left: 8px;
-    color: #aaa;
-    font-size: 12px;
-    white-space: nowrap;
-}
-`;
-    (document.head || document.documentElement).appendChild(this._styleEl);
-  }
-
   private _createBar(): void {
     this._barEl = document.createElement("div") as HTMLDivElement;
     this._barEl.className = "vimium-find-bar";
@@ -217,17 +166,13 @@ class FindMode {
     this._countEl!.textContent = found ? "" : "No matches";
   }
 
-  // --- Key handling during FIND mode ---
+  // --- Key handling during FIND mode (called via KeyHandler delegate) ---
 
-  private _handleKeyDown(event: KeyboardEvent): void {
-    if (!this._active) return;
+  private _handleKey(event: KeyboardEvent): boolean {
+    if (!this._active) return false;
 
-    if (event.code === "Escape") {
-      event.preventDefault();
-      event.stopPropagation();
-      this.deactivate(true);
-      return;
-    }
+    // Let Escape fall through to KeyHandler's exitToNormal dispatch
+    if (event.code === "Escape") return false;
 
     if (event.code === "Enter") {
       event.preventDefault();
@@ -240,11 +185,12 @@ class FindMode {
         this._caseSensitive = FindMode.isSmartCaseSensitive(this._lastQuery);
         this.deactivate(false);
       }
-      return;
+      return true;
     }
 
-    // Let input handle all other keys — don't propagate to KeyHandler
+    // Let input handle all other keys — stop propagation but not default so keys reach input
     event.stopPropagation();
+    return true;
   }
 
   // --- Command wiring ---

@@ -14,9 +14,7 @@ let removedTabIds;
 let activatedTabId;
 let actionState;
 let tabRemovedListeners;
-let nativeMessageResponse;
-let storedSettings;
-
+let tabUpdatedListeners;
 function resetBrowserShim() {
     mockTabs = [
         { id: 1, title: "Tab 1", url: "https://example.com/1", active: false },
@@ -28,12 +26,7 @@ function resetBrowserShim() {
     activatedTabId = null;
     actionState = {};
     tabRemovedListeners = [];
-    nativeMessageResponse = {
-        excludedDomains: [],
-        keyBindingMode: "location",
-        theme: "yellow",
-    };
-    storedSettings = {};
+    tabUpdatedListeners = [];
 
     global.browser = {
         tabs: {
@@ -55,6 +48,9 @@ function resetBrowserShim() {
             },
             onRemoved: {
                 addListener(fn) { tabRemovedListeners.push(fn); },
+            },
+            onUpdated: {
+                addListener(fn) { tabUpdatedListeners.push(fn); },
             },
         },
         action: {
@@ -79,16 +75,6 @@ function resetBrowserShim() {
         },
         runtime: {
             onMessage: { addListener() {} },
-            async sendNativeMessage(_appId, _message) {
-                return nativeMessageResponse;
-            },
-        },
-        storage: {
-            local: {
-                async set(items) {
-                    Object.assign(storedSettings, items);
-                },
-            },
         },
     };
 }
@@ -115,10 +101,8 @@ function loadBackground() {
         handleCommand: global.handleCommand,
         MAX_CLOSED_TABS: global.MAX_CLOSED_TABS,
         activeTabSet: global.activeTabSet,
+        tabUrlCache: global.tabUrlCache,
         updateIconState: global.updateIconState,
-        syncSettings: global.syncSettings,
-        validateSettings: global.validateSettings,
-        DEFAULT_SETTINGS: global.DEFAULT_SETTINGS,
     };
 }
 
@@ -168,12 +152,16 @@ describe("background.js tab management", () => {
     });
 
     describe("closeTab command", () => {
-        // Verifies that closing a tab removes it and pushes its URL to the stack.
-        it("removes the sender tab and pushes URL to stack", async () => {
+        // Verifies that closing a tab removes it. URL tracking is handled by onRemoved listener.
+        it("removes the sender tab", async () => {
             const sender = makeSender(2);
+            // Simulate onUpdated having cached the URL
+            bgModule.tabUrlCache.set(2, "https://example.com/2");
             const result = await bgModule.handleCommand("closeTab", sender);
             assert.equal(result.status, "ok");
             assert.deepEqual(removedTabIds, [2]);
+            // onRemoved listener records the URL
+            for (const fn of tabRemovedListeners) fn(2);
             assert.equal(bgModule.closedTabStack.length, 1);
             assert.equal(bgModule.closedTabStack[0], "https://example.com/2");
         });
@@ -272,7 +260,7 @@ describe("background.js tab management", () => {
             await bgModule.handleCommand("extensionActive", sender, {});
             assert.equal(bgModule.activeTabSet.has(2), true);
             assert.equal(actionState[2].enabled, true);
-            assert.equal(actionState[2].title, "Vimium");
+            assert.equal(actionState[2].title, "vimium-mac");
         });
 
         // Verifies that extensionInactive disables the icon for the tab.
@@ -282,7 +270,7 @@ describe("background.js tab management", () => {
             await bgModule.handleCommand("extensionInactive", sender, {});
             assert.equal(bgModule.activeTabSet.has(3), false);
             assert.equal(actionState[3].enabled, false);
-            assert.equal(actionState[3].title, "Vimium (disabled on this site)");
+            assert.equal(actionState[3].title, "vimium-mac (disabled on this site)");
         });
 
         // Verifies that closing a tab cleans up its entry from activeTabSet.
@@ -311,85 +299,4 @@ describe("background.js tab management", () => {
         });
     });
 
-    describe("validateSettings", () => {
-        // Verifies that valid settings pass through unchanged.
-        it("accepts valid settings", () => {
-            const input = { excludedDomains: ["example.com"], keyBindingMode: "character", theme: "dark" };
-            const result = bgModule.validateSettings(input);
-            assert.deepEqual(result, input);
-        });
-
-        // Verifies that unrecognized keyBindingMode falls back to default.
-        it("falls back to default for invalid keyBindingMode", () => {
-            const result = bgModule.validateSettings({ keyBindingMode: "bogus" });
-            assert.equal(result.keyBindingMode, "location");
-        });
-
-        // Verifies that unrecognized theme falls back to default.
-        it("falls back to default for invalid theme", () => {
-            const result = bgModule.validateSettings({ theme: "neon" });
-            assert.equal(result.theme, "yellow");
-        });
-
-        // Verifies that non-array excludedDomains falls back to empty array.
-        it("falls back to empty array for non-array excludedDomains", () => {
-            const result = bgModule.validateSettings({ excludedDomains: "not-an-array" });
-            assert.deepEqual(result.excludedDomains, []);
-        });
-
-        // Verifies that non-string entries are filtered from excludedDomains.
-        it("filters non-string entries from excludedDomains", () => {
-            const result = bgModule.validateSettings({ excludedDomains: ["ok.com", 42, null, "good.org"] });
-            assert.deepEqual(result.excludedDomains, ["ok.com", "good.org"]);
-        });
-
-        // Verifies that empty/missing input returns all defaults.
-        it("returns defaults for empty input", () => {
-            assert.deepEqual(bgModule.validateSettings({}), bgModule.DEFAULT_SETTINGS);
-        });
-    });
-
-    describe("syncSettings command", () => {
-        // Verifies that syncSettings fetches settings from native and stores them.
-        it("syncs settings from native app to browser.storage.local", async () => {
-            nativeMessageResponse = {
-                excludedDomains: ["github.com"],
-                keyBindingMode: "character",
-                theme: "dark",
-            };
-            storedSettings = {};
-            const result = await bgModule.handleCommand("syncSettings", {});
-            assert.equal(result.status, "ok");
-            assert.deepEqual(storedSettings.excludedDomains, ["github.com"]);
-            assert.equal(storedSettings.keyBindingMode, "character");
-            assert.equal(storedSettings.theme, "dark");
-        });
-
-        // Verifies that settingsChanged command also triggers a sync.
-        it("settingsChanged triggers sync", async () => {
-            nativeMessageResponse = {
-                excludedDomains: [],
-                keyBindingMode: "location",
-                theme: "light",
-            };
-            storedSettings = {};
-            const result = await bgModule.handleCommand("settingsChanged", {});
-            assert.equal(result.status, "ok");
-            assert.equal(storedSettings.theme, "light");
-        });
-
-        // Verifies that invalid native response values fall back to defaults.
-        it("validates and falls back for bad native response values", async () => {
-            nativeMessageResponse = {
-                excludedDomains: "not-array",
-                keyBindingMode: "invalid",
-                theme: 123,
-            };
-            storedSettings = {};
-            await bgModule.handleCommand("syncSettings", {});
-            assert.deepEqual(storedSettings.excludedDomains, []);
-            assert.equal(storedSettings.keyBindingMode, "location");
-            assert.equal(storedSettings.theme, "yellow");
-        });
-    });
 });

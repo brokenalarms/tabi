@@ -125,6 +125,10 @@ describe("FindMode", () => {
         setupDOM();
         keyHandler = new KeyHandler();
         findMode = new FindMode(keyHandler);
+        keyHandler.on("exitToNormal", () => {
+            if (findMode.isActive()) findMode.deactivate(true);
+            keyHandler.setMode(Mode.NORMAL);
+        });
     });
 
     afterEach(() => {

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <link rel="stylesheet" href="styles/popup.css">
+</head>
+<body>
+  <div class="popup">
+    <h1>Vimium</h1>
+
+    <div class="setting">
+      <label class="setting-label">Key Binding Mode</label>
+      <div class="segmented" id="keyBindingMode">
+        <button data-value="location" class="active">By Position</button>
+        <button data-value="character">By Character</button>
+      </div>
+      <p class="hint">Position matches physical key location. Character matches what you type.</p>
+    </div>
+
+    <hr>
+
+    <div class="setting">
+      <label class="setting-label">Theme</label>
+      <div class="segmented" id="theme">
+        <button data-value="classic" class="active">Classic</button>
+        <button data-value="dark">Dark</button>
+        <button data-value="light">Light</button>
+        <button data-value="auto">Auto</button>
+      </div>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

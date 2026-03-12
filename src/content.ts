@@ -79,11 +79,7 @@ function isDomainExcluded(excludedDomains: string[]): boolean {
 }
 
 function applyTheme(theme: Theme): void {
-  if (theme === "auto") {
-    document.documentElement.removeAttribute("data-vimium-theme");
-  } else {
-    document.documentElement.setAttribute("data-vimium-theme", theme);
-  }
+  document.documentElement.setAttribute("data-vimium-theme", theme);
 }
 
 function initialize(settings: Partial<VimiumSettings>): void {

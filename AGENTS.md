@@ -1,5 +1,20 @@
 # Agent Instructions
 
+## Safari Extension Build Requirements
+
+**CRITICAL: Do not break the extension's ability to load in Safari.** These are the most common causes of silent failure (extension just doesn't appear — no error):
+
+1. **NSExtension in Info.plist** — The file `Vimium/Safari Extension/Info.plist` MUST contain an `NSExtension` dictionary with `NSExtensionPointIdentifier` and `NSExtensionPrincipalClass`. Xcode's `INFOPLIST_KEY_NSExtension_*` build settings DO NOT WORK for this — they silently produce an Info.plist without the NSExtension dictionary. Always use the explicit Info.plist file.
+
+2. **Resources must be copied into the bundle with directory structure preserved** — The extension's manifest.json references files in subdirectories (`modules/`, `styles/`, `images/`). xcodegen's `resources:` key does not actually copy files. The `postBuildScripts` rsync step in `project.yml` handles this — do not remove it.
+
+3. **When modifying `project.yml`**, always verify afterwards:
+   - `INFOPLIST_FILE: Vimium/Safari Extension/Info.plist` is set on the extension target
+   - The "Copy Extension Resources" and "Validate Extension Bundle" post-build scripts are present
+   - Run `xcodegen generate && xcodebuild -scheme Vimium build` and check for the validation pass message
+
+4. **TypeScript sources** live in `src/`. The JS files in `Vimium/Safari Extension/Resources/` are build output (gitignored). The "Compile TypeScript" pre-build script generates them via esbuild.
+
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
 
 ## Quick Reference

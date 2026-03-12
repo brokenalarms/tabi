@@ -20,6 +20,8 @@ declare const browser: {
 
 interface KeyHandlerLike {
   setMode(mode: ModeValue): void;
+  setModeKeyDelegate(handler: (event: KeyboardEvent) => boolean): void;
+  clearModeKeyDelegate(): void;
   on(command: string, callback: () => void): void;
   off(command: string): void;
 }
@@ -30,7 +32,7 @@ interface Hint {
   div: HTMLDivElement;
 }
 
-const HINT_CHARS = "sadfjklewcmpgh";
+const HINT_CHARS = "sadgjklewcmpoh";
 
 const CLICKABLE_SELECTOR = [
   "a", "button", "input", "textarea", "select",
@@ -49,8 +51,6 @@ class HintMode {
   private _hints: Hint[];
   private _typed: string;
   private _overlay: HTMLDivElement | null;
-  private _styleEl: HTMLStyleElement | null;
-  private readonly _onKeyDown: (event: KeyboardEvent) => void;
 
   constructor(keyHandler: KeyHandlerLike) {
     this._keyHandler = keyHandler;
@@ -59,15 +59,16 @@ class HintMode {
     this._hints = [];
     this._typed = "";
     this._overlay = null;
-    this._styleEl = null;
-    this._onKeyDown = this._handleKeyDown.bind(this);
     this._wireCommands();
   }
 
   // --- Public API ---
 
   activate(newTab: boolean): void {
-    if (this._active) return;
+    if (this._active) {
+      this._deactivate();
+      return;
+    }
     this._newTab = !!newTab;
     this._active = true;
     this._typed = "";
@@ -80,7 +81,6 @@ class HintMode {
     }
 
     const labels = HintMode.generateLabels(elements.length);
-    this._injectStyles();
     this._createOverlay();
     this._hints = elements.map((el, i) => {
       const label = labels[i];
@@ -88,7 +88,7 @@ class HintMode {
       return { element: el, label, div };
     });
 
-    document.addEventListener("keydown", this._onKeyDown, true);
+    this._keyHandler.setModeKeyDelegate(this._handleKey.bind(this));
   }
 
   deactivate(): void {
@@ -103,45 +103,56 @@ class HintMode {
 
   private _discoverElements(): HTMLElement[] {
     const seen = new Set<Element>();
+    const clickableSet = new Set<Element>();
     const result: HTMLElement[] = [];
 
     const collect = (root: Document | ShadowRoot): void => {
+      // Mark clickable-selector matches so we skip the expensive getComputedStyle for them
       const nodes = root.querySelectorAll(CLICKABLE_SELECTOR);
       for (const el of nodes) {
-        if (seen.has(el)) continue;
-        seen.add(el);
-        if (this._isVisible(el as HTMLElement)) result.push(el as HTMLElement);
+        clickableSet.add(el);
       }
-      // cursor:pointer heuristic — check all elements, but only those
-      // not already captured by selector matching
+
+      // Single pass over all elements: handle selector matches and cursor:pointer
       const allEls = root.querySelectorAll("*");
       for (const el of allEls) {
         if (seen.has(el)) continue;
+
+        if (clickableSet.has(el)) {
+          seen.add(el);
+          if (this._isVisible(el as HTMLElement)) result.push(el as HTMLElement);
+          continue;
+        }
+
+        // Viewport bounds check before expensive getComputedStyle
+        const rect = (el as HTMLElement).getBoundingClientRect();
+        if ((rect.width === 0 && rect.height === 0) ||
+            rect.bottom < 0 || rect.top > window.innerHeight ||
+            rect.right < 0 || rect.left > window.innerWidth) {
+          continue;
+        }
+
         try {
           const style = getComputedStyle(el);
           if (style.cursor === "pointer" && this._isVisible(el as HTMLElement)) {
+            // Skip cursor:pointer ancestors of clickable elements — the
+            // descendants already get their own hints.
+            if (el.querySelector(CLICKABLE_SELECTOR)) continue;
             seen.add(el);
             result.push(el as HTMLElement);
           }
         } catch (_) {
           // getComputedStyle may throw for detached elements
         }
+
+        // Check for shadow roots while we're iterating
+        if (el.shadowRoot) {
+          collect(el.shadowRoot);
+        }
       }
     };
 
     collect(document);
-
-    // Traverse open shadow roots
-    const walkShadow = (root: Document | ShadowRoot): void => {
-      const els = root.querySelectorAll("*");
-      for (const el of els) {
-        if (el.shadowRoot) {
-          collect(el.shadowRoot);
-          walkShadow(el.shadowRoot);
-        }
-      }
-    };
-    walkShadow(document);
 
     // Sort by viewport position: top-left elements get shortest labels
     result.sort((a, b) => {
@@ -155,7 +166,15 @@ class HintMode {
 
   private _isVisible(el: HTMLElement): boolean {
     const rect = el.getBoundingClientRect();
-    if (rect.width === 0 && rect.height === 0) return false;
+    if (rect.width === 0 && rect.height === 0) {
+      // Anchor elements (e.g. Google search result links) may have zero-size
+      // rects when the visual size comes from a child element. Fall back to
+      // checking the first child element's visibility.
+      if (el.tagName === "A" && el.firstElementChild) {
+        return this._isVisible(el.firstElementChild as HTMLElement);
+      }
+      return false;
+    }
     if (rect.bottom < 0 || rect.top > window.innerHeight) return false;
     if (rect.right < 0 || rect.left > window.innerWidth) return false;
 
@@ -198,30 +217,6 @@ class HintMode {
 
   // --- Overlay rendering ---
 
-  private _injectStyles(): void {
-    if (this._styleEl) return;
-    this._styleEl = document.createElement("style") as HTMLStyleElement;
-    this._styleEl.textContent = `
-.vimium-hint-overlay {
-    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-    z-index: 2147483647; pointer-events: none;
-}
-.vimium-hint {
-    position: fixed; z-index: 2147483647;
-    padding: 1px 3px;
-    background: linear-gradient(to bottom, #fff785, #ffc542);
-    border: 1px solid #c38a22; border-radius: 3px;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-    color: #302505;
-    font: bold 12px/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif;
-    text-transform: uppercase;
-    pointer-events: none; white-space: nowrap;
-}
-.vimium-hint .vimium-hint-matched { opacity: 0.4; }
-`;
-    (document.head || document.documentElement).appendChild(this._styleEl);
-  }
-
   private _createOverlay(): void {
     this._overlay = document.createElement("div") as HTMLDivElement;
     this._overlay.className = "vimium-hint-overlay";
@@ -239,18 +234,24 @@ class HintMode {
     return div;
   }
 
-  // --- Key handling during HINTS mode ---
+  // --- Key handling during HINTS mode (called via KeyHandler delegate) ---
 
-  private _handleKeyDown(event: KeyboardEvent): void {
-    if (!this._active) return;
+  private _handleKey(event: KeyboardEvent): boolean {
+    if (!this._active) return false;
+
+    // 'f' with no modifiers toggles hints off
+    if (event.code === "KeyF" && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      this._deactivate();
+      return true;
+    }
+
+    // Let Escape fall through to KeyHandler's exitToNormal dispatch
+    if (event.code === "Escape") return false;
 
     event.preventDefault();
     event.stopPropagation();
-
-    if (event.code === "Escape") {
-      this._deactivate();
-      return;
-    }
 
     // Backspace removes last typed character
     if (event.code === "Backspace") {
@@ -258,12 +259,12 @@ class HintMode {
         this._typed = this._typed.slice(0, -1);
         this._updateHintVisibility();
       }
-      return;
+      return true;
     }
 
     // Only accept hint characters
     const char = event.key ? event.key.toLowerCase() : "";
-    if (!HINT_CHARS.includes(char) || char.length !== 1) return;
+    if (!HINT_CHARS.includes(char) || char.length !== 1) return true;
 
     this._typed += char;
     this._updateHintVisibility();
@@ -273,6 +274,7 @@ class HintMode {
     if (match) {
       this._activateHint(match);
     }
+    return true;
   }
 
   private _updateHintVisibility(): void {
@@ -316,17 +318,12 @@ class HintMode {
     if (!this._active) return;
     this._active = false;
     this._typed = "";
-    document.removeEventListener("keydown", this._onKeyDown, true);
+    this._keyHandler.clearModeKeyDelegate();
 
     if (this._overlay && this._overlay.parentNode) {
       this._overlay.parentNode.removeChild(this._overlay);
     }
     this._overlay = null;
-
-    if (this._styleEl && this._styleEl.parentNode) {
-      this._styleEl.parentNode.removeChild(this._styleEl);
-    }
-    this._styleEl = null;
 
     this._hints = [];
     this._keyHandler.setMode(Mode.NORMAL);

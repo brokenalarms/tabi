@@ -6,11 +6,7 @@ const assert = require("node:assert/strict");
 
 // Inline applyTheme logic matching content.ts for unit testing
 function applyTheme(theme, element) {
-    if (theme === "auto") {
-        element.removeAttribute("data-vimium-theme");
-    } else {
-        element.setAttribute("data-vimium-theme", theme);
-    }
+    element.setAttribute("data-vimium-theme", theme);
 }
 
 describe("applyTheme", () => {
@@ -25,19 +21,19 @@ describe("applyTheme", () => {
     }
 
     it("sets data-vimium-theme attribute for named themes", () => {
-        for (const theme of ["yellow", "dark", "light"]) {
+        for (const theme of ["classic", "dark", "light"]) {
             const el = makeElement();
             applyTheme(theme, el);
             assert.equal(el.getAttribute("data-vimium-theme"), theme);
         }
     });
 
-    it("removes data-vimium-theme attribute for auto theme", () => {
+    it("sets data-vimium-theme to auto for auto theme", () => {
         const el = makeElement();
         applyTheme("dark", el);
         assert.equal(el.getAttribute("data-vimium-theme"), "dark");
         applyTheme("auto", el);
-        assert.equal(el.getAttribute("data-vimium-theme"), null);
+        assert.equal(el.getAttribute("data-vimium-theme"), "auto");
     });
 
     it("overwrites previous theme when switching", () => {
@@ -92,7 +88,7 @@ describe("storage.onChanged listener", () => {
         assert.equal(el.getAttribute("data-vimium-theme"), "dark");
 
         handleChange({ theme: { newValue: "auto" } }, "local");
-        assert.equal(el.getAttribute("data-vimium-theme"), null);
+        assert.equal(el.getAttribute("data-vimium-theme"), "auto");
     });
 
     function makeElement() {
