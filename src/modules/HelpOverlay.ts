@@ -4,6 +4,8 @@
 
 import type { ModeValue } from "../types";
 
+declare const COMMANDS: Record<string, string>;
+
 declare const Mode: {
   readonly NORMAL: "NORMAL";
   readonly INSERT: "INSERT";
@@ -17,36 +19,6 @@ interface KeyHandlerLike {
   off(command: string): void;
   getBindings(): Map<string, Map<string, string>>;
 }
-
-const COMMAND_LABELS: Record<string, string> = {
-  scrollDown: "Scroll down",
-  scrollUp: "Scroll up",
-  scrollLeft: "Scroll left",
-  scrollRight: "Scroll right",
-  scrollHalfPageDown: "Half page down",
-  scrollHalfPageUp: "Half page up",
-  scrollToBottom: "Scroll to bottom",
-  scrollToTop: "Scroll to top",
-  goBack: "Go back",
-  goForward: "Go forward",
-  pageRefresh: "Refresh page",
-  activateHints: "Open link (current tab)",
-  activateHintsNewTab: "Open link (new tab)",
-  enterFindMode: "Find on page (Cmd+F)",
-  createTab: "New tab",
-  closeTab: "Close tab",
-  restoreTab: "Restore tab",
-  tabLeft: "Move tab left",
-  tabRight: "Move tab right",
-  tabNext: "Next tab",
-  tabPrev: "Previous tab",
-  firstTab: "First tab",
-  lastTab: "Last tab",
-  openTabSearch: "Search tabs",
-  focusInput: "Focus first text input",
-  goUpUrl: "Go up one URL level",
-  showHelp: "Show this help",
-};
 
 class HelpOverlay {
   private _keyHandler: KeyHandlerLike;
@@ -88,7 +60,7 @@ class HelpOverlay {
 
     const title = document.createElement("h2");
     title.className = "vimium-help-title";
-    title.textContent = "Vimium Keyboard Shortcuts";
+    title.textContent = "vimium-mac keyboard shortcuts";
     modal.appendChild(title);
 
     const grid = document.createElement("div");
@@ -98,7 +70,7 @@ class HelpOverlay {
     const normalBindings = bindings.get("NORMAL");
     if (normalBindings) {
       for (const [seq, cmd] of normalBindings) {
-        const label = COMMAND_LABELS[cmd] || cmd;
+        const label = COMMANDS[cmd] || cmd;
 
         const row = document.createElement("div");
         row.className = "vimium-help-row";
@@ -129,19 +101,22 @@ class HelpOverlay {
   }
 
   static _formatSequence(seq: string): string {
-    return seq
-      .split(" ")
-      .map((part) =>
-        part
-          .replace(/^Shift-/, "\u21E7")
-          .replace(/^Ctrl-/, "\u2303")
-          .replace(/^Alt-/, "\u2325")
-          .replace(/^Meta-/, "\u2318")
-          .replace(/^Key/, "")
-          .replace(/^Digit/, "")
-          .replace(/^Slash$/, "/"),
-      )
-      .join(" ");
+    return seq.split(" ").map((part) => {
+      const modifiers: string[] = [];
+      let code = part;
+      for (const [prefix, symbol] of [
+        ["Shift-", "\u21E7"], ["Ctrl-", "\u2303"],
+        ["Alt-", "\u2325"], ["Meta-", "\u2318"],
+      ] as const) {
+        if (code.startsWith(prefix)) {
+          modifiers.push(symbol);
+          code = code.slice(prefix.length);
+        }
+      }
+      code = code.replace(/^Key/, "").replace(/^Digit/, "");
+      if (code === "Slash") code = "/";
+      return modifiers.join("") + code.toLowerCase();
+    }).join(" ");
   }
 
   private _deactivate(): void {

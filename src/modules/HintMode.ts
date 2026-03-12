@@ -33,6 +33,7 @@ interface Hint {
 }
 
 const HINT_CHARS = "sadgjklewcmpoh";
+const HINT_ANIMATE = true;
 
 const CLICKABLE_SELECTOR = [
   "a", "button", "input", "textarea", "select",
@@ -194,6 +195,16 @@ class HintMode {
     return style.cursor === "pointer";
   }
 
+  private _findAssociatedLabel(el: HTMLElement): HTMLElement | null {
+    if (el.id) {
+      const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+      if (label) return label as HTMLElement;
+    }
+    const parent = el.closest("label");
+    if (parent) return parent as HTMLElement;
+    return null;
+  }
+
   private _isVisible(el: HTMLElement): boolean {
     const rect = el.getBoundingClientRect();
     if (rect.width === 0 && rect.height === 0) {
@@ -207,6 +218,13 @@ class HintMode {
           }
         }
       }
+      if (el.tagName === "INPUT") {
+        const type = ((el as HTMLInputElement).type || "").toLowerCase();
+        if (type === "radio" || type === "checkbox") {
+          const label = this._findAssociatedLabel(el);
+          if (label) return this._isVisible(label);
+        }
+      }
       return false;
     }
     if (rect.bottom < 0 || rect.top > window.innerHeight) return false;
@@ -214,7 +232,16 @@ class HintMode {
 
     const style = getComputedStyle(el);
     if (style.visibility === "hidden" || style.display === "none") return false;
-    if (parseFloat(style.opacity) === 0) return false;
+    if (parseFloat(style.opacity) === 0) {
+      if (el.tagName === "INPUT") {
+        const type = ((el as HTMLInputElement).type || "").toLowerCase();
+        if (type === "radio" || type === "checkbox") {
+          const label = this._findAssociatedLabel(el);
+          if (label) return this._isVisible(label);
+        }
+      }
+      return false;
+    }
 
     // Check if element is clipped by an ancestor with overflow:hidden/clip
     let ancestor = el.parentElement;
@@ -256,23 +283,37 @@ class HintMode {
   private _getHintRect(el: HTMLElement): DOMRect {
     const rect = el.getBoundingClientRect();
 
-    if (el.tagName === "A") {
-      // Prefer a heading child for positioning — Google (and similar sites)
-      // wrap <h3> + site info in one large <a>, and the heading is the
-      // visual target the user expects the hint on.
-      const heading = el.querySelector("h1, h2, h3, h4, h5, h6");
-      if (heading) {
-        const hr = heading.getBoundingClientRect();
-        if (hr.width > 0 && hr.height > 0) {
-          // Subtract paddingTop so hint aligns with actual text, not element box
-          const paddingTop = parseFloat(getComputedStyle(heading).paddingTop) || 0;
-          if (paddingTop > 0) {
-            return new DOMRect(hr.left, hr.top + paddingTop, hr.width, hr.height - paddingTop);
-          }
-          return hr;
+    if (el.tagName === "INPUT") {
+      const type = ((el as HTMLInputElement).type || "").toLowerCase();
+      if (type === "radio" || type === "checkbox") {
+        if ((rect.width === 0 && rect.height === 0) || parseFloat(getComputedStyle(el).opacity) === 0) {
+          const label = this._findAssociatedLabel(el);
+          if (label) return label.getBoundingClientRect();
         }
       }
+    }
 
+    // For elements wider than 25% of the viewport, find the most relevant
+    // child to anchor the hint on — a heading, button, icon, or chevron.
+    // Places the hint where the user's eye is naturally drawn rather than
+    // at the top-left of a wide container.
+    if (rect.width > window.innerWidth * 0.25) {
+      const child = el.querySelector(
+        "h1, h2, h3, h4, h5, h6, button, svg, [role='button'], [class*='icon'], [class*='chevron'], [class*='arrow']"
+      );
+      if (child) {
+        const cr = child.getBoundingClientRect();
+        if (cr.width > 0 && cr.height > 0 && cr.width < rect.width * 0.5) {
+          const paddingTop = parseFloat(getComputedStyle(child).paddingTop) || 0;
+          if (paddingTop > 0) {
+            return new DOMRect(cr.left, cr.top + paddingTop, cr.width, cr.height - paddingTop);
+          }
+          return cr;
+        }
+      }
+    }
+
+    if (el.tagName === "A") {
       // Use getClientRects() for inline elements — gives per-line-box rects,
       // avoiding inflated bounding rects from visually-hidden child spans
       const clientRects = el.getClientRects();
@@ -330,7 +371,12 @@ class HintMode {
   private _createOverlay(): void {
     this._overlay = document.createElement("div") as HTMLDivElement;
     this._overlay.className = "vimium-hint-overlay";
+    if (HINT_ANIMATE) this._overlay.classList.add("vimium-hint-animate");
     document.body.appendChild(this._overlay);
+    if (HINT_ANIMATE) {
+      void this._overlay.offsetHeight;
+      this._overlay.classList.add("visible");
+    }
   }
 
   private _createHintDiv(element: HTMLElement, label: string): HTMLDivElement {
@@ -394,6 +440,12 @@ class HintMode {
     this._typed += char;
     this._updateHintVisibility();
 
+    // Deactivate if no hints match the typed prefix
+    if (!this._hints.some(h => h.label.startsWith(this._typed))) {
+      this._deactivate();
+      return true;
+    }
+
     // Check for exact match
     const match = this._hints.find((h) => h.label === this._typed);
     if (match) {
@@ -447,10 +499,17 @@ class HintMode {
     document.removeEventListener("mousedown", this._onMouseDown, true);
     window.removeEventListener("scroll", this._onScroll, true);
 
-    if (this._overlay && this._overlay.parentNode) {
+    if (HINT_ANIMATE && this._overlay) {
+      this._overlay.classList.remove("visible");
+      const overlay = this._overlay;
+      setTimeout(() => {
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      }, 80);
+      this._overlay = null;
+    } else if (this._overlay && this._overlay.parentNode) {
       this._overlay.parentNode.removeChild(this._overlay);
+      this._overlay = null;
     }
-    this._overlay = null;
 
     this._hints = [];
     this._keyHandler.setMode(Mode.NORMAL);

@@ -3,6 +3,8 @@
 
 import type { KeyBindingMode, ModeValue } from "../types";
 
+declare const COMMANDS: Record<string, string>;
+
 const Mode = {
   NORMAL: "NORMAL",
   INSERT: "INSERT",
@@ -179,53 +181,59 @@ class KeyHandler {
 
   private _initDefaultBindings(): void {
     const n = Mode.NORMAL;
+    const _bind = (mode: ModeValue, seq: string, cmd: string) => {
+      if (!(cmd in COMMANDS)) {
+        console.warn(`[Vimium] Unknown command "${cmd}" — not in COMMANDS`);
+      }
+      this.bind(mode, seq, cmd);
+    };
 
     // Scrolling
-    this.bind(n, "KeyJ", "scrollDown");
-    this.bind(n, "KeyK", "scrollUp");
-    this.bind(n, "KeyH", "scrollLeft");
-    this.bind(n, "KeyL", "scrollRight");
-    this.bind(n, "KeyD", "scrollHalfPageDown");
-    this.bind(n, "KeyU", "scrollHalfPageUp");
-    this.bind(n, "Shift-KeyG", "scrollToBottom");
-    this.bind(n, "KeyG KeyG", "scrollToTop");
+    _bind(n, "KeyJ", "scrollDown");
+    _bind(n, "KeyK", "scrollUp");
+    _bind(n, "KeyH", "scrollLeft");
+    _bind(n, "KeyL", "scrollRight");
+    _bind(n, "KeyD", "scrollHalfPageDown");
+    _bind(n, "KeyU", "scrollHalfPageUp");
+    _bind(n, "Shift-KeyG", "scrollToBottom");
+    _bind(n, "KeyG KeyG", "scrollToTop");
 
     // History / navigation
-    this.bind(n, "Shift-KeyH", "goBack");
-    this.bind(n, "Shift-KeyL", "goForward");
-    this.bind(n, "KeyR", "pageRefresh");
+    _bind(n, "Shift-KeyH", "goBack");
+    _bind(n, "Shift-KeyL", "goForward");
+    _bind(n, "KeyR", "pageRefresh");
 
     // Hints
-    this.bind(n, "KeyF", "activateHints");
-    this.bind(n, "Shift-KeyF", "activateHintsNewTab");
+    _bind(n, "KeyF", "activateHints");
+    _bind(n, "Shift-KeyF", "activateHintsNewTab");
 
     // Find (delegates to native Cmd+F)
-    this.bind(n, "Slash", "enterFindMode");
+    _bind(n, "Slash", "enterFindMode");
 
     // Tabs
-    this.bind(n, "KeyT", "createTab");
-    this.bind(n, "KeyX", "closeTab");
-    this.bind(n, "Shift-KeyX", "restoreTab");
-    this.bind(n, "Shift-KeyJ", "tabLeft");
-    this.bind(n, "Shift-KeyK", "tabRight");
-    this.bind(n, "KeyG KeyT", "tabNext");
-    this.bind(n, "KeyG Shift-KeyT", "tabPrev");
-    this.bind(n, "KeyG Digit0", "firstTab");
-    this.bind(n, "KeyG Shift-Digit4", "lastTab");
+    _bind(n, "KeyT", "createTab");
+    _bind(n, "KeyX", "closeTab");
+    _bind(n, "Shift-KeyX", "restoreTab");
+    _bind(n, "Shift-KeyJ", "tabLeft");
+    _bind(n, "Shift-KeyK", "tabRight");
+    _bind(n, "KeyG KeyT", "tabNext");
+    _bind(n, "KeyG Shift-KeyT", "tabPrev");
+    _bind(n, "KeyG Digit0", "firstTab");
+    _bind(n, "KeyG Shift-Digit4", "lastTab");
 
     // Tab search
-    this.bind(n, "Shift-KeyT", "openTabSearch");
+    _bind(n, "Shift-KeyT", "openTabSearch");
 
     // Navigation
-    this.bind(n, "KeyG KeyI", "focusInput");
-    this.bind(n, "KeyG KeyU", "goUpUrl");
+    _bind(n, "KeyG KeyI", "focusInput");
+    _bind(n, "KeyG KeyU", "goUpUrl");
 
     // Help
-    this.bind(n, "Shift-Slash", "showHelp");
+    _bind(n, "Shift-Slash", "showHelp");
 
     // Mode escape — works in all non-NORMAL modes
     for (const mode of [Mode.INSERT, Mode.HINTS, Mode.TAB_SEARCH]) {
-      this.bind(mode, "Escape", "exitToNormal");
+      _bind(mode, "Escape", "exitToNormal");
     }
   }
 

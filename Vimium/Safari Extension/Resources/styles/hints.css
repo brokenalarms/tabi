@@ -23,6 +23,15 @@
     white-space: nowrap;
 }
 
+.vimium-hint-overlay.vimium-hint-animate {
+    opacity: 0;
+    transition: opacity 100ms ease-out;
+}
+
+.vimium-hint-overlay.vimium-hint-animate.visible {
+    opacity: 1;
+}
+
 .vimium-hint .vimium-hint-matched {
     opacity: var(--vimium-hint-matched-opacity);
 }

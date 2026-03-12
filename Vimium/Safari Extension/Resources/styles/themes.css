@@ -34,7 +34,19 @@
     --vimium-hint-matched-opacity: 0.35;
 }
 
-/* ── Tab search / help theme (follows system dark mode) ───────────────── */
+/* ── Help overlay theme (follows system dark mode) ────────────────────── */
+
+.vimium-help-overlay,
+.vimium-help-modal {
+    --vimium-help-bg: #2a2a2a;
+    --vimium-help-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+    --vimium-help-color: #eee;
+    --vimium-help-key-bg: #444;
+    --vimium-help-desc-color: #ccc;
+    --vimium-help-muted-color: #888;
+}
+
+/* ── Tab search theme (follows system dark mode) ──────────────────────── */
 
 .vimium-tab-search-overlay,
 .vimium-tab-search-modal {
@@ -52,6 +64,16 @@
 }
 
 @media (prefers-color-scheme: light) {
+    .vimium-help-overlay,
+    .vimium-help-modal {
+        --vimium-help-bg: #fff;
+        --vimium-help-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+        --vimium-help-color: #333;
+        --vimium-help-key-bg: #e8e8e8;
+        --vimium-help-desc-color: #555;
+        --vimium-help-muted-color: #999;
+    }
+
     .vimium-tab-search-overlay,
     .vimium-tab-search-modal {
         --vimium-tab-modal-bg: #fff;

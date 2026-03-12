@@ -69,6 +69,13 @@ function fireFocusOut(target) {
 // Load the module source (not an ES module — defines globals)
 function loadKeyHandler() {
     setupDOM();
+    // Load commands first (defines global COMMANDS)
+    const commandsPath = require("node:path").resolve(
+        __dirname,
+        "../Vimium/Safari Extension/Resources/commands.js"
+    );
+    delete require.cache[commandsPath];
+    require(commandsPath);
     // Clear require cache so each test gets a fresh module
     const modulePath = require("node:path").resolve(
         __dirname,

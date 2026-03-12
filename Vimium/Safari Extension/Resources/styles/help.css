@@ -12,15 +12,15 @@
     position: fixed;
     bottom: 16px;
     right: 16px;
-    background: #2a2a2a;
+    background: var(--vimium-help-bg);
     border-radius: 8px;
     padding: 16px 20px;
     width: 400px;
     max-width: 90vw;
     max-height: 60vh;
     overflow-y: auto;
-    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
-    color: #eee;
+    box-shadow: var(--vimium-help-shadow);
+    color: var(--vimium-help-color);
     font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
 }
 
@@ -43,7 +43,7 @@
 .vimium-help-key {
     font-family: "SF Mono", Menlo, monospace;
     font-size: 11px;
-    background: #444;
+    background: var(--vimium-help-key-bg);
     border-radius: 3px;
     padding: 1px 5px;
     text-align: center;
@@ -52,13 +52,13 @@
 
 .vimium-help-desc {
     font-size: 12px;
-    color: #ccc;
+    color: var(--vimium-help-desc-color);
     line-height: 1.8;
 }
 
 .vimium-help-hint {
     text-align: center;
     font-size: 10px;
-    color: #888;
+    color: var(--vimium-help-muted-color);
     margin-top: 12px;
 }

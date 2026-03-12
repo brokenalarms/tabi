@@ -119,6 +119,7 @@ function setupDOM(elements = []) {
             });
         },
         createElement(tag) {
+            const classes = new Set();
             const el = {
                 tagName: tag.toUpperCase(),
                 className: "",
@@ -127,6 +128,12 @@ function setupDOM(elements = []) {
                 style: {},
                 children: [],
                 parentNode: null,
+                classList: {
+                    add(c) { classes.add(c); },
+                    remove(c) { classes.delete(c); },
+                    contains(c) { return classes.has(c); },
+                },
+                offsetHeight: 0,
                 appendChild(child) {
                     this.children.push(child);
                     child.parentNode = this;
@@ -176,6 +183,7 @@ function setupDOM(elements = []) {
         innerHeight: 768,
         focus: mock.fn(),
         addEventListener: mock.fn(),
+        removeEventListener: mock.fn(),
     };
     global.getComputedStyle = (el) => el._style || { visibility: "visible", display: "block", opacity: "1", cursor: "default" };
     global.clearTimeout = clearTimeout;
@@ -188,10 +196,13 @@ function setupDOM(elements = []) {
 function loadModules(elements = []) {
     setupDOM(elements);
     const path = require("node:path");
+    const cmdPath = path.resolve(__dirname, "../Vimium/Safari Extension/Resources/commands.js");
     const khPath = path.resolve(__dirname, "../Vimium/Safari Extension/Resources/modules/KeyHandler.js");
     const hmPath = path.resolve(__dirname, "../Vimium/Safari Extension/Resources/modules/HintMode.js");
+    delete require.cache[cmdPath];
     delete require.cache[khPath];
     delete require.cache[hmPath];
+    require(cmdPath);
     require(khPath);
     require(hmPath);
     keyHandler = new global.KeyHandler();
@@ -408,6 +419,20 @@ describe("HintMode", () => {
             assert.equal(keyHandler.getMode(), "NORMAL");
         });
 
+        // Typing a hint char that doesn't match any hint prefix deactivates
+        it("deactivates when typed hint char matches no prefix", () => {
+            const link = makeElement("A", { href: "#", top: 10, left: 0 });
+            loadModules([link]);
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive());
+
+            // With 1 element, label is "s". Typing "a" (a valid hint char but
+            // doesn't match any hint prefix) should deactivate.
+            fireKeyDown(makeKeyEvent("KeyA", { key: "a" }));
+            assert.ok(!hintMode.isActive(), "Should deactivate when no hints match typed prefix");
+            assert.equal(keyHandler.getMode(), "NORMAL");
+        });
+
         // Mouse click dismisses hints
         it("deactivates on mousedown", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
@@ -417,6 +442,142 @@ describe("HintMode", () => {
             fireMouseDown();
             assert.ok(!hintMode.isActive());
             assert.equal(keyHandler.getMode(), "NORMAL");
+        });
+    });
+
+    describe("Cancel and recovery", () => {
+        // After cancelling hints, normal commands work again
+        it("normal commands work after hint cancellation", () => {
+            const link = makeElement("A", { href: "#", top: 10, left: 0 });
+            loadModules([link]);
+
+            let scrollDownCalled = false;
+            keyHandler.on("scrollDown", () => { scrollDownCalled = true; });
+
+            // Activate and cancel hints
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive());
+            fireKeyDown(makeKeyEvent("KeyZ", { key: "z" })); // non-hint key cancels
+            assert.ok(!hintMode.isActive());
+            assert.equal(keyHandler.getMode(), "NORMAL");
+
+            // Now press j — should dispatch scrollDown
+            fireKeyDown(makeKeyEvent("KeyJ"));
+            assert.ok(scrollDownCalled, "scrollDown should fire after hint cancellation");
+        });
+
+        // After no-match prefix cancel, normal commands work
+        it("normal commands work after no-match prefix cancellation", () => {
+            const link = makeElement("A", { href: "#", top: 10, left: 0 });
+            loadModules([link]);
+
+            let scrollDownCalled = false;
+            keyHandler.on("scrollDown", () => { scrollDownCalled = true; });
+
+            // Activate hints, type valid hint char that doesn't match any prefix
+            hintMode.activate(false);
+            fireKeyDown(makeKeyEvent("KeyA", { key: "a" })); // label is "s", "a" doesn't match
+            assert.ok(!hintMode.isActive());
+
+            fireKeyDown(makeKeyEvent("KeyJ"));
+            assert.ok(scrollDownCalled, "scrollDown should fire after no-match cancellation");
+        });
+
+        // After Escape cancel, normal commands work
+        it("normal commands work after Escape cancellation", () => {
+            const link = makeElement("A", { href: "#", top: 10, left: 0 });
+            loadModules([link]);
+
+            let scrollDownCalled = false;
+            keyHandler.on("scrollDown", () => { scrollDownCalled = true; });
+
+            hintMode.activate(false);
+            fireKeyDown(makeKeyEvent("Escape"));
+            assert.ok(!hintMode.isActive());
+
+            fireKeyDown(makeKeyEvent("KeyJ"));
+            assert.ok(scrollDownCalled, "scrollDown should fire after Escape cancellation");
+        });
+
+        // After successful hint activation, normal commands work
+        it("normal commands work after hint activation", () => {
+            const link = makeElement("A", { href: "#", top: 10, left: 0 });
+            loadModules([link]);
+
+            let scrollDownCalled = false;
+            keyHandler.on("scrollDown", () => { scrollDownCalled = true; });
+
+            hintMode.activate(false);
+            fireKeyDown(makeKeyEvent("KeyS", { key: "s" })); // activates the hint
+            assert.ok(!hintMode.isActive());
+
+            fireKeyDown(makeKeyEvent("KeyJ"));
+            assert.ok(scrollDownCalled, "scrollDown should fire after hint activation");
+        });
+    });
+
+    describe("Layout independence", () => {
+        // Hint typing uses event.key (layout character), not event.code (physical position)
+        it("matches hints by event.key, not event.code", () => {
+            // Create 15 links so labels are 2-char (ss, sa, sd, ...)
+            const links = [];
+            for (let i = 0; i < 15; i++) {
+                links.push(makeElement("A", { href: "#" + i, top: i * 20, left: 0 }));
+            }
+            loadModules(links);
+            hintMode.activate(false);
+
+            // Simulate a non-QWERTY layout: physical KeyD produces "h" on this layout.
+            // The hint label "sh" should match when user types key="s" then key="h",
+            // regardless of which physical keys produced those characters.
+            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));   // physical S, produces "s"
+            assert.ok(hintMode.isActive());
+            fireKeyDown(makeKeyEvent("KeyD", { key: "h" }));   // physical D, but layout produces "h"
+            // "sh" is a valid 2-char label (index 7) — should activate that hint
+            assert.ok(!hintMode.isActive(), "Should match hint 'sh' via event.key='h', not event.code='KeyD'");
+        });
+
+        // Hint typing ignores event.code entirely — wrong code, right key still works
+        it("ignores event.code for hint matching", () => {
+            const link = makeElement("A", { href: "#", top: 10, left: 0 });
+            loadModules([link]);
+            hintMode.activate(false);
+
+            // Label is "s". Send event with code=KeyO but key="s" (remapped layout).
+            // Should still match because we use event.key.
+            fireKeyDown(makeKeyEvent("KeyO", { key: "s" }));
+            assert.ok(!hintMode.isActive(), "Should activate hint via event.key='s' despite code='KeyO'");
+            assert.equal(link.click.mock.callCount(), 1);
+        });
+
+        // setKeyBindingMode("character") does NOT affect hint typing
+        it("positional/character key binding mode does not affect hint typing", () => {
+            const link = makeElement("A", { href: "#", top: 10, left: 0 });
+            loadModules([link]);
+            keyHandler.setKeyBindingMode("character");
+
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive());
+
+            // Label is "s". Physical KeyD with key="s" (simulating remapped layout).
+            // Even in character mode, hint typing should use event.key.
+            fireKeyDown(makeKeyEvent("KeyD", { key: "s" }));
+            assert.ok(!hintMode.isActive(), "Hint typing should use event.key regardless of keyBindingMode");
+            assert.equal(link.click.mock.callCount(), 1);
+        });
+
+        // setKeyBindingMode("location") does NOT affect hint typing
+        it("location key binding mode does not affect hint typing", () => {
+            const link = makeElement("A", { href: "#", top: 10, left: 0 });
+            loadModules([link]);
+            keyHandler.setKeyBindingMode("location");
+
+            hintMode.activate(false);
+
+            // Same test — physical KeyD with key="s"
+            fireKeyDown(makeKeyEvent("KeyD", { key: "s" }));
+            assert.ok(!hintMode.isActive(), "Hint typing should use event.key regardless of keyBindingMode");
+            assert.equal(link.click.mock.callCount(), 1);
         });
     });
 
