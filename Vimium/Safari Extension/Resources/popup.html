@@ -11,12 +11,12 @@
     <h1>Vimium</h1>
 
     <div class="setting">
-      <label class="setting-label">Vim Keys Binding Mode</label>
+      <label class="setting-label">Key Binding Mode</label>
       <div class="segmented" id="keyBindingMode">
-        <button data-value="location" class="active">By Position</button>
         <button data-value="character">By Character</button>
+        <button data-value="location" class="active">By Position</button>
       </div>
-      <p class="hint">Position matches by physical key location. Character matches what you type for non-QWERTY layouts.</p>
+      <p class="hint">Character matches what you type. <br/> Position matches by physical key location, regardless of layout.</p>
     </div>
 
     <hr>
@@ -24,10 +24,10 @@
     <div class="setting">
       <label class="setting-label">Hint Style</label>
       <div class="segmented" id="enablePointerTails">
-        <button data-value="false" class="active">Classic</button>
         <button data-value="true">Floating</button>
+        <button data-value="false" class="active">Classic</button>
       </div>
-      <p class="hint">Classic places hints inline over the start of each link. Floating displays them underneath and centered, with connector tails.</p>
+      <p class="hint">Floating displays hints underneath with connector tails. <br/> Classic places them inline over the start of each link. </p>
     </div>
 
     <hr>
@@ -35,12 +35,12 @@
     <div class="setting">
       <label class="setting-label">Tag Style</label>
       <div class="segmented" id="theme">
-        <button data-value="classic">Classic</button>
+        <button data-value="auto" class="active">Auto</button>
         <button data-value="dark">Dark</button>
         <button data-value="light">Light</button>
-        <button data-value="auto" class="active">Auto</button>
+        <button data-value="classic">Classic</button>
       </div>
-      <p class="hint">Auto selects light or dark in order to best contrast with page background.</p>
+      <p class="hint">Auto selects light or dark in order to best contrast with page background. <br/> Classic is yellow!</p>
     </div>
   </div>
   <script src="popup.js"></script>

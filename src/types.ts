@@ -27,8 +27,9 @@ export type CommandMessage =
   | { command: "tabRight" }
   | { command: "tabNext" }
   | { command: "tabPrev" }
-  | { command: "firstTab" }
-  | { command: "lastTab" }
+  | { command: "goToTab"; index: number }
+  | { command: "goToTabFirst" }
+  | { command: "goToTabLast" }
   | { command: "extensionActive" }
   | { command: "extensionInactive" };
 

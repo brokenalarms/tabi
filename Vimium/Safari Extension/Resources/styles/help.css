@@ -15,7 +15,7 @@
     background: var(--vimium-help-bg);
     border-radius: 8px;
     padding: 16px 20px;
-    width: 400px;
+    width: fit-content;
     max-width: 90vw;
     max-height: 60vh;
     overflow-y: auto;

@@ -5,7 +5,7 @@
 type Command =
   | "createTab" | "closeTab" | "switchTab" | "queryTabs"
   | "restoreTab" | "tabLeft" | "tabRight" | "tabNext" | "tabPrev"
-  | "firstTab" | "lastTab" | "extensionActive" | "extensionInactive";
+  | "goToTab" | "goToTabFirst" | "goToTabLast" | "extensionActive" | "extensionInactive";
 
 interface TabInfo {
   id: number;
@@ -122,7 +122,17 @@ async function handleCommand(command: Command, sender: MessageSender, message?: 
       break;
     }
 
-    case "firstTab": {
+    case "goToTab": {
+      const tabs = await browser.tabs.query({ currentWindow: true });
+      if (tabs.length === 0) break;
+      const index = message && typeof message.index === "number" ? message.index : 1;
+      // g1-g9 = tab N (1-indexed, clamped to tab count)
+      const targetIndex = Math.min(index - 1, tabs.length - 1);
+      await browser.tabs.update(tabs[targetIndex].id, { active: true });
+      break;
+    }
+
+    case "goToTabFirst": {
       const tabs = await browser.tabs.query({ currentWindow: true });
       if (tabs.length > 0) {
         await browser.tabs.update(tabs[0].id, { active: true });
@@ -130,7 +140,7 @@ async function handleCommand(command: Command, sender: MessageSender, message?: 
       break;
     }
 
-    case "lastTab": {
+    case "goToTabLast": {
       const tabs = await browser.tabs.query({ currentWindow: true });
       if (tabs.length > 0) {
         await browser.tabs.update(tabs[tabs.length - 1].id, { active: true });

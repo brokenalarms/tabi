@@ -210,21 +210,39 @@ describe("KeyHandler", () => {
             assert.ok(called);
         });
 
-        // Tests that g+0 dispatches firstTab
+        // Tests that g+0 dispatches goToTabFirst
         it("dispatches g0 sequence", () => {
             let called = false;
-            keyHandler.on("firstTab", () => { called = true; });
+            keyHandler.on("goToTabFirst", () => { called = true; });
             fireKeyDown(makeKeyEvent("KeyG"));
             fireKeyDown(makeKeyEvent("Digit0"));
             assert.ok(called);
         });
 
-        // Tests that g+$ (Shift-4) dispatches lastTab
+        // Tests that g+$ (Shift-4) dispatches goToTabLast
         it("dispatches g$ sequence", () => {
             let called = false;
-            keyHandler.on("lastTab", () => { called = true; });
+            keyHandler.on("goToTabLast", () => { called = true; });
             fireKeyDown(makeKeyEvent("KeyG"));
             fireKeyDown(makeKeyEvent("Digit4", { shift: true }));
+            assert.ok(called);
+        });
+
+        // Tests that g+5 dispatches goToTab5
+        it("dispatches g5 sequence", () => {
+            let called = false;
+            keyHandler.on("goToTab5", () => { called = true; });
+            fireKeyDown(makeKeyEvent("KeyG"));
+            fireKeyDown(makeKeyEvent("Digit5"));
+            assert.ok(called);
+        });
+
+        // Tests that g+^ (Shift-6) dispatches goToTabFirst
+        it("dispatches g^ sequence", () => {
+            let called = false;
+            keyHandler.on("goToTabFirst", () => { called = true; });
+            fireKeyDown(makeKeyEvent("KeyG"));
+            fireKeyDown(makeKeyEvent("Digit6", { shift: true }));
             assert.ok(called);
         });
 

@@ -182,13 +182,25 @@ function initialize(settings: Partial<VimiumSettings>): void {
   const tabCommands = [
     "createTab", "closeTab", "restoreTab",
     "tabLeft", "tabRight", "tabNext", "tabPrev",
-    "firstTab", "lastTab",
   ];
   for (const cmd of tabCommands) {
     keyHandler.on(cmd, () => {
       browser.runtime.sendMessage({ command: cmd });
     });
   }
+  // g1-g9: go to tab by number
+  for (let i = 1; i <= 9; i++) {
+    keyHandler.on("goToTab" + i, () => {
+      browser.runtime.sendMessage({ command: "goToTab", index: i });
+    });
+  }
+  // g0 / g^ = first tab, g$ = last tab
+  keyHandler.on("goToTabFirst", () => {
+    browser.runtime.sendMessage({ command: "goToTabFirst" });
+  });
+  keyHandler.on("goToTabLast", () => {
+    browser.runtime.sendMessage({ command: "goToTabLast" });
+  });
 
   // Focus first text input on the page (gi). Tab cycles through inputs.
   keyHandler.on("focusInput", () => {

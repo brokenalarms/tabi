@@ -222,15 +222,27 @@ describe("background.js tab management", () => {
             assert.equal(activatedTabId, 3);
         });
 
-        // Verifies that firstTab activates the first tab in the window.
-        it("firstTab activates first tab", async () => {
-            await bgModule.handleCommand("firstTab", makeSender(3));
+        // Verifies that goToTabFirst activates the first tab.
+        it("goToTabFirst activates first tab", async () => {
+            await bgModule.handleCommand("goToTabFirst", makeSender(3));
             assert.equal(activatedTabId, 1);
         });
 
-        // Verifies that lastTab activates the last tab in the window.
-        it("lastTab activates last tab", async () => {
-            await bgModule.handleCommand("lastTab", makeSender(1));
+        // Verifies that goToTabLast activates the last tab.
+        it("goToTabLast activates last tab", async () => {
+            await bgModule.handleCommand("goToTabLast", makeSender(1));
+            assert.equal(activatedTabId, 3);
+        });
+
+        // Verifies that goToTab index 2 activates the second tab.
+        it("goToTab 2 activates second tab", async () => {
+            await bgModule.handleCommand("goToTab", makeSender(1), { command: "goToTab", index: 2 });
+            assert.equal(activatedTabId, 2);
+        });
+
+        // Verifies that goToTab clamps to last tab when index exceeds count.
+        it("goToTab clamps to last tab when index exceeds count", async () => {
+            await bgModule.handleCommand("goToTab", makeSender(1), { command: "goToTab", index: 8 });
             assert.equal(activatedTabId, 3);
         });
     });

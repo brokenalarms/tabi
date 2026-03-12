@@ -68,24 +68,27 @@ class HelpOverlay {
 
     const bindings = this._keyHandler.getBindings();
     const normalBindings = bindings.get("NORMAL");
+    let goToTabDigitShown = false;
     if (normalBindings) {
       for (const [seq, cmd] of normalBindings) {
+        // Collapse g1-g9 into a single help row
+        if (/^goToTab\d$/.test(cmd)) {
+          if (goToTabDigitShown) continue;
+          goToTabDigitShown = true;
+          HelpOverlay._addRow(grid, "g1\u2013g9", "Go to tab by number");
+          continue;
+        }
+        if (cmd === "goToTabFirst") {
+          HelpOverlay._addRow(grid, "g0 / g^", "First tab");
+          continue;
+        }
+        if (cmd === "goToTabLast") {
+          HelpOverlay._addRow(grid, "g$", "Last tab");
+          continue;
+        }
+
         const label = COMMANDS[cmd] || cmd;
-
-        const row = document.createElement("div");
-        row.className = "vimium-help-row";
-
-        const keyEl = document.createElement("kbd");
-        keyEl.className = "vimium-help-key";
-        keyEl.textContent = HelpOverlay._formatSequence(seq);
-
-        const descEl = document.createElement("span");
-        descEl.className = "vimium-help-desc";
-        descEl.textContent = label;
-
-        row.appendChild(keyEl);
-        row.appendChild(descEl);
-        grid.appendChild(row);
+        HelpOverlay._addRow(grid, HelpOverlay._formatSequence(seq), label);
       }
     }
 
@@ -98,6 +101,20 @@ class HelpOverlay {
 
     this._overlay.appendChild(modal);
     document.body.appendChild(this._overlay);
+  }
+
+  private static _addRow(grid: HTMLElement, keyText: string, descText: string): void {
+    const row = document.createElement("div");
+    row.className = "vimium-help-row";
+    const keyEl = document.createElement("kbd");
+    keyEl.className = "vimium-help-key";
+    keyEl.textContent = keyText;
+    const descEl = document.createElement("span");
+    descEl.className = "vimium-help-desc";
+    descEl.textContent = descText;
+    row.appendChild(keyEl);
+    row.appendChild(descEl);
+    grid.appendChild(row);
   }
 
   static _formatSequence(seq: string): string {

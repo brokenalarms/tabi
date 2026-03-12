@@ -218,8 +218,12 @@ class KeyHandler {
     _bind(n, "Shift-KeyK", "tabRight");
     _bind(n, "KeyG KeyT", "tabNext");
     _bind(n, "KeyG Shift-KeyT", "tabPrev");
-    _bind(n, "KeyG Digit0", "firstTab");
-    _bind(n, "KeyG Shift-Digit4", "lastTab");
+    for (let i = 1; i <= 9; i++) {
+      this.bind(n, "KeyG Digit" + i, "goToTab" + i);
+    }
+    this.bind(n, "KeyG Shift-Digit6", "goToTabFirst");   // g^
+    this.bind(n, "KeyG Digit0", "goToTabFirst");          // g0
+    this.bind(n, "KeyG Shift-Digit4", "goToTabLast");     // g$
 
     // Tab search
     _bind(n, "Shift-KeyT", "openTabSearch");
