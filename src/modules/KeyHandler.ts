@@ -17,6 +17,25 @@ const NON_TEXT_INPUT_TYPES = new Set([
 ]);
 const KEY_TIMEOUT_MS = 500;
 
+// Map typed characters to canonical US QWERTY event.code names.
+// In character mode this lets symbol bindings work on any keyboard layout.
+const KEY_CHAR_TO_CODE: Record<string, string> = {
+  "/": "Slash", "?": "Slash",
+  "\\": "Backslash", "|": "Backslash",
+  ".": "Period", ">": "Period",
+  ",": "Comma", "<": "Comma",
+  ";": "Semicolon", ":": "Semicolon",
+  "'": "Quote", "\"": "Quote",
+  "[": "BracketLeft", "{": "BracketLeft",
+  "]": "BracketRight", "}": "BracketRight",
+  "`": "Backquote", "~": "Backquote",
+  "-": "Minus", "_": "Minus",
+  "=": "Equal", "+": "Equal",
+  "!": "Digit1", "@": "Digit2", "#": "Digit3", "$": "Digit4",
+  "%": "Digit5", "^": "Digit6", "&": "Digit7", "*": "Digit8",
+  "(": "Digit9", ")": "Digit0",
+};
+
 type ModeListener = (newMode: ModeValue, prevMode: ModeValue) => void;
 
 class KeyHandler {
@@ -116,7 +135,8 @@ class KeyHandler {
       this._bindings.set(mode, new Map());
       this._prefixes.set(mode, new Set());
     }
-    this._bindings.get(mode)!.set(sequence, commandName);
+    const modeMap = this._bindings.get(mode);
+    if (modeMap) modeMap.set(sequence, commandName);
     this._rebuildPrefixes(mode);
   }
 
@@ -141,9 +161,10 @@ class KeyHandler {
         if (event.shiftKey) parts.push("Shift");
         code = "Digit" + key;
       } else {
-        // Symbols, special keys: use event.code directly
+        // Symbols and special keys: map typed character to canonical code
+        // so bindings work regardless of physical keyboard layout
         if (event.shiftKey) parts.push("Shift");
-        code = event.code;
+        code = (key.length === 1 && KEY_CHAR_TO_CODE[key]) || event.code;
       }
     } else {
       if (event.shiftKey) parts.push("Shift");
@@ -178,10 +199,8 @@ class KeyHandler {
     this.bind(n, "KeyF", "activateHints");
     this.bind(n, "Shift-KeyF", "activateHintsNewTab");
 
-    // Find
+    // Find (delegates to native Cmd+F)
     this.bind(n, "Slash", "enterFindMode");
-    this.bind(n, "KeyN", "findNext");
-    this.bind(n, "Shift-KeyN", "findPrev");
 
     // Tabs
     this.bind(n, "KeyT", "createTab");
@@ -205,7 +224,7 @@ class KeyHandler {
     this.bind(n, "Shift-Slash", "showHelp");
 
     // Mode escape — works in all non-NORMAL modes
-    for (const mode of [Mode.INSERT, Mode.HINTS, Mode.FIND, Mode.TAB_SEARCH]) {
+    for (const mode of [Mode.INSERT, Mode.HINTS, Mode.TAB_SEARCH]) {
       this.bind(mode, "Escape", "exitToNormal");
     }
   }

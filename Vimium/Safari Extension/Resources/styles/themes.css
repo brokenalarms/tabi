@@ -1,12 +1,11 @@
 /*
  * Vimium Theme System
  *
- * CSS custom properties scoped to Vimium container classes.
- * The data-vimium-theme attribute is set on document.documentElement.
- * Themes: classic (default yellow), dark, light, auto (inverted — contrasts with page).
+ * Hint tags: themed via data-vimium-theme (contrasts with page background).
+ * Tab search / help: themed via prefers-color-scheme (follows system dark mode).
  */
 
-/* ── Classic theme (default — yellow gradient) ────────────────────────── */
+/* ── Hint tag theme (default — yellow gradient) ───────────────────────── */
 
 .vimium-hint-overlay,
 .vimium-hint {
@@ -17,34 +16,6 @@
     --vimium-hint-matched-opacity: 0.4;
 }
 
-.vimium-find-bar {
-    --vimium-find-bg: #333;
-    --vimium-find-border: #555;
-    --vimium-find-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
-    --vimium-find-input-bg: #1a1a1a;
-    --vimium-find-input-border: #666;
-    --vimium-find-input-color: #eee;
-    --vimium-find-input-focus-border: #4a9eff;
-    --vimium-find-count-color: #aaa;
-}
-
-.vimium-tab-search-overlay {
-    --vimium-tab-overlay-bg: rgba(0, 0, 0, 0.5);
-    --vimium-tab-modal-bg: #2a2a2a;
-    --vimium-tab-modal-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-    --vimium-tab-input-border: #444;
-    --vimium-tab-input-bg: #333;
-    --vimium-tab-input-color: #eee;
-    --vimium-tab-placeholder-color: #888;
-    --vimium-tab-item-border: #333;
-    --vimium-tab-item-selected-bg: rgba(74, 158, 255, 0.2);
-    --vimium-tab-title-color: #eee;
-    --vimium-tab-url-color: #888;
-    --vimium-tab-empty-color: #888;
-}
-
-/* ── Dark theme ─────────────────────────────────────────────────────── */
-
 [data-vimium-theme="dark"] .vimium-hint-overlay,
 [data-vimium-theme="dark"] .vimium-hint {
     --vimium-hint-bg: linear-gradient(to bottom, #4a4a4a, #333);
@@ -53,34 +24,6 @@
     --vimium-hint-color: #eee;
     --vimium-hint-matched-opacity: 0.35;
 }
-
-[data-vimium-theme="dark"] .vimium-find-bar {
-    --vimium-find-bg: #1a1a1a;
-    --vimium-find-border: #444;
-    --vimium-find-shadow: 0 -2px 8px rgba(0, 0, 0, 0.5);
-    --vimium-find-input-bg: #111;
-    --vimium-find-input-border: #555;
-    --vimium-find-input-color: #ddd;
-    --vimium-find-input-focus-border: #4a9eff;
-    --vimium-find-count-color: #999;
-}
-
-[data-vimium-theme="dark"] .vimium-tab-search-overlay {
-    --vimium-tab-overlay-bg: rgba(0, 0, 0, 0.6);
-    --vimium-tab-modal-bg: #1a1a1a;
-    --vimium-tab-modal-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-    --vimium-tab-input-border: #333;
-    --vimium-tab-input-bg: #222;
-    --vimium-tab-input-color: #ddd;
-    --vimium-tab-placeholder-color: #777;
-    --vimium-tab-item-border: #222;
-    --vimium-tab-item-selected-bg: rgba(74, 158, 255, 0.15);
-    --vimium-tab-title-color: #ddd;
-    --vimium-tab-url-color: #777;
-    --vimium-tab-empty-color: #777;
-}
-
-/* ── Light theme (white background, black text) ───────────────────────── */
 
 [data-vimium-theme="light"] .vimium-hint-overlay,
 [data-vimium-theme="light"] .vimium-hint {
@@ -91,29 +34,36 @@
     --vimium-hint-matched-opacity: 0.35;
 }
 
-[data-vimium-theme="light"] .vimium-find-bar {
-    --vimium-find-bg: #f5f5f5;
-    --vimium-find-border: #ddd;
-    --vimium-find-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-    --vimium-find-input-bg: #fff;
-    --vimium-find-input-border: #ccc;
-    --vimium-find-input-color: #333;
-    --vimium-find-input-focus-border: #2979ff;
-    --vimium-find-count-color: #666;
+/* ── Tab search / help theme (follows system dark mode) ───────────────── */
+
+.vimium-tab-search-overlay,
+.vimium-tab-search-modal {
+    --vimium-tab-modal-bg: #1a1a1a;
+    --vimium-tab-modal-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    --vimium-tab-input-border: #333;
+    --vimium-tab-input-bg: #222;
+    --vimium-tab-input-color: #eee;
+    --vimium-tab-placeholder-color: #888;
+    --vimium-tab-item-border: #333;
+    --vimium-tab-item-selected-bg: rgba(74, 158, 255, 0.2);
+    --vimium-tab-title-color: #eee;
+    --vimium-tab-url-color: #aaa;
+    --vimium-tab-empty-color: #888;
 }
 
-[data-vimium-theme="light"] .vimium-tab-search-overlay {
-    --vimium-tab-overlay-bg: rgba(0, 0, 0, 0.3);
-    --vimium-tab-modal-bg: #fff;
-    --vimium-tab-modal-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-    --vimium-tab-input-border: #ddd;
-    --vimium-tab-input-bg: #f9f9f9;
-    --vimium-tab-input-color: #333;
-    --vimium-tab-placeholder-color: #999;
-    --vimium-tab-item-border: #eee;
-    --vimium-tab-item-selected-bg: rgba(41, 121, 255, 0.1);
-    --vimium-tab-title-color: #333;
-    --vimium-tab-url-color: #999;
-    --vimium-tab-empty-color: #999;
+@media (prefers-color-scheme: light) {
+    .vimium-tab-search-overlay,
+    .vimium-tab-search-modal {
+        --vimium-tab-modal-bg: #fff;
+        --vimium-tab-modal-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        --vimium-tab-input-border: #ddd;
+        --vimium-tab-input-bg: #f9f9f9;
+        --vimium-tab-input-color: #333;
+        --vimium-tab-placeholder-color: #999;
+        --vimium-tab-item-border: #eee;
+        --vimium-tab-item-selected-bg: rgba(41, 121, 255, 0.1);
+        --vimium-tab-title-color: #333;
+        --vimium-tab-url-color: #666;
+        --vimium-tab-empty-color: #999;
+    }
 }
-

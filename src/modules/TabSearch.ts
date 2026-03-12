@@ -69,7 +69,8 @@ class TabSearch {
     this._selectedIndex = 0;
     this._createOverlay();
     this._renderResults();
-    this._inputEl!.focus();
+    if (!this._inputEl) return;
+    this._inputEl.focus();
     this._keyHandler.setModeKeyDelegate(this._handleKey.bind(this));
   }
 
@@ -207,7 +208,7 @@ class TabSearch {
       title.textContent = tab.title || "(Untitled)";
 
       const url = document.createElement("div");
-      url.className = "vimium-tab-sear ch-item-url";
+      url.className = "vimium-tab-search-item-url";
       url.textContent = tab.url || "";
 
       item.appendChild(title);
@@ -217,7 +218,8 @@ class TabSearch {
   }
 
   private _handleInput(): void {
-    const query = this._inputEl!.value;
+    if (!this._inputEl) return;
+    const query = this._inputEl.value;
     const nonActive = this._tabs.filter(t => !t.active);
     this._filtered = TabSearch.scoreTabs(query, nonActive);
     this._selectedIndex = 0;

@@ -45,6 +45,8 @@ function makeElement(tag, opts = {}) {
         },
         _style: style,
         _children: children,
+        _attrs: opts.attrs || {},
+        getAttribute(name) { return this._attrs[name] ?? null; },
         contains(other) {
             let node = other;
             while (node) {
@@ -141,8 +143,17 @@ function setupDOM(elements = []) {
             return { nodeType: 3, textContent: text };
         },
         elementFromPoint(x, y) {
-            // Default: return the first element (good enough for most tests)
-            return elements.length > 0 ? elements[0] : null;
+            // Return smallest element whose rect contains the point
+            let best = null;
+            let bestArea = Infinity;
+            for (const el of elements) {
+                const rect = el.getBoundingClientRect();
+                if (x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom) {
+                    const area = rect.width * rect.height;
+                    if (area < bestArea) { best = el; bestArea = area; }
+                }
+            }
+            return best;
         },
     };
 

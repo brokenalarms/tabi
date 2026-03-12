@@ -56,8 +56,7 @@ declare class HintMode {
 
 declare class FindMode {
   constructor(keyHandler: KeyHandler);
-  isActive(): boolean;
-  deactivate(restoreSelection: boolean): void;
+  destroy(): void;
 }
 
 declare class TabSearch {
@@ -180,10 +179,6 @@ function initialize(settings: Partial<VimiumSettings>): void {
       hintMode.deactivate();
       return;
     }
-    if (keyHandler.getMode() === Mode.FIND && findMode.isActive()) {
-      findMode.deactivate(true);
-      return;
-    }
     if (keyHandler.getMode() === Mode.TAB_SEARCH && tabSearch.isActive()) {
       tabSearch.deactivate();
       return;
@@ -233,7 +228,6 @@ function initialize(settings: Partial<VimiumSettings>): void {
   // Clean up all mode overlays on navigation (page unload)
   function cleanupModes(): void {
     if (hintMode.isActive()) hintMode.deactivate();
-    if (findMode.isActive()) findMode.deactivate(true);
     if (tabSearch.isActive()) tabSearch.deactivate();
   }
   window.addEventListener("beforeunload", cleanupModes);

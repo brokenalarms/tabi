@@ -53,6 +53,7 @@ class HintMode {
   private _overlay: HTMLDivElement | null;
   private _pointerTails: boolean;
   private readonly _onMouseDown: () => void;
+  private readonly _onScroll: () => void;
 
   constructor(keyHandler: KeyHandlerLike) {
     this._keyHandler = keyHandler;
@@ -63,6 +64,7 @@ class HintMode {
     this._overlay = null;
     this._pointerTails = false;
     this._onMouseDown = this._deactivate.bind(this);
+    this._onScroll = this._deactivate.bind(this);
   }
 
   // --- Public API ---
@@ -93,6 +95,7 @@ class HintMode {
 
     this._keyHandler.setModeKeyDelegate(this._handleKey.bind(this));
     document.addEventListener("mousedown", this._onMouseDown, true);
+    window.addEventListener("scroll", this._onScroll, true);
   }
 
   deactivate(): void {
@@ -128,7 +131,7 @@ class HintMode {
       for (const el of nodes) {
         if (seen.has(el)) continue;
         seen.add(el);
-        if (this._isVisible(el as HTMLElement)) result.push(el as HTMLElement);
+        if (this._isInteractive(el as HTMLElement) && this._isVisible(el as HTMLElement)) result.push(el as HTMLElement);
       }
 
       // Check for shadow roots
@@ -163,6 +166,32 @@ class HintMode {
       }
     }
     return result.filter(el => !toRemove.has(el));
+  }
+
+  // Non-semantic elements (divs, spans, etc.) must show visual interactivity
+  // signals to be considered real click targets. Without this, container wrappers
+  // with tabindex or onclick produce false hints.
+  private _isInteractive(el: HTMLElement): boolean {
+    // Disabled elements and aria-hidden trees are never interactive
+    if ((el as HTMLButtonElement).disabled) return false;
+    if (el.getAttribute("aria-hidden") === "true") return false;
+
+    const tag = el.tagName;
+    if (tag === "A" || tag === "BUTTON" || tag === "INPUT" ||
+        tag === "TEXTAREA" || tag === "SELECT" ||
+        tag === "SUMMARY" || tag === "DETAILS") {
+      return true;
+    }
+    // ARIA widget roles indicate intentional interactivity
+    const role = el.getAttribute("role");
+    if (role === "button" || role === "link" || role === "tab" ||
+        role === "menuitem" || role === "option" ||
+        role === "checkbox" || role === "radio" || role === "switch") {
+      return true;
+    }
+    // Generic elements need cursor:pointer — real custom buttons set this
+    const style = getComputedStyle(el);
+    return style.cursor === "pointer";
   }
 
   private _isVisible(el: HTMLElement): boolean {
@@ -323,7 +352,7 @@ class HintMode {
       div.style.top = Math.max(0, rect.top) + "px";
     }
 
-    this._overlay!.appendChild(div);
+    if (this._overlay) this._overlay.appendChild(div);
     return div;
   }
 
@@ -416,6 +445,7 @@ class HintMode {
     this._typed = "";
     this._keyHandler.clearModeKeyDelegate();
     document.removeEventListener("mousedown", this._onMouseDown, true);
+    window.removeEventListener("scroll", this._onScroll, true);
 
     if (this._overlay && this._overlay.parentNode) {
       this._overlay.parentNode.removeChild(this._overlay);
