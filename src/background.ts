@@ -1,11 +1,14 @@
 // Vimium background service worker
 // Handles tab management and messaging with content scripts
 
+import type { VimiumSettings, KeyBindingMode, Theme } from "./types";
+
 // Command names handled by the background service worker
 type Command =
   | "createTab" | "closeTab" | "switchTab" | "queryTabs" | "syncSettings"
   | "restoreTab" | "tabLeft" | "tabRight" | "tabNext" | "tabPrev"
-  | "firstTab" | "lastTab" | "extensionActive" | "extensionInactive";
+  | "firstTab" | "lastTab" | "extensionActive" | "extensionInactive"
+  | "settingsChanged";
 
 interface TabInfo {
   id: number;
@@ -32,7 +35,7 @@ declare const browser: {
     onMessage: {
       addListener(fn: (message: unknown, sender: MessageSender, sendResponse: (response: unknown) => void) => boolean | void): void;
     };
-    sendNativeMessage(appId: string, message: unknown): Promise<{ excludedDomains?: string[] }>;
+    sendNativeMessage(appId: string, message: unknown): Promise<Record<string, unknown>>;
   };
   storage: {
     local: {
@@ -145,8 +148,9 @@ async function handleCommand(command: Command, sender: MessageSender, message?: 
       return tabs.map(t => ({ id: t.id, title: t.title, url: t.url, active: t.active }));
     }
 
-    case "syncSettings": {
-      await syncExcludedDomains();
+    case "syncSettings":
+    case "settingsChanged": {
+      await syncSettings();
       return { status: "ok" };
     }
 
@@ -181,23 +185,47 @@ async function handleCommand(command: Command, sender: MessageSender, message?: 
   return { status: "ok" };
 }
 
-// Sync excluded domains from native settings to browser.storage.local
-async function syncExcludedDomains(): Promise<void> {
+const VALID_KEY_BINDING_MODES: KeyBindingMode[] = ["location", "character"];
+const VALID_THEMES: Theme[] = ["yellow", "dark", "light", "auto"];
+
+const DEFAULT_SETTINGS: VimiumSettings = {
+  excludedDomains: [],
+  keyBindingMode: "location",
+  theme: "yellow",
+};
+
+function validateSettings(raw: Record<string, unknown>): VimiumSettings {
+  const excludedDomains = Array.isArray(raw.excludedDomains)
+    ? raw.excludedDomains.filter((d): d is string => typeof d === "string")
+    : DEFAULT_SETTINGS.excludedDomains;
+
+  const keyBindingMode = VALID_KEY_BINDING_MODES.includes(raw.keyBindingMode as KeyBindingMode)
+    ? (raw.keyBindingMode as KeyBindingMode)
+    : DEFAULT_SETTINGS.keyBindingMode;
+
+  const theme = VALID_THEMES.includes(raw.theme as Theme)
+    ? (raw.theme as Theme)
+    : DEFAULT_SETTINGS.theme;
+
+  return { excludedDomains, keyBindingMode, theme };
+}
+
+// Sync all settings from native app to browser.storage.local
+async function syncSettings(): Promise<void> {
   try {
     const response = await browser.runtime.sendNativeMessage(
       "com.anthropic.Vimium",
-      { command: "getExcludedDomains" }
+      { command: "getSettings" }
     );
-    if (response && response.excludedDomains) {
-      await browser.storage.local.set({ excludedDomains: response.excludedDomains });
-    }
+    const settings = validateSettings(response ?? {});
+    await browser.storage.local.set(settings as unknown as Record<string, unknown>);
   } catch (err) {
-    console.error("Vimium: failed to sync excluded domains:", err);
+    console.error("Vimium: failed to sync settings:", err);
   }
 }
 
 // Sync on service worker startup
-syncExcludedDomains();
+syncSettings();
 
 // Clean up activeTabSet when tabs are removed
 browser.tabs.onRemoved.addListener((tabId: number) => {
@@ -232,4 +260,7 @@ if (typeof globalThis !== "undefined") {
   g.MAX_CLOSED_TABS = MAX_CLOSED_TABS;
   g.activeTabSet = activeTabSet;
   g.updateIconState = updateIconState;
+  g.syncSettings = syncSettings;
+  g.validateSettings = validateSettings;
+  g.DEFAULT_SETTINGS = DEFAULT_SETTINGS;
 }
