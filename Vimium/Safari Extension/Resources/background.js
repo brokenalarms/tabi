@@ -81,8 +81,9 @@ async function handleCommand(command, sender, message) {
       const tabs = await browser.tabs.query({ currentWindow: true });
       return tabs.map((t) => ({ id: t.id, title: t.title, url: t.url, active: t.active }));
     }
-    case "syncSettings": {
-      await syncExcludedDomains();
+    case "syncSettings":
+    case "settingsChanged": {
+      await syncSettings();
       return { status: "ok" };
     }
     case "switchTab": {
@@ -111,20 +112,32 @@ async function handleCommand(command, sender, message) {
   }
   return { status: "ok" };
 }
-async function syncExcludedDomains() {
+const VALID_KEY_BINDING_MODES = ["location", "character"];
+const VALID_THEMES = ["yellow", "dark", "light", "auto"];
+const DEFAULT_SETTINGS = {
+  excludedDomains: [],
+  keyBindingMode: "location",
+  theme: "yellow"
+};
+function validateSettings(raw) {
+  const excludedDomains = Array.isArray(raw.excludedDomains) ? raw.excludedDomains.filter((d) => typeof d === "string") : DEFAULT_SETTINGS.excludedDomains;
+  const keyBindingMode = VALID_KEY_BINDING_MODES.includes(raw.keyBindingMode) ? raw.keyBindingMode : DEFAULT_SETTINGS.keyBindingMode;
+  const theme = VALID_THEMES.includes(raw.theme) ? raw.theme : DEFAULT_SETTINGS.theme;
+  return { excludedDomains, keyBindingMode, theme };
+}
+async function syncSettings() {
   try {
     const response = await browser.runtime.sendNativeMessage(
       "com.anthropic.Vimium",
-      { command: "getExcludedDomains" }
+      { command: "getSettings" }
     );
-    if (response && response.excludedDomains) {
-      await browser.storage.local.set({ excludedDomains: response.excludedDomains });
-    }
+    const settings = validateSettings(response ?? {});
+    await browser.storage.local.set(settings);
   } catch (err) {
-    console.error("Vimium: failed to sync excluded domains:", err);
+    console.error("Vimium: failed to sync settings:", err);
   }
 }
-syncExcludedDomains();
+syncSettings();
 browser.tabs.onRemoved.addListener((tabId) => {
   activeTabSet.delete(tabId);
 });
@@ -149,4 +162,7 @@ if (typeof globalThis !== "undefined") {
   g.MAX_CLOSED_TABS = MAX_CLOSED_TABS;
   g.activeTabSet = activeTabSet;
   g.updateIconState = updateIconState;
+  g.syncSettings = syncSettings;
+  g.validateSettings = validateSettings;
+  g.DEFAULT_SETTINGS = DEFAULT_SETTINGS;
 }
