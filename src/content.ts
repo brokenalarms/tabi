@@ -246,6 +246,11 @@ function initialize(settings: Partial<VimiumSettings>): void {
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") restoreFocus();
   });
+  // Restore focus after back/forward navigation — Safari restores pages
+  // from bfcache without reliably firing focus or visibilitychange.
+  window.addEventListener("pageshow", (e: PageTransitionEvent) => {
+    if (e.persisted) restoreFocus();
+  });
 
   // Notify background that extension is active on this tab
   browser.runtime.sendMessage({ command: "extensionActive" });

@@ -12,6 +12,7 @@ interface KeyHandlerLike {
 
 const SCROLL_STEP = 60;
 const SCROLL_DURATION_MS = 150;
+const SCROLL_JUMP_MAX_MS = 380;
 
 class ScrollController {
   private _keyHandler: KeyHandlerLike;
@@ -103,16 +104,22 @@ class ScrollController {
     ScrollController._smoothScroll(target, dx, dy);
   }
 
+  private static _jumpDuration(distance: number): number {
+    if (distance === 0) return 0;
+    // Scale duration with distance: short jumps stay snappy, long jumps ease in smoothly
+    return Math.min(SCROLL_DURATION_MS + Math.log2(1 + Math.abs(distance)) * 20, SCROLL_JUMP_MAX_MS);
+  }
+
   static scrollToTop(): void {
     const target = ScrollController.findScrollTarget("y");
     const dy = -target.scrollTop;
-    ScrollController._smoothScroll(target, 0, dy);
+    ScrollController._smoothScroll(target, 0, dy, ScrollController._jumpDuration(dy));
   }
 
   static scrollToBottom(): void {
     const target = ScrollController.findScrollTarget("y");
     const dy = target.scrollHeight - target.clientHeight - target.scrollTop;
-    ScrollController._smoothScroll(target, 0, dy);
+    ScrollController._smoothScroll(target, 0, dy, ScrollController._jumpDuration(dy));
   }
 
   // --- Command wiring ---
