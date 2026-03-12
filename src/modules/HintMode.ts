@@ -157,13 +157,22 @@ class HintMode {
 
     // Remove ancestor elements when a descendant is also a candidate —
     // the inner element is the actual interaction target.
+    // Exception: keep both when they are different interactive types
+    // (e.g. a link card containing a menu button — these are independent targets).
     const resultSet = new Set(result);
     const toRemove = new Set<HTMLElement>();
     for (const el of result) {
+      const elType = HintMode._interactiveType(el);
       let ancestor = el.parentElement;
       while (ancestor) {
         if (resultSet.has(ancestor as HTMLElement)) {
-          toRemove.add(ancestor as HTMLElement);
+          const ancType = HintMode._interactiveType(ancestor as HTMLElement);
+          // Only remove ancestor if it's the same type as the descendant —
+          // they represent the same click target (e.g. <a> wrapping <a>).
+          // Different types means independent controls: keep both.
+          if (ancType === elType) {
+            toRemove.add(ancestor as HTMLElement);
+          }
         }
         ancestor = ancestor.parentElement;
       }
@@ -217,6 +226,20 @@ class HintMode {
     }
 
     return result.filter(el => !toRemove.has(el));
+  }
+
+  // Returns the interactive "type" of an element — used to determine whether
+  // an ancestor and descendant are the same target or independent controls.
+  private static _interactiveType(el: HTMLElement): string {
+    const tag = el.tagName;
+    const role = el.getAttribute("role");
+    if (tag === "A" || role === "link") return "link";
+    if (tag === "BUTTON" || role === "button" || role === "menuitem") return "action";
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" ||
+        role === "checkbox" || role === "radio" || role === "switch" || role === "option") return "form";
+    if (tag === "SUMMARY" || tag === "DETAILS" || role === "tab") return "disclosure";
+    if (tag === "LABEL") return "label";
+    return "generic";
   }
 
   // Non-semantic elements (divs, spans, etc.) must show visual interactivity
@@ -358,6 +381,7 @@ class HintMode {
     }
 
     if (rect.width > window.innerWidth * 0.25) {
+      // First try specific widget children
       const children = el.querySelectorAll(
         "h1, h2, h3, h4, h5, h6, button, svg, [role='button'], [class*='icon'], [class*='chevron'], [class*='arrow']"
       );
@@ -365,6 +389,15 @@ class HintMode {
         const cr = children[i].getBoundingClientRect();
         if (cr.width > 0 && cr.height > 0 && cr.width < rect.width * 0.5) {
           return children[i] as HTMLElement;
+        }
+      }
+      // Fall back to any narrower child with text (e.g. <span>Show more</span>)
+      const textChildren = el.querySelectorAll("span, p, em, strong, b, i, u, small");
+      for (let i = 0; i < textChildren.length; i++) {
+        const child = textChildren[i] as HTMLElement;
+        const cr = child.getBoundingClientRect();
+        if (cr.width > 0 && cr.height > 0 && cr.width < rect.width * 0.5 && (child.textContent || "").trim().length > 0) {
+          return child;
         }
       }
     }
