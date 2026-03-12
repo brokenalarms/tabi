@@ -89,7 +89,16 @@ function loadBackground() {
     const modPath = require.resolve("../Vimium/Safari Extension/Resources/background.js");
     delete require.cache[modPath];
     resetBrowserShim();
-    bgModule = require(modPath);
+    require(modPath);
+    bgModule = {
+        closedTabStack: global.closedTabStack,
+        pushClosedTab: global.pushClosedTab,
+        popClosedTab: global.popClosedTab,
+        handleCommand: global.handleCommand,
+        MAX_CLOSED_TABS: global.MAX_CLOSED_TABS,
+        activeTabSet: global.activeTabSet,
+        updateIconState: global.updateIconState,
+    };
 }
 
 describe("background.js tab management", () => {
