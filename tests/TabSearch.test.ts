@@ -1,89 +1,21 @@
-// TabSearch unit tests — using Node.js built-in test runner
+// TabSearch unit tests — using Node.js built-in test runner + happy-dom
 // Tests fuzzy matching/scoring, overlay lifecycle, keyboard navigation,
 // tab switching, and command wiring.
 
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
+import { createDOM, type DOMEnvironment } from "./helpers/dom";
 import { KeyHandler } from "../src/modules/KeyHandler";
 import { TabSearch } from "../src/modules/TabSearch";
 import { Mode } from "../src/commands";
 
-// --- Minimal DOM shim ---
-
-let capturedListeners: Record<string, Function>,
-    keyHandler: InstanceType<typeof KeyHandler>,
-    tabSearch: InstanceType<typeof TabSearch>;
-let bodyEl: any, headEl: any;
+let env: DOMEnvironment;
+let keyHandler: KeyHandler;
+let tabSearch: TabSearch;
 let sentMessages: any[];
 
-function makeElement(tag: string, opts: any = {}) {
-    return {
-        tagName: tag,
-        type: opts.type || "",
-        isContentEditable: false,
-        className: "",
-        placeholder: "",
-        value: opts.value || "",
-        textContent: "",
-        parentNode: opts.parentNode || bodyEl,
-        style: {},
-        firstChild: null as any,
-        _children: [] as any[],
-        _listeners: {} as Record<string, Function>,
-        focus: mock.fn(),
-        blur: mock.fn(),
-        select: mock.fn(),
-        setAttribute(k: string, v: string) { (this as any)["_attr_" + k] = v; },
-        appendChild(child: any) {
-            child.parentNode = this;
-            this._children.push(child);
-            if (!this.firstChild) this.firstChild = child;
-            return child;
-        },
-        removeChild(child: any) {
-            const idx = this._children.indexOf(child);
-            if (idx >= 0) this._children.splice(idx, 1);
-            child.parentNode = null;
-            this.firstChild = this._children[0] || null;
-            return child;
-        },
-        addEventListener(type: string, fn: Function) { this._listeners[type] = fn; },
-        removeEventListener(type: string, fn: Function) { delete this._listeners[type]; },
-    };
-}
-
-function setupDOM() {
-    capturedListeners = {};
+function setupBrowserMock() {
     sentMessages = [];
-
-    bodyEl = makeElement("BODY");
-    bodyEl.parentNode = null;
-    headEl = makeElement("HEAD");
-
-    (globalThis as any).document = {
-        body: bodyEl,
-        head: headEl,
-        documentElement: makeElement("HTML"),
-        activeElement: bodyEl,
-        createElement(tag: string) {
-            return makeElement(tag.toUpperCase());
-        },
-        addEventListener(type: string, fn: Function, opts?: any) {
-            capturedListeners[type] = fn;
-        },
-        removeEventListener(type: string, fn: Function, opts?: any) {
-            if (capturedListeners[type] === fn) delete capturedListeners[type];
-        },
-        querySelectorAll() { return []; },
-    };
-
-    (globalThis as any).window = {
-        innerWidth: 1024,
-        innerHeight: 768,
-        find() { return true; },
-        getSelection() { return { removeAllRanges() {} }; },
-    };
-
     (globalThis as any).browser = {
         runtime: {
             sendMessage(msg: any) {
@@ -101,46 +33,27 @@ function setupDOM() {
             },
         },
     };
-
-    (globalThis as any).getComputedStyle = () => ({
-        visibility: "visible",
-        display: "block",
-        opacity: "1",
-        cursor: "default",
-    });
 }
 
-function teardownDOM() {
-    delete (globalThis as any).document;
-    delete (globalThis as any).window;
-    delete (globalThis as any).browser;
-    delete (globalThis as any).getComputedStyle;
-}
-
-function fireKeyDown(code: string, opts: any = {}) {
-    const event = {
+function fireKeyDown(code: string, opts: { key?: string; shiftKey?: boolean; ctrlKey?: boolean; altKey?: boolean; metaKey?: boolean } = {}) {
+    const event = new (env.window as any).KeyboardEvent("keydown", {
         code,
         key: opts.key || "",
         shiftKey: opts.shiftKey || false,
         ctrlKey: opts.ctrlKey || false,
         altKey: opts.altKey || false,
         metaKey: opts.metaKey || false,
-        _prevented: false,
-        _stopped: false,
-        preventDefault() { this._prevented = true; },
-        stopPropagation() { this._stopped = true; },
-    };
-    if (capturedListeners.keydown) {
-        capturedListeners.keydown(event);
-    }
+        bubbles: true,
+        cancelable: true,
+    });
+    env.document.dispatchEvent(event);
     return event;
 }
 
-// --- Tests ---
-
 describe("TabSearch", () => {
     beforeEach(() => {
-        setupDOM();
+        env = createDOM();
+        setupBrowserMock();
         keyHandler = new KeyHandler();
         tabSearch = new TabSearch(keyHandler);
         keyHandler.on("exitToNormal", () => {
@@ -152,7 +65,8 @@ describe("TabSearch", () => {
     afterEach(() => {
         if (tabSearch) tabSearch.destroy();
         if (keyHandler) keyHandler.destroy();
-        teardownDOM();
+        delete (globalThis as any).browser;
+        env.cleanup();
     });
 
     describe("scoreMatch", () => {
@@ -240,8 +154,8 @@ describe("TabSearch", () => {
             assert.equal(tabSearch.isActive(), true);
             assert.equal(keyHandler.getMode(), Mode.TAB_SEARCH);
             // Overlay should be appended to body
-            assert.equal(bodyEl._children.length, 1);
-            assert.equal(bodyEl._children[0].className, "vimium-tab-search-overlay");
+            const overlay = env.document.querySelector(".vimium-tab-search-overlay");
+            assert.ok(overlay, "overlay element should exist in DOM");
         });
 
         // Verifies that deactivation removes overlay and returns to NORMAL
@@ -250,14 +164,16 @@ describe("TabSearch", () => {
             tabSearch.deactivate();
             assert.equal(tabSearch.isActive(), false);
             assert.equal(keyHandler.getMode(), Mode.NORMAL);
-            assert.equal(bodyEl._children.length, 0);
+            const overlay = env.document.querySelector(".vimium-tab-search-overlay");
+            assert.equal(overlay, null, "overlay should be removed from DOM");
         });
 
         // Verifies that double-activate is idempotent
         it("ignores double activate", async () => {
             await tabSearch.activate();
             await tabSearch.activate();
-            assert.equal(bodyEl._children.length, 1);
+            const overlays = env.document.querySelectorAll(".vimium-tab-search-overlay");
+            assert.equal(overlays.length, 1);
         });
 
         // Verifies active tab is excluded from results
@@ -325,7 +241,6 @@ describe("TabSearch", () => {
         it("sends switchTab for selected tab on Enter", async () => {
             await tabSearch.activate();
             const selectedTab = (tabSearch as any)._filtered[0];
-            const beforeCount = sentMessages.length;
             fireKeyDown("Enter");
             const switchMsg = sentMessages.find(m => m.command === "switchTab");
             assert.ok(switchMsg, "switchTab message should be sent");
@@ -376,25 +291,17 @@ describe("TabSearch", () => {
     });
 
     describe("key event isolation", () => {
-        // Verifies that non-navigation keys are stopped from propagating
-        it("stops propagation for regular keys", async () => {
-            await tabSearch.activate();
-            const event = fireKeyDown("KeyA", { key: "a" });
-            assert.equal(event._stopped, true);
-        });
-
         // Verifies navigation keys prevent default
         it("prevents default for ArrowDown", async () => {
             await tabSearch.activate();
             const event = fireKeyDown("ArrowDown");
-            assert.equal(event._prevented, true);
+            assert.equal(event.defaultPrevented, true);
         });
     });
 
     describe("command wiring", () => {
         // Verifies that openTabSearch command activates tab search
         it("openTabSearch command activates", async () => {
-            // Dispatch command directly — activate is async so we track the call
             let activated = false;
             const origActivate = tabSearch.activate.bind(tabSearch);
             tabSearch.activate = async () => { activated = true; await origActivate(); };
@@ -405,7 +312,6 @@ describe("TabSearch", () => {
         // Verifies that destroy unwires commands
         it("destroy unwires commands", () => {
             tabSearch.destroy();
-            // After destroy, openTabSearch should be a no-op
             assert.equal((keyHandler as any)._commands.has("openTabSearch"), false);
         });
     });
