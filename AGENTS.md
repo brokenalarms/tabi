@@ -43,4 +43,6 @@ If the user agrees, you may proceed:
  
 - **Review** Is there a better way to integrate this edge test in a generic way so that it not specifically fixing the issue at hand, but a class of issues? It should integrate seamlessly into the existing pipeline, not be a random 'if this unique situation then do something completely different' function call. If it doesn't fit, should we think about refactoring to better generically handle it for future flexibility, so the change is not brittle and liable to break again if the website changes?
 
+- **Pull in the latest from origin main, commit and create PR** then we have a history of each fix in Github as well. This is part of completing the fix after I agree, you don't need to ask to create a PR. If there are errors we can update it (updating the description to account for all commits each time).
+
 Each pasted scenario = one test. The test is the proof that the bug is fixed and won't regress.
