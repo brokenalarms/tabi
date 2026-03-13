@@ -513,6 +513,88 @@ describe("DOM problems — hint target redirects to sole clickable child", () =>
     });
 });
 
+// Facebook: fixed nav bar loses hints after scrolling because a non-fixed ancestor
+// scrolls off-viewport and FILTER_REJECT prunes the entire subtree, including the
+// fixed-position banner with interactive nav links/buttons.
+// FIX: viewport bounds check uses FILTER_SKIP instead of FILTER_REJECT so children
+// of off-viewport containers are still visited.
+describe("DOM problems — fixed elements inside off-viewport ancestors", () => {
+    let cleanup: () => void;
+
+    afterEach(() => {
+        if (cleanup) cleanup();
+    });
+
+    it("discovers links in fixed header when ancestor is off-viewport", () => {
+        const env = createDOM(`
+            <div id="page-wrapper">
+                <div id="banner" role="banner">
+                    <a id="home" href="/" role="link" tabindex="0">Home</a>
+                    <a id="video" href="/watch" role="link" tabindex="0">Video</a>
+                    <a id="groups" href="/groups" role="link" tabindex="0">Groups</a>
+                </div>
+                <div id="content">
+                    <a id="post-link" href="/post/1">Post</a>
+                </div>
+            </div>
+        `);
+        cleanup = env.cleanup;
+
+        const wrapper = env.document.getElementById("page-wrapper")!;
+        const banner = env.document.getElementById("banner")!;
+        const home = env.document.getElementById("home")!;
+        const video = env.document.getElementById("video")!;
+        const groups = env.document.getElementById("groups")!;
+        const postLink = env.document.getElementById("post-link")!;
+
+        // Simulate scrolled state: page-wrapper has scrolled off the top
+        const offViewport = { top: -2000, left: 0, bottom: -1940, right: 1024, width: 1024, height: 60, x: 0, y: -2000, toJSON() { return this; } };
+        (wrapper as any).getBoundingClientRect = () => offViewport;
+
+        // Banner is position:fixed — stays at top of viewport
+        const bannerRect = { top: 0, left: 0, bottom: 56, right: 1024, width: 1024, height: 56, x: 0, y: 0, toJSON() { return this; } };
+        (banner as any).getBoundingClientRect = () => bannerRect;
+
+        // Nav links are in-viewport (inside the fixed banner)
+        const rects: Record<string, any> = {};
+        let left = 100;
+        for (const link of [home, video, groups]) {
+            const r = { top: 10, left, bottom: 46, right: left + 80, width: 80, height: 36, x: left, y: 10, toJSON() { return this; } };
+            (link as any).getBoundingClientRect = () => r;
+            (link as any).getClientRects = () => [r];
+            rects[link.id] = r;
+            left += 100;
+        }
+
+        // Post link is in-viewport below the banner
+        const postRect = { top: 100, left: 50, bottom: 120, right: 250, width: 200, height: 20, x: 50, y: 100, toJSON() { return this; } };
+        (postLink as any).getBoundingClientRect = () => postRect;
+        (postLink as any).getClientRects = () => [postRect];
+
+        // elementsFromPoint returns the link at that position
+        const allLinks = [home, video, groups, postLink];
+        (env.document as any).elementsFromPoint = (x: number, y: number) => {
+            const hits: Element[] = [];
+            for (const link of allLinks) {
+                const r = (link as any).getBoundingClientRect();
+                if (x >= r.left && x < r.right && y >= r.top && y < r.bottom) {
+                    hits.push(link as unknown as Element);
+                }
+            }
+            return hits;
+        };
+
+        const found = discoverElements((el) => el.getBoundingClientRect());
+        const foundIds = found.map((el) => el.id);
+
+        assert.ok(foundIds.includes("home"), "home link should be discovered");
+        assert.ok(foundIds.includes("video"), "video link should be discovered");
+        assert.ok(foundIds.includes("groups"), "groups link should be discovered");
+        assert.ok(foundIds.includes("post-link"), "post link should be discovered");
+        assert.equal(found.length, 4, "Should find all 4 links");
+    });
+});
+
 // X.com trending: div[role="link"] contains a button[role="button"] (the "..." menu).
 // The trend box should get its own hint separate from the button's hint.
 // Previously getHintTargetElement redirected to the inner button, making both hints overlap.

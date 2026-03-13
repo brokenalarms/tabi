@@ -30,15 +30,16 @@ When the user pastes a **DOM snippet, screenshot and URL** showing a hint mode b
 
 If the user agrees, you may proceed:
 
-- **Write a TDD test first that should be broken at first**: Before the fix, add a test in `tests/HintMode.test.js` that:
-   - Reconstruct that simplified DOM using `happy-dom`.
+- **Write a TDD test first that must be broken at first**: BEFORE you write the the fix, add a test  that:
+   - Reconstructs that simplified DOM using `happy-dom`.
    - Do NOT  write DOM in the comments. Create a string for this simplified DOM, that you feed to `happy-dom`, and this will be the basis of your test. 
    - Includes a comment at the top of the test in the same format, stating the ISSUE, SITE, and FIX, or **what the test proves** (e.g. "GitHub: nested `<button>` inside `<button>` — only inner buttons get hints, not the wrapper").
    - Asserts the correct behavior: right number of hints, correct elements hinted, correct dedup outcome.
+   - Run the test and assert that it fails.
 
-- **Implement the fix** in `src/modules/HintMode.ts`.
+- Only then **Implement the fix**.
 
--  **Verify**: `npm run build && npm test` — all tests pass.
+-  **Verify**: `npm run build && npm test` — all tests pass, without you needing to modify the test to fit after the fact unless a new edge case is somehow uncovered.
  
 - **Review** Is there a better way to integrate this edge test in a generic way so that it not specifically fixing the issue at hand, but a class of issues? It should integrate seamlessly into the existing pipeline, not be a random 'if this unique situation then do something completely different' function call. If it doesn't fit, should we think about refactoring to better generically handle it for future flexibility, so the change is not brittle and liable to break again if the website changes?
 

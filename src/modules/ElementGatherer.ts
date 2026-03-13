@@ -59,9 +59,9 @@ export function walkerFilter(node: Node): number {
     rect = fallbackRect;
   }
 
-  // Outside viewport
-  if (rect.bottom < 0 || rect.top > window.innerHeight) return NodeFilter.FILTER_REJECT;
-  if (rect.right < 0 || rect.left > window.innerWidth) return NodeFilter.FILTER_REJECT;
+  // Outside viewport — use SKIP (not REJECT) so fixed/sticky children are still visited
+  if (rect.bottom < 0 || rect.top > window.innerHeight) return NodeFilter.FILTER_SKIP;
+  if (rect.right < 0 || rect.left > window.innerWidth) return NodeFilter.FILTER_SKIP;
 
   // Step 2 — clickability
   if (!el.matches(CLICKABLE_SELECTOR) && style.cursor !== "pointer") return NodeFilter.FILTER_SKIP;
