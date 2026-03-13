@@ -61,30 +61,11 @@ targets:
         OTHER_LDFLAGS: ["-framework", "SafariServices"]
     preBuildScripts:
       - name: Compile TypeScript
+        basedOnDependencyAnalysis: false
         script: |
           cd "$PROJECT_DIR"
           export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
           npm run build
-        inputFiles:
-          - $(PROJECT_DIR)/src/background.ts
-          - $(PROJECT_DIR)/src/content.ts
-          - $(PROJECT_DIR)/src/types.ts
-          - $(PROJECT_DIR)/src/modules/FindMode.ts
-          - $(PROJECT_DIR)/src/modules/HintMode.ts
-          - $(PROJECT_DIR)/src/modules/KeyHandler.ts
-          - $(PROJECT_DIR)/src/modules/ScrollController.ts
-          - $(PROJECT_DIR)/src/modules/TabSearch.ts
-          - $(PROJECT_DIR)/src/modules/HelpOverlay.ts
-        outputFiles:
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/background.js
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/content.js
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/types.js
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/FindMode.js
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/HintMode.js
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/KeyHandler.js
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/ScrollController.js
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/TabSearch.js
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/HelpOverlay.js
     postBuildScripts:
       - name: Copy Extension Resources
         script: |
