@@ -148,21 +148,38 @@ export class HintMode {
     }
 
     // Native interactive elements are atomic — pick the best visual anchor:
-    // 1. Single SVG in the first child subtree → hint under the icon
+    // 1. Single leading SVG icon (no text before, text after) → hint under the icon
     // 2. Heading (no SVGs) → hint on the heading (article card links)
     // 3. Otherwise → the element itself
     const tag = el.tagName.toLowerCase();
     if (NATIVE_INTERACTIVE_ELEMENTS.includes(tag)) {
-      const firstChild = el.firstElementChild;
-      if (firstChild) {
-        const isSvg = firstChild.tagName.toLowerCase() === "svg";
-        const svgs = isSvg ? [firstChild] : firstChild.querySelectorAll("svg");
-        if (svgs.length === 1) {
-          const sr = (svgs[0] as HTMLElement).getBoundingClientRect();
-          if (sr.width > 0 && sr.height > 0) return svgs[0] as HTMLElement;
+      const svgs = el.querySelectorAll("svg");
+      if (svgs.length === 1) {
+        const svg = svgs[0] as HTMLElement;
+        const sr = svg.getBoundingClientRect();
+        if (sr.width > 0 && sr.height > 0) {
+          // Walk up to the direct child of el that contains the SVG
+          let svgAncestor: Element = svg;
+          while (svgAncestor.parentElement && svgAncestor.parentElement !== el) {
+            svgAncestor = svgAncestor.parentElement;
+          }
+          // Leading icon pattern: no text siblings before SVG, text after
+          let textBefore = false;
+          let textAfter = false;
+          let seenSvg = false;
+          for (const child of el.children) {
+            if (child === svgAncestor || child.contains(svg)) {
+              seenSvg = true;
+              continue;
+            }
+            const hasText = (child.textContent || "").trim().length > 0;
+            if (!seenSvg && hasText) textBefore = true;
+            if (seenSvg && hasText) textAfter = true;
+          }
+          if (!textBefore && textAfter) return svg;
         }
       }
-      if (!el.querySelector("svg")) {
+      if (svgs.length === 0) {
         const heading = el.querySelector("h1, h2, h3, h4, h5, h6") as HTMLElement | null;
         if (heading) {
           const hr = heading.getBoundingClientRect();
