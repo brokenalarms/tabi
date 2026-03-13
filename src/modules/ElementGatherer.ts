@@ -24,7 +24,7 @@ export function findAssociatedLabel(el: HTMLElement): HTMLElement | null {
   return null;
 }
 
-export function isVisible(el: HTMLElement): boolean {
+function isVisible(el: HTMLElement): boolean {
   const rect = el.getBoundingClientRect();
   if (rect.width === 0 && rect.height === 0) {
     if (el.tagName.toLowerCase() === "a") {
@@ -105,7 +105,7 @@ export function isVisible(el: HTMLElement): boolean {
 
 // --- Interactive type ---
 
-export function interactiveType(el: HTMLElement): string {
+function interactiveType(el: HTMLElement): string {
   const tag = el.tagName.toLowerCase();
   const role = el.getAttribute("role")?.toLowerCase();
   if (tag === "a" || role === "link") return "link";
