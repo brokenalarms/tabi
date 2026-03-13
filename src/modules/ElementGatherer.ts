@@ -12,6 +12,109 @@ export const CLICKABLE_SELECTOR = [
   ...CLICKABLE_ATTRS,
 ].join(", ");
 
+// --- Walker filter (3-step pipeline) ---
+// Used with document.createTreeWalker to discover clickable, visible elements.
+// FILTER_REJECT prunes entire subtrees (step 1), FILTER_SKIP skips the node
+// but continues into children (steps 2–3), FILTER_ACCEPT yields the element.
+
+export function walkerFilter(node: Node): number {
+  const el = node as HTMLElement;
+
+  // Step 1 — cheap exclusion (prune invisible subtrees)
+  if (el.getAttribute("aria-hidden") === "true") return NodeFilter.FILTER_REJECT;
+  if (el.hasAttribute("inert")) return NodeFilter.FILTER_REJECT;
+  if (el.hidden) return NodeFilter.FILTER_REJECT;
+  if ((el as HTMLButtonElement).disabled) return NodeFilter.FILTER_REJECT;
+
+  const style = getComputedStyle(el);
+  if (style.display === "none") return NodeFilter.FILTER_REJECT;
+  if (style.visibility === "hidden") return NodeFilter.FILTER_REJECT;
+
+  // Effective rect: anchor-child fallback for zero-size <a>,
+  // label redirect for zero-size radio/checkbox
+  let rect = el.getBoundingClientRect();
+  if (rect.width === 0 && rect.height === 0) {
+    let fallbackRect: DOMRect | null = null;
+    if (el.tagName.toLowerCase() === "a") {
+      for (const child of el.children) {
+        const cr = (child as HTMLElement).getBoundingClientRect();
+        if (cr.width > 0 && cr.height > 0) { fallbackRect = cr; break; }
+      }
+    } else if (el.tagName.toLowerCase() === "input") {
+      const type = ((el as HTMLInputElement).type || "").toLowerCase();
+      if (type === "radio" || type === "checkbox") {
+        const label = findAssociatedLabel(el);
+        if (label) {
+          const lr = label.getBoundingClientRect();
+          if (lr.width > 0 && lr.height > 0) fallbackRect = lr;
+        }
+      }
+    }
+    if (!fallbackRect) return NodeFilter.FILTER_REJECT;
+    rect = fallbackRect;
+  }
+
+  // Outside viewport
+  if (rect.bottom < 0 || rect.top > window.innerHeight) return NodeFilter.FILTER_REJECT;
+  if (rect.right < 0 || rect.left > window.innerWidth) return NodeFilter.FILTER_REJECT;
+
+  // Step 2 — clickability
+  if (!el.matches(CLICKABLE_SELECTOR) && style.cursor !== "pointer") return NodeFilter.FILTER_SKIP;
+
+  // Step 3 — expensive exclusion
+  // Opacity:0 with radio/checkbox label redirect
+  if (parseFloat(style.opacity) === 0) {
+    if (el.tagName.toLowerCase() === "input") {
+      const type = ((el as HTMLInputElement).type || "").toLowerCase();
+      if (type === "radio" || type === "checkbox") {
+        const label = findAssociatedLabel(el);
+        if (label && isVisible(label)) return NodeFilter.FILTER_ACCEPT;
+      }
+    }
+    return NodeFilter.FILTER_SKIP;
+  }
+
+  // Clipped by overflow:hidden ancestor
+  let ancestor = el.parentElement;
+  while (ancestor && ancestor !== document.body) {
+    const overflow = getComputedStyle(ancestor).overflow;
+    if (overflow === "hidden" || overflow === "clip") {
+      const ar = ancestor.getBoundingClientRect();
+      if (rect.bottom <= ar.top || rect.top >= ar.bottom ||
+          rect.right <= ar.left || rect.left >= ar.right) {
+        return NodeFilter.FILTER_SKIP;
+      }
+    }
+    ancestor = ancestor.parentElement;
+  }
+
+  // Covered by another element (elementsFromPoint)
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const px = Math.min(Math.max(centerX, 0), window.innerWidth - 1);
+  const py = Math.min(Math.max(centerY, 0), window.innerHeight - 1);
+
+  const elMatchesPoint = (point: Element[]): boolean => {
+    for (const hit of point) {
+      if (el.contains(hit) || hit.contains(el)) return true;
+    }
+    return false;
+  };
+
+  const centerHits = document.elementsFromPoint(px, py);
+  if (centerHits.length > 0 && !elMatchesPoint(centerHits)) {
+    const tlHits = document.elementsFromPoint(
+      Math.min(Math.max(rect.left + 2, 0), window.innerWidth - 1),
+      Math.min(Math.max(rect.top + 2, 0), window.innerHeight - 1)
+    );
+    if (tlHits.length === 0 || !elMatchesPoint(tlHits)) {
+      return NodeFilter.FILTER_SKIP;
+    }
+  }
+
+  return NodeFilter.FILTER_ACCEPT;
+}
+
 // --- Visibility ---
 
 export function findAssociatedLabel(el: HTMLElement): HTMLElement | null {
