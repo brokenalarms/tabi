@@ -148,21 +148,38 @@ export class HintMode {
     }
 
     // Native interactive elements are atomic — pick the best visual anchor:
-    // 1. Single SVG in the first child subtree → hint under the icon
-    // 2. Heading (no SVGs) → hint on the heading (article card links)
+    // 1. Single leading icon (SVG/img, no text before, text after) → hint under the icon
+    // 2. Heading (no icons) → hint on the heading (article card links)
     // 3. Otherwise → the element itself
     const tag = el.tagName.toLowerCase();
     if (NATIVE_INTERACTIVE_ELEMENTS.includes(tag)) {
-      const firstChild = el.firstElementChild;
-      if (firstChild) {
-        const isSvg = firstChild.tagName.toLowerCase() === "svg";
-        const svgs = isSvg ? [firstChild] : firstChild.querySelectorAll("svg");
-        if (svgs.length === 1) {
-          const sr = (svgs[0] as HTMLElement).getBoundingClientRect();
-          if (sr.width > 0 && sr.height > 0) return svgs[0] as HTMLElement;
+      const icons = el.querySelectorAll("svg, img");
+      if (icons.length === 1) {
+        const icon = icons[0] as HTMLElement;
+        const ir = icon.getBoundingClientRect();
+        if (ir.width > 0 && ir.height > 0) {
+          // Walk up to the direct child of el that contains the icon
+          let iconAncestor: Element = icon;
+          while (iconAncestor.parentElement && iconAncestor.parentElement !== el) {
+            iconAncestor = iconAncestor.parentElement;
+          }
+          // Leading icon pattern: no text siblings before icon, text after
+          let textBefore = false;
+          let textAfter = false;
+          let seenIcon = false;
+          for (const child of el.children) {
+            if (child === iconAncestor || child.contains(icon)) {
+              seenIcon = true;
+              continue;
+            }
+            const hasText = (child.textContent || "").trim().length > 0;
+            if (!seenIcon && hasText) textBefore = true;
+            if (seenIcon && hasText) textAfter = true;
+          }
+          if (!textBefore && textAfter) return icon;
         }
       }
-      if (!el.querySelector("svg")) {
+      if (icons.length === 0) {
         const heading = el.querySelector("h1, h2, h3, h4, h5, h6") as HTMLElement | null;
         if (heading) {
           const hr = heading.getBoundingClientRect();
