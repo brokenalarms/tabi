@@ -61,7 +61,7 @@ export class HintMode {
       this.deactivate();
       return;
     }
-    this.newTab = !!newTab;
+    this.newTab = newTab;
     this.active = true;
     this.typed = "";
     this.keyHandler.setMode(Mode.HINTS);

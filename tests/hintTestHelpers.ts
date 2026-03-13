@@ -247,6 +247,25 @@ export function setupDOM(elements: any[] = []) {
             }
             return best;
         },
+        createTreeWalker(root: any, whatToShow: number) {
+            // Minimal TreeWalker mock for SHOW_ELEMENT (0x1)
+            // Walks element children depth-first
+            const nodes: any[] = [];
+            function collect(node: any) {
+                for (const child of (node.children || [])) {
+                    nodes.push(child);
+                    collect(child);
+                }
+            }
+            collect(root);
+            let idx = -1;
+            return {
+                nextNode() {
+                    idx++;
+                    return idx < nodes.length ? nodes[idx] : null;
+                },
+            };
+        },
         elementsFromPoint(x: number, y: number) {
             // Return all elements whose rect contains the point, smallest first
             const hits: any[] = [];
@@ -286,6 +305,7 @@ export function setupDOM(elements: any[] = []) {
     };
 
     (globalThis as any).CSS = { escape: (s: string) => s };
+    (globalThis as any).NodeFilter = { SHOW_ELEMENT: 1 };
 
     (globalThis as any).window = {
         innerWidth: 1024,
