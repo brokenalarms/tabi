@@ -127,7 +127,7 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
   const result: HTMLElement[] = [];
 
   const collectFromRoot = (root: Document | ShadowRoot): void => {
-    const walkRoot = root === document ? document.body || document.documentElement : (root as unknown as HTMLElement);
+    const walkRoot = root === document ? document.body || document.documentElement : root;
     if (!walkRoot) return;
 
     let level: Element[] = Array.from(walkRoot.children);
