@@ -66,6 +66,9 @@ targets:
           cd "$PROJECT_DIR"
           export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
           npm run build
+        outputFiles:
+          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/background.js
+          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/content.js
     postBuildScripts:
       - name: Copy Extension Resources
         script: |
