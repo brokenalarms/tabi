@@ -720,3 +720,77 @@ describe("DOM problems — role=link with inner button gets separate hints", () 
     });
 });
 
+// ISSUE: Non-interactive cursor:pointer divs (overlays, icon containers) get
+// separate hints alongside the real interactive sibling (input, button, etc.)
+// SITE: linkedin.com/feed — search bar has overlay div, icon div, and input
+// FIX: During dedup, remove cursor:pointer-only candidates when a sibling
+// matches CLICKABLE_SELECTOR
+describe("DOM problems — cursor:pointer sibling dedup", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("removes generic siblings when an interactive sibling exists", () => {
+        const parent = makeElement("DIV", { top: 0, left: 0, width: 400, height: 40 });
+
+        const input = makeElement("INPUT", {
+            top: 5, left: 5, width: 350, height: 30,
+            attrs: { role: "combobox", placeholder: "Search..." },
+        });
+        // Decorative divs that match CLICKABLE_SELECTOR via tabindex (or cursor:pointer
+        // in real browsers) but have no semantic role — "generic" interactive type
+        const iconContainer = makeElement("DIV", {
+            top: 5, left: 5, width: 30, height: 30,
+            attrs: { tabindex: "0" },
+        });
+        const overlay = makeElement("DIV", {
+            top: 5, left: 5, width: 350, height: 30,
+            attrs: { tabindex: "0" },
+        });
+
+        parent.appendChild(input);
+        parent.appendChild(iconContainer);
+        parent.appendChild(overlay);
+
+        loadModules([input, iconContainer, overlay]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            const all = [input, iconContainer, overlay];
+            return all.filter((el: any) => {
+                const r = el.getBoundingClientRect();
+                return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+            });
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const hintOverlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = hintOverlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1, "Expected 1 hint (input only) — generic divs should be removed");
+    });
+
+    it("keeps generic element when no interactive sibling exists", () => {
+        const parent = makeElement("DIV", { top: 0, left: 0, width: 400, height: 40 });
+
+        const clickableDiv = makeElement("DIV", {
+            top: 5, left: 5, width: 350, height: 30,
+            attrs: { tabindex: "0" },
+        });
+
+        parent.appendChild(clickableDiv);
+
+        loadModules([clickableDiv]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [clickableDiv];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(), "Lone generic div should still get a hint");
+    });
+});
+

@@ -338,6 +338,23 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
     }
   }
 
+  // Sibling dedup: remove generic candidates when a non-generic sibling exists.
+  // Decorative divs (cursor:pointer, tabindex) alongside real interactive elements
+  // (input, button, link) shouldn't get their own hints.
+  for (const el of result) {
+    if (toRemove.has(el)) continue;
+    if (interactiveType(el) !== "generic") continue;
+    const parent = el.parentElement;
+    if (!parent) continue;
+    for (const other of result) {
+      if (other === el || toRemove.has(other)) continue;
+      if (other.parentElement === parent && interactiveType(other) !== "generic") {
+        toRemove.add(el);
+        break;
+      }
+    }
+  }
+
   // Disclosure trigger dedup
   for (const el of result) {
     if (toRemove.has(el)) continue;
