@@ -93,7 +93,7 @@ function initialize(settings: Partial<VimiumSettings>): void {
   const scrollController = new ScrollController(keyHandler);
 
   // Link hint navigation
-  const hintMode = new HintMode(keyHandler, { animate: resolved.animate });
+  const hintMode = new HintMode(keyHandler);
   hintMode.wireCommands();
   hintMode.setPointerTails(resolved.enablePointerTails === "true");
 

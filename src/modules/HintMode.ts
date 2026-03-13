@@ -3,6 +3,7 @@
 // clicks when the user types the matching label characters.
 
 import type { ModeValue } from "../types";
+import { DEFAULTS } from "../types";
 import { discoverElements, findAssociatedLabel, CLICKABLE_SELECTOR } from "./ElementGatherer";
 import { Mode } from "../commands";
 
@@ -28,10 +29,6 @@ interface Hint {
 
 const HINT_CHARS = "sadgjklewcmpoh";
 
-export interface HintModeOptions {
-  animate?: boolean;
-}
-
 export class HintMode {
   private keyHandler: KeyHandlerLike;
   private active: boolean;
@@ -40,12 +37,11 @@ export class HintMode {
   private typed: string;
   private overlay: HTMLDivElement | null;
   private pointerTails: boolean;
-  private animate: boolean;
   private activating: boolean;
   private readonly onMouseDown: () => void;
   private readonly onScroll: () => void;
 
-  constructor(keyHandler: KeyHandlerLike, options?: HintModeOptions) {
+  constructor(keyHandler: KeyHandlerLike) {
     this.keyHandler = keyHandler;
     this.active = false;
     this.willOpenNewTab = false;
@@ -53,7 +49,6 @@ export class HintMode {
     this.typed = "";
     this.overlay = null;
     this.pointerTails = false;
-    this.animate = options?.animate ?? true;
     this.activating = false;
     this.onMouseDown = this.deactivate.bind(this);
     this.onScroll = this.deactivate.bind(this);
@@ -261,7 +256,7 @@ export class HintMode {
 
   private createOverlay(): void {
     this.overlay = document.createElement("div");
-    this.overlay.className = this.animate
+    this.overlay.className = DEFAULTS.animate
       ? "vimium-hint-overlay vimium-hint-animate"
       : "vimium-hint-overlay";
     document.documentElement.appendChild(this.overlay);
