@@ -324,14 +324,14 @@ class HintMode {
   // Returns the interactive "type" of an element — used to determine whether
   // an ancestor and descendant are the same target or independent controls.
   private static interactiveType(el: HTMLElement): string {
-    const tag = el.tagName;
-    const role = el.getAttribute("role");
+    const tag = el.tagName.toLowerCase();
+    const role = el.getAttribute("role")?.toLowerCase();
     if (tag === "A" || role === "link") return "link";
-    if (tag === "BUTTON" || role === "button" || role === "menuitem") return "action";
-    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" ||
+    if (tag === "button" || role === "button" || role === "menuitem") return "action";
+    if (tag === "input" || tag === "textarea" || tag === "select" ||
         role === "checkbox" || role === "radio" || role === "switch" || role === "option") return "form";
-    if (tag === "SUMMARY" || tag === "DETAILS" || role === "tab") return "disclosure";
-    if (tag === "LABEL") return "label";
+    if (tag === "summary" || tag === "details" || role === "tab") return "disclosure";
+    if (tag === "label") return "label";
     return "generic";
   }
 
