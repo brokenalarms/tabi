@@ -4,7 +4,7 @@
 
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
-import { discoverElements, findAssociatedLabel, CLICKABLE_SELECTOR } from "./ElementGatherer";
+import { discoverElements, findAssociatedLabel, CLICKABLE_SELECTOR, NATIVE_INTERACTIVE_ELEMENTS } from "./ElementGatherer";
 import { Mode } from "../commands";
 
 declare const browser: {
@@ -146,6 +146,11 @@ export class HintMode {
         if (cr.width > 0 && cr.height > 0) return child as HTMLElement;
       }
     }
+
+    // Native interactive elements are atomic — use their own rect.
+    // Same NATIVE_INTERACTIVE_ELEMENTS set that governs subtree pruning in discovery.
+    const tag = el.tagName.toLowerCase();
+    if (NATIVE_INTERACTIVE_ELEMENTS.includes(tag)) return el;
 
     // If this element contains other clickable children, don't redirect — keep
     // the hint on the first-level element. Inner clickable elements get their own hints.
