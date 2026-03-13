@@ -182,7 +182,7 @@ class HintMode {
       for (const el of nodes) {
         if (seen.has(el)) continue;
         seen.add(el);
-        if (this.isInteractive(el as HTMLElement) && this.isVisible(el as HTMLElement)) result.push(el as HTMLElement);
+        if (this.isVisible(el as HTMLElement) && this.isInteractive(el as HTMLElement)) result.push(el as HTMLElement);
       }
 
       // Check for shadow roots
