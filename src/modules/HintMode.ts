@@ -74,9 +74,6 @@ export class HintMode {
 
     const labels = HintMode.generateLabels(elements.length);
     this.createOverlay();
-    if (this.willOpenNewTab && this.overlay) {
-      this.overlay.classList.add("vimium-newtab");
-    }
     this.hints = elements.map((el, i) => {
       const label = labels[i];
       const div = this.createHintDiv(el, label);
@@ -364,7 +361,6 @@ export class HintMode {
     if (match) {
       if (event.shiftKey) {
         this.willOpenNewTab = true;
-        if (this.overlay) this.overlay.classList.add("vimium-newtab");
       }
       this.activateHint(match);
     }
@@ -420,30 +416,27 @@ export class HintMode {
         });
       } else {
         element.focus();
-        this.activateViaKeyboard(element);
+        this.simulateClick(element);
       }
     };
 
     hint.div.addEventListener("animationend", afterCollapse, { once: true });
   }
 
-  private activateViaKeyboard(element: HTMLElement): void {
-    const tag = element.tagName.toLowerCase();
-    const inputType = tag === "input" ? ((element as HTMLInputElement).type || "").toLowerCase() : "";
-    const interactive = tag === "a" || tag === "button" || tag === "select" || tag === "textarea"
-      || tag === "input" || element.getAttribute("role") === "button"
-      || element.getAttribute("role") === "link" || element.getAttribute("role") === "menuitem";
+  private simulateClick(element: HTMLElement): void {
+    const rect = element.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    const shared = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y };
 
-    if (interactive) {
-      const useSpace = inputType === "checkbox" || inputType === "radio";
-      const key = useSpace ? " " : "Enter";
-      const code = useSpace ? "Space" : "Enter";
-      const opts = { key, code, bubbles: true, cancelable: true };
-      element.dispatchEvent(new KeyboardEvent("keydown", opts));
-      element.dispatchEvent(new KeyboardEvent("keypress", opts));
-      element.dispatchEvent(new KeyboardEvent("keyup", opts));
-    } else {
-      element.click();
-    }
+    element.dispatchEvent(new PointerEvent("pointerdown", { ...shared, pointerId: 1 }));
+    element.dispatchEvent(new MouseEvent("mousedown", shared));
+
+    const delay = 30 + Math.random() * 50;
+    setTimeout(() => {
+      element.dispatchEvent(new PointerEvent("pointerup", { ...shared, pointerId: 1 }));
+      element.dispatchEvent(new MouseEvent("mouseup", shared));
+      element.dispatchEvent(new MouseEvent("click", shared));
+    }, delay);
   }
 }

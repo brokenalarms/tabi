@@ -19,7 +19,7 @@
     box-shadow: var(--vimium-hint-shadow);
     color: var(--vimium-hint-color);
     font: bold 12px/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif;
-    text-transform: none;
+    text-transform: uppercase;
     pointer-events: none;
     white-space: nowrap;
 }
@@ -31,10 +31,6 @@
 
 .vimium-hint-overlay.vimium-hint-animate.visible {
     opacity: 1;
-}
-
-.vimium-hint-overlay.vimium-newtab .vimium-hint {
-    text-transform: uppercase;
 }
 
 .vimium-hint-row::after {
