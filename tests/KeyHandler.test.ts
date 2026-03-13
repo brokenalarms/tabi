@@ -68,16 +68,13 @@ describe("KeyHandler", () => {
             keyHandler.setMode(Mode.HINTS);
             assert.equal(keyHandler.getMode(), "HINTS");
 
-            keyHandler.setMode(Mode.FIND);
-            assert.equal(keyHandler.getMode(), "FIND");
-
             keyHandler.setMode(Mode.TAB_SEARCH);
             assert.equal(keyHandler.getMode(), "TAB_SEARCH");
 
             keyHandler.setMode(Mode.NORMAL);
             assert.equal(keyHandler.getMode(), "NORMAL");
 
-            assert.equal(transitions.length, 5);
+            assert.equal(transitions.length, 4);
             assert.equal(transitions[0].from, "NORMAL");
             assert.equal(transitions[0].to, "INSERT");
         });
@@ -291,9 +288,9 @@ describe("KeyHandler", () => {
         });
     });
 
-    describe("Overlay modes (HINTS, FIND, TAB_SEARCH)", () => {
+    describe("Overlay modes (HINTS, TAB_SEARCH)", () => {
         // Verifies that Escape dispatches exitToNormal in overlay modes
-        for (const mode of ["HINTS", "FIND", "TAB_SEARCH"] as const) {
+        for (const mode of ["HINTS", "TAB_SEARCH"] as const) {
             it(`Escape dispatches exitToNormal in ${mode} mode`, () => {
                 let called = false;
                 keyHandler.on("exitToNormal", () => { called = true; });
@@ -393,6 +390,18 @@ describe("KeyHandler", () => {
             const ev = makeKeyEvent("KeyH", { key: "j" });
             fireKeyDown(ev);
             assert.ok(called, "scrollDown should fire for 'j' character on Dvorak layout");
+        });
+
+        it("maps / to Slash in character mode (Dvorak / key)", () => {
+            // On Dvorak, / is at physical BracketLeft position
+            // Character mode should map the "/" character to canonical Slash code
+            const ev = makeKeyEvent("BracketLeft", { key: "/" });
+            assert.equal(KeyHandler.normalizeKey(ev, "character"), "Slash");
+        });
+
+        it("maps ? to Shift-Slash in character mode", () => {
+            const ev = makeKeyEvent("BracketLeft", { key: "?", shift: true });
+            assert.equal(KeyHandler.normalizeKey(ev, "character"), "Shift-Slash");
         });
 
         it("dispatches based on position when mode is location", () => {
