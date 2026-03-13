@@ -13,6 +13,10 @@ build/
 # Build output (compiled from src/*.ts)
 Vimium/Safari Extension/Resources/**/*.js
 
+# Playwright
+tests/integration/harness.js
+test-results/
+
 # Node
 node_modules/
 

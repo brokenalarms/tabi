@@ -12,18 +12,6 @@ describe("DOM problems — element discovery", () => {
         if (keyHandler) keyHandler.destroy();
     });
 
-    // Skips elements outside the viewport
-    it("filters out elements below viewport", () => {
-        const visible = makeElement("A", { href: "#", top: 10, left: 0 });
-        const below = makeElement("A", { href: "#", top: 1000, bottom: 1020 });
-        loadModules([visible, below]);
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        // Only one hint should be created (the visible one)
-        // The below-viewport element has top > innerHeight (768)
-        assert.ok(hintMode.isActive());
-    });
-
     // Skips hidden elements (display:none)
     it("filters out display:none elements", () => {
         const hidden = makeElement("A", { href: "#", display: "none", top: 10, left: 0 });
@@ -157,47 +145,6 @@ describe("DOM problems — visibility edge cases", () => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
         if (keyHandler) keyHandler.destroy();
-    });
-
-    // ISSUE: element behind a transparent overlay gets no hint — elementFromPoint misses it
-    // FIX: use elementsFromPoint to detect elements in the full stacking context
-    it("detects element behind transparent overlay via elementsFromPoint", () => {
-        const overlayEl = makeElement("A", { href: "#", top: 10, left: 10, width: 200, height: 40 });
-        const btn = makeElement("BUTTON", { top: 10, left: 10, width: 200, height: 40 });
-
-        loadModules([overlayEl, btn]);
-
-        // overlayEl is topmost; btn is underneath
-        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
-            return [overlayEl, btn];
-        };
-
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(hintMode.isActive());
-        // Both should be visible — 2 hints → single-char labels s, a
-        fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
-        assert.equal(overlayEl.click.mock.callCount(), 1, "Overlay element should be hintable");
-        hintMode.activate(false);
-        fireKeyDown(makeKeyEvent("KeyA", { key: "a" }));
-        assert.equal(btn.click.mock.callCount(), 1, "Element behind overlay should be hintable via elementsFromPoint");
-    });
-
-    // ISSUE: hints appear on elements visually clipped by overflow:hidden ancestor
-    // FIX: check if element rect intersects ancestor's clip rect
-    it("filters element clipped by overflow:hidden ancestor", () => {
-        const container = makeElement("DIV", {
-            top: 0, left: 0, width: 200, height: 50,
-            overflow: "hidden",
-        });
-        // Button is positioned below the container's bottom edge
-        const btn = makeElement("BUTTON", { top: 60, bottom: 80, left: 10, width: 80, height: 20 });
-        container.appendChild(btn);
-
-        loadModules([btn]);
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(!hintMode.isActive(), "Element clipped by overflow:hidden ancestor should be filtered");
     });
 
     // ISSUE: custom-styled radio with opacity:0 gets no hint because it fails visibility check
@@ -424,66 +371,3 @@ describe("DOM problems — disclosure trigger dedup", () => {
     });
 });
 
-describe("DOM problems — hint target text walker", () => {
-    afterEach(() => {
-        const { hintMode, keyHandler } = getState();
-        if (hintMode) hintMode.destroy();
-        if (keyHandler) keyHandler.destroy();
-    });
-
-    // ISSUE: hint targets notification badge "2" instead of nav item text "My Network"
-    // SITE: linkedin.com — nav bar notification badges have aria-hidden="true"
-    // FIX: skip aria-hidden nodes in the text walker so hint targets the main visible text
-    it("targets nav text, not aria-hidden badge count", () => {
-        const badgeCount = makeElement("SPAN", {
-            top: 5, left: 50, width: 16, height: 16,
-            textContent: "2",
-            attrs: { "aria-hidden": "true" },
-        });
-        const navText = makeElement("SPAN", {
-            top: 30, left: 30, width: 80, height: 16,
-            textContent: "My Network",
-        });
-        const anchor = makeElement("A", {
-            href: "/mynetwork",
-            top: 0, left: 30, width: 80, height: 50,
-            children: [badgeCount, navText],
-        });
-
-        loadModules([anchor]);
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(hintMode.isActive());
-
-        // Hint position should target navText (top:30), not badge (top:5)
-        const overlay = document.documentElement.querySelector(".vimium-hint-overlay")!;
-        const hintDiv = overlay.children[0] as HTMLElement;
-        assert.equal(hintDiv.style.top, "30px",
-            "Hint should target nav text position, not aria-hidden badge count");
-    });
-
-    // ISSUE: hint targets a 1×1px visually-hidden span inside image button
-    // SITE: linkedin.com — feed image buttons wrap a visually-hidden "Activate to view larger image" span
-    // FIX: require minimum size (>4px) in text walker to skip visually-hidden elements
-    it("skips visually-hidden 1x1 span inside large button", () => {
-        const visHidden = makeElement("SPAN", {
-            top: 5, left: 5, width: 1, height: 1,
-            textContent: "Activate to view larger image",
-        });
-        const button = makeElement("BUTTON", {
-            top: 0, left: 0, width: 600, height: 600,
-            children: [visHidden],
-        });
-
-        loadModules([button]);
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(hintMode.isActive());
-
-        // Hint should target the button itself (top:0), not the 1×1 span (top:5)
-        const overlay = document.documentElement.querySelector(".vimium-hint-overlay")!;
-        const hintDiv = overlay.children[0] as HTMLElement;
-        assert.equal(hintDiv.style.top, "0px",
-            "Hint should target button position, not visually-hidden span");
-    });
-});
