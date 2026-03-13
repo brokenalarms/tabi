@@ -181,9 +181,9 @@ export class HintMode {
               }
             }
             if (!textBefore && textAfter && firstTextAfter) {
-              // Ensure horizontal layout: icon and text share a vertical band.
+              // Only target the icon if text is beside it, not below it.
               const tr = (firstTextAfter as HTMLElement).getBoundingClientRect();
-              if (ir.bottom > tr.top && tr.bottom > ir.top) return icon;
+              if (tr.top < ir.bottom) return icon;
             }
             ancestor = parent;
           }
