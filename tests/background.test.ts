@@ -1,13 +1,10 @@
-// background.js unit tests — using Node.js built-in test runner
+// background.ts unit tests — using Node.js built-in test runner
 // Tests tab management message handling: create, close, restore tabs,
 // tab cycling (left/right/first/last), closed-tab stack with max limit,
 // and queryTabs response format.
 
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { createRequire } from "node:module";
-
-const require = createRequire(import.meta.url);
 
 // --- browser API shim ---
 
@@ -89,80 +86,65 @@ function makeSender(tabId: number) {
     return { tab: tab || { id: tabId, url: `https://example.com/${tabId}` } };
 }
 
-// --- Load module ---
+// --- Import module (browser shim must be installed first) ---
 
-interface BgModule {
-    closedTabStack: string[];
-    pushClosedTab: (url: string | null) => void;
-    popClosedTab: () => string | null;
-    handleCommand: (command: string, sender: Record<string, unknown>, message?: Record<string, unknown>) => Promise<Record<string, unknown>>;
-    MAX_CLOSED_TABS: number;
-    activeTabSet: Set<number>;
-    tabUrlCache: Map<number, string>;
-    updateIconState: (tabId: number) => Promise<void>;
-}
+resetBrowserShim();
 
-let bgModule: BgModule;
+import {
+    closedTabStack,
+    pushClosedTab,
+    popClosedTab,
+    handleCommand,
+    MAX_CLOSED_TABS,
+    activeTabSet,
+    tabUrlCache,
+    init,
+} from "../src/background";
 
-function loadBackground() {
-    // Clear require cache so each test suite gets a fresh module
-    const modPath = require.resolve("../Vimium/Safari Extension/Resources/background.js");
-    delete require.cache[modPath];
-    resetBrowserShim();
-    require(modPath);
-    const g = globalThis as Record<string, unknown>;
-    bgModule = {
-        closedTabStack: g.closedTabStack as string[],
-        pushClosedTab: g.pushClosedTab as BgModule["pushClosedTab"],
-        popClosedTab: g.popClosedTab as BgModule["popClosedTab"],
-        handleCommand: g.handleCommand as BgModule["handleCommand"],
-        MAX_CLOSED_TABS: g.MAX_CLOSED_TABS as number,
-        activeTabSet: g.activeTabSet as Set<number>,
-        tabUrlCache: g.tabUrlCache as Map<number, string>,
-        updateIconState: g.updateIconState as BgModule["updateIconState"],
-    };
-}
-
-describe("background.js tab management", () => {
+describe("background.ts tab management", () => {
     beforeEach(() => {
-        loadBackground();
+        resetBrowserShim();
+        closedTabStack.length = 0;
+        activeTabSet.clear();
+        tabUrlCache.clear();
+        init();
     });
 
     describe("closed-tab stack", () => {
         // Verifies that closing tabs pushes URLs onto the stack and
         // restoring pops them in LIFO order.
         it("pushes URLs and pops in LIFO order", () => {
-            bgModule.pushClosedTab("https://a.com");
-            bgModule.pushClosedTab("https://b.com");
-            assert.equal(bgModule.popClosedTab(), "https://b.com");
-            assert.equal(bgModule.popClosedTab(), "https://a.com");
-            assert.equal(bgModule.popClosedTab(), null);
+            pushClosedTab("https://a.com");
+            pushClosedTab("https://b.com");
+            assert.equal(popClosedTab(), "https://b.com");
+            assert.equal(popClosedTab(), "https://a.com");
+            assert.equal(popClosedTab(), null);
         });
 
         // Verifies that blank/empty URLs are not pushed onto the stack.
         it("ignores blank and empty URLs", () => {
-            bgModule.pushClosedTab("");
-            bgModule.pushClosedTab("about:blank");
-            bgModule.pushClosedTab("about:newtab");
-            bgModule.pushClosedTab(null);
-            assert.equal(bgModule.closedTabStack.length, 0);
+            pushClosedTab("");
+            pushClosedTab("about:blank");
+            pushClosedTab("about:newtab");
+            pushClosedTab(null);
+            assert.equal(closedTabStack.length, 0);
         });
 
         // Verifies that the stack enforces a maximum size of 50 entries.
         it("enforces max size of 50", () => {
             for (let i = 0; i < 60; i++) {
-                bgModule.pushClosedTab(`https://example.com/${i}`);
+                pushClosedTab(`https://example.com/${i}`);
             }
-            assert.equal(bgModule.closedTabStack.length, bgModule.MAX_CLOSED_TABS);
+            assert.equal(closedTabStack.length, MAX_CLOSED_TABS);
             // Oldest entries should have been evicted
-            assert.equal(bgModule.popClosedTab(), "https://example.com/59");
+            assert.equal(popClosedTab(), "https://example.com/59");
         });
     });
 
     describe("createTab command", () => {
         // Verifies that the createTab command opens a new empty tab.
         it("creates a new tab", async () => {
-            const result = await bgModule.handleCommand("createTab", {});
+            const result = await handleCommand("createTab", {});
             assert.equal(result.status, "ok");
             assert.equal(createdTabs.length, 1);
         });
@@ -173,19 +155,19 @@ describe("background.js tab management", () => {
         it("removes the sender tab", async () => {
             const sender = makeSender(2);
             // Simulate onUpdated having cached the URL
-            bgModule.tabUrlCache.set(2, "https://example.com/2");
-            const result = await bgModule.handleCommand("closeTab", sender);
+            tabUrlCache.set(2, "https://example.com/2");
+            const result = await handleCommand("closeTab", sender);
             assert.equal(result.status, "ok");
             assert.deepEqual(removedTabIds, [2]);
             // onRemoved listener records the URL
             for (const fn of tabRemovedListeners) fn(2);
-            assert.equal(bgModule.closedTabStack.length, 1);
-            assert.equal(bgModule.closedTabStack[0], "https://example.com/2");
+            assert.equal(closedTabStack.length, 1);
+            assert.equal(closedTabStack[0], "https://example.com/2");
         });
 
         // Verifies that closeTab is a no-op when there is no sender tab.
         it("does nothing without sender tab", async () => {
-            const result = await bgModule.handleCommand("closeTab", {});
+            const result = await handleCommand("closeTab", {});
             assert.equal(result.status, "ok");
             assert.equal(removedTabIds.length, 0);
         });
@@ -194,17 +176,17 @@ describe("background.js tab management", () => {
     describe("restoreTab command", () => {
         // Verifies that restoring a tab creates one with the last closed URL.
         it("creates a tab with the last closed URL", async () => {
-            bgModule.pushClosedTab("https://restored.com");
-            const result = await bgModule.handleCommand("restoreTab", {});
+            pushClosedTab("https://restored.com");
+            const result = await handleCommand("restoreTab", {});
             assert.equal(result.status, "ok");
             assert.equal(createdTabs.length, 1);
             assert.equal(createdTabs[0].url, "https://restored.com");
-            assert.equal(bgModule.closedTabStack.length, 0);
+            assert.equal(closedTabStack.length, 0);
         });
 
         // Verifies that restoring with an empty stack is a no-op.
         it("does nothing when stack is empty", async () => {
-            const result = await bgModule.handleCommand("restoreTab", {});
+            const result = await handleCommand("restoreTab", {});
             assert.equal(result.status, "ok");
             assert.equal(createdTabs.length, 0);
         });
@@ -214,52 +196,52 @@ describe("background.js tab management", () => {
         // Verifies that tabLeft activates the tab to the left, wrapping around.
         it("tabLeft activates previous tab (wraps around)", async () => {
             const sender = makeSender(1); // index 0
-            await bgModule.handleCommand("tabLeft", sender);
+            await handleCommand("tabLeft", sender);
             assert.equal(activatedTabId, 3); // wraps to last
         });
 
         // Verifies that tabRight activates the next tab, wrapping around.
         it("tabRight activates next tab (wraps around)", async () => {
             const sender = makeSender(3); // index 2
-            await bgModule.handleCommand("tabRight", sender);
+            await handleCommand("tabRight", sender);
             assert.equal(activatedTabId, 1); // wraps to first
         });
 
         // Verifies that tabPrev works the same as tabLeft.
         it("tabPrev works like tabLeft", async () => {
             const sender = makeSender(2); // index 1
-            await bgModule.handleCommand("tabPrev", sender);
+            await handleCommand("tabPrev", sender);
             assert.equal(activatedTabId, 1);
         });
 
         // Verifies that tabNext works the same as tabRight.
         it("tabNext works like tabRight", async () => {
             const sender = makeSender(2); // index 1
-            await bgModule.handleCommand("tabNext", sender);
+            await handleCommand("tabNext", sender);
             assert.equal(activatedTabId, 3);
         });
 
         // Verifies that goToTabFirst activates the first tab.
         it("goToTabFirst activates first tab", async () => {
-            await bgModule.handleCommand("goToTabFirst", makeSender(3));
+            await handleCommand("goToTabFirst", makeSender(3));
             assert.equal(activatedTabId, 1);
         });
 
         // Verifies that goToTabLast activates the last tab.
         it("goToTabLast activates last tab", async () => {
-            await bgModule.handleCommand("goToTabLast", makeSender(1));
+            await handleCommand("goToTabLast", makeSender(1));
             assert.equal(activatedTabId, 3);
         });
 
         // Verifies that goToTab index 2 activates the second tab.
         it("goToTab 2 activates second tab", async () => {
-            await bgModule.handleCommand("goToTab", makeSender(1), { command: "goToTab", index: 2 });
+            await handleCommand("goToTab", makeSender(1), { command: "goToTab", index: 2 });
             assert.equal(activatedTabId, 2);
         });
 
         // Verifies that goToTab clamps to last tab when index exceeds count.
         it("goToTab clamps to last tab when index exceeds count", async () => {
-            await bgModule.handleCommand("goToTab", makeSender(1), { command: "goToTab", index: 8 });
+            await handleCommand("goToTab", makeSender(1), { command: "goToTab", index: 8 });
             assert.equal(activatedTabId, 3);
         });
     });
@@ -267,7 +249,7 @@ describe("background.js tab management", () => {
     describe("queryTabs command", () => {
         // Verifies that queryTabs returns tab metadata for all tabs.
         it("returns tab list with id, title, url, active fields", async () => {
-            const result = await bgModule.handleCommand("queryTabs", {}) as unknown as Array<Record<string, unknown>>;
+            const result = await handleCommand("queryTabs", {}) as unknown as Array<Record<string, unknown>>;
             assert.equal(result.length, 3);
             assert.deepEqual(Object.keys(result[0]).sort(), ["active", "id", "title", "url"]);
             assert.equal(result[1].active, true);
@@ -277,7 +259,7 @@ describe("background.js tab management", () => {
     describe("unknown command", () => {
         // Verifies that unknown commands return an error status.
         it("returns unknown_command status", async () => {
-            const result = await bgModule.handleCommand("nonsense", {});
+            const result = await handleCommand("nonsense" as any, {});
             assert.equal(result.status, "unknown_command");
         });
     });
@@ -286,8 +268,8 @@ describe("background.js tab management", () => {
         // Verifies that extensionActive marks the tab active and enables the icon.
         it("extensionActive enables icon for the tab", async () => {
             const sender = makeSender(2);
-            await bgModule.handleCommand("extensionActive", sender, {});
-            assert.equal(bgModule.activeTabSet.has(2), true);
+            await handleCommand("extensionActive", sender, {});
+            assert.equal(activeTabSet.has(2), true);
             assert.equal(actionState[2].enabled, true);
             assert.equal(actionState[2].title, "vimium-mac");
         });
@@ -295,37 +277,36 @@ describe("background.js tab management", () => {
         // Verifies that extensionInactive disables the icon for the tab.
         it("extensionInactive disables icon for the tab", async () => {
             const sender = makeSender(3);
-            bgModule.activeTabSet.add(3);
-            await bgModule.handleCommand("extensionInactive", sender, {});
-            assert.equal(bgModule.activeTabSet.has(3), false);
+            activeTabSet.add(3);
+            await handleCommand("extensionInactive", sender, {});
+            assert.equal(activeTabSet.has(3), false);
             assert.equal(actionState[3].enabled, false);
             assert.equal(actionState[3].title, "vimium-mac (disabled on this site)");
         });
 
         // Verifies that closing a tab cleans up its entry from activeTabSet.
         it("tab removal cleans up activeTabSet", () => {
-            bgModule.activeTabSet.add(5);
-            assert.equal(bgModule.activeTabSet.has(5), true);
+            activeTabSet.add(5);
+            assert.equal(activeTabSet.has(5), true);
             // Simulate tab removal by calling registered listeners
             for (const fn of tabRemovedListeners) fn(5);
-            assert.equal(bgModule.activeTabSet.has(5), false);
+            assert.equal(activeTabSet.has(5), false);
         });
     });
 
     describe("switchTab command", () => {
         // Verifies that switchTab activates the specified tab by ID.
         it("activates the specified tab", async () => {
-            const result = await bgModule.handleCommand("switchTab", {}, { tabId: 3 });
+            const result = await handleCommand("switchTab", {}, { tabId: 3 });
             assert.equal(result.status, "ok");
             assert.equal(activatedTabId, 3);
         });
 
         // Verifies that switchTab does nothing when no tabId is provided.
         it("does nothing without tabId", async () => {
-            const result = await bgModule.handleCommand("switchTab", {}, {});
+            const result = await handleCommand("switchTab", {}, {});
             assert.equal(result.status, "ok");
             assert.equal(activatedTabId, null);
         });
     });
-
 });

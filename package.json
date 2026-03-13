@@ -5,7 +5,7 @@
   "scripts": {
     "build": "node esbuild.config.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test --test-reporter=dot --test-force-exit tests/*.test.ts",
     "test:integration": "playwright test"
   },
   "devDependencies": {
