@@ -2,7 +2,7 @@
 // Tests the mode state machine, key sequence parser with timeout,
 // input field detection, and command dispatch.
 
-import { describe, it, beforeEach, afterEach, mock } from "node:test";
+import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { createDOM, type DOMEnvironment } from "./helpers/dom";
 import { KeyHandler } from "../src/modules/KeyHandler";
