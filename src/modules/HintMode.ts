@@ -405,6 +405,9 @@ export class HintMode {
         });
       } else {
         element.focus();
+        const opts = { bubbles: true, cancelable: true, view: window };
+        element.dispatchEvent(new MouseEvent("mousedown", opts));
+        element.dispatchEvent(new MouseEvent("mouseup", opts));
         element.click();
       }
     };
