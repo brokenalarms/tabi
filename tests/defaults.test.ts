@@ -14,7 +14,6 @@ describe("resolveSettings", () => {
     const resolved = resolveSettings({ theme: "dark", keyBindingMode: "character" });
     assert.equal(resolved.theme, "dark");
     assert.equal(resolved.keyBindingMode, "character");
-    assert.equal(resolved.enablePointerTails, "true");
   });
 
   // Explicit undefined from storage should not clobber DEFAULTS

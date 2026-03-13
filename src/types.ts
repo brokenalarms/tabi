@@ -6,13 +6,11 @@ export type Theme = "classic" | "dark" | "light" | "auto";
 export interface VimiumSettings {
   keyBindingMode: KeyBindingMode;
   theme: Theme;
-  enablePointerTails: string;
   animate: boolean;
 }
 
 export const DEFAULTS: VimiumSettings = {
   theme: "auto",
-  enablePointerTails: "true",
   keyBindingMode: "location",
   animate: true,
 };
@@ -22,7 +20,6 @@ export function resolveSettings(storage: Record<string, unknown>): VimiumSetting
     ...DEFAULTS,
     ...(storage.keyBindingMode !== undefined && { keyBindingMode: storage.keyBindingMode as KeyBindingMode }),
     ...(storage.theme !== undefined && { theme: storage.theme as Theme }),
-    ...(storage.enablePointerTails !== undefined && { enablePointerTails: storage.enablePointerTails as string }),
     ...(storage.animate !== undefined && { animate: storage.animate as boolean }),
   };
 }
