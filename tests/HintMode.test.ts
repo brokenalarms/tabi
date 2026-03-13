@@ -336,7 +336,7 @@ describe("HintMode", () => {
             assert.equal((globalThis as any).browser.runtime.sendMessage.mock.callCount(), 1);
             const msg = (globalThis as any).browser.runtime.sendMessage.mock.calls[0].arguments[0];
             assert.equal(msg.command, "createTab");
-            assert.equal(msg.url, "https://example.com");
+            assert.equal(msg.url, "https://example.com/");
             assert.ok(!hintMode.isActive());
         });
 

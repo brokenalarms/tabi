@@ -48,7 +48,6 @@ describe("DOM problems — element discovery", () => {
     it("falls back to firstElementChild for zero-size anchors", () => {
         const child = makeElement("H3", { top: 10, left: 20, width: 200, height: 24 });
         const anchor = makeElement("A", { href: "#", width: 0, height: 0, top: 0, left: 0, children: [child] });
-        child.parentElement = anchor;
         loadModules([anchor]);
         const { hintMode } = getState();
         hintMode.activate(false);
@@ -78,9 +77,7 @@ describe("DOM problems — element discovery", () => {
             attrs: { "inert": "" },
         });
         const btn = makeElement("BUTTON", { top: 10, left: 10 });
-        btn.parentElement = inertContainer;
-        btn.parentNode = inertContainer;
-        (inertContainer as any).children = [btn];
+        inertContainer.appendChild(btn);
 
         loadModules([btn]);
         const { hintMode } = getState();
@@ -108,9 +105,7 @@ describe("DOM problems — element discovery", () => {
             attrs: { "aria-hidden": "true" },
         });
         const btn = makeElement("BUTTON", { top: 10, left: 10 });
-        btn.parentElement = wrapper;
-        btn.parentNode = wrapper;
-        (wrapper as any).children = [btn];
+        wrapper.appendChild(btn);
 
         loadModules([btn]);
         const { hintMode } = getState();
@@ -131,11 +126,8 @@ describe("DOM problems — element discovery", () => {
     it("filters out ancestor wrapper when descendant is also a candidate", () => {
         const textarea = makeElement("TEXTAREA", { top: 10, left: 10 });
         const wrapper = makeElement("DIV", { top: 10, left: 10 });
-        (wrapper as any)._tabindex = "0";
-        textarea.parentElement = wrapper;
-        textarea.parentNode = wrapper;
-        wrapper.children = [textarea];
-        (wrapper as any).children = [textarea];
+        wrapper.setAttribute("tabindex", "0");
+        wrapper.appendChild(textarea);
 
         loadModules([wrapper, textarea]);
 
@@ -170,14 +162,14 @@ describe("DOM problems — visibility edge cases", () => {
     // ISSUE: element behind a transparent overlay gets no hint — elementFromPoint misses it
     // FIX: use elementsFromPoint to detect elements in the full stacking context
     it("detects element behind transparent overlay via elementsFromPoint", () => {
-        const overlay = makeElement("A", { href: "#", top: 10, left: 10, width: 200, height: 40 });
+        const overlayEl = makeElement("A", { href: "#", top: 10, left: 10, width: 200, height: 40 });
         const btn = makeElement("BUTTON", { top: 10, left: 10, width: 200, height: 40 });
 
-        loadModules([overlay, btn]);
+        loadModules([overlayEl, btn]);
 
-        // overlay is topmost; btn is underneath
+        // overlayEl is topmost; btn is underneath
         (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
-            return [overlay, btn];
+            return [overlayEl, btn];
         };
 
         const { hintMode } = getState();
@@ -185,7 +177,7 @@ describe("DOM problems — visibility edge cases", () => {
         assert.ok(hintMode.isActive());
         // Both should be visible — 2 hints → single-char labels s, a
         fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
-        assert.equal(overlay.click.mock.callCount(), 1, "Overlay element should be hintable");
+        assert.equal(overlayEl.click.mock.callCount(), 1, "Overlay element should be hintable");
         hintMode.activate(false);
         fireKeyDown(makeKeyEvent("KeyA", { key: "a" }));
         assert.equal(btn.click.mock.callCount(), 1, "Element behind overlay should be hintable via elementsFromPoint");
@@ -200,9 +192,7 @@ describe("DOM problems — visibility edge cases", () => {
         });
         // Button is positioned below the container's bottom edge
         const btn = makeElement("BUTTON", { top: 60, bottom: 80, left: 10, width: 80, height: 20 });
-        btn.parentElement = container;
-        btn.parentNode = container;
-        (container as any).children = [btn];
+        container.appendChild(btn);
 
         loadModules([btn]);
         const { hintMode } = getState();
@@ -220,7 +210,6 @@ describe("DOM problems — visibility edge cases", () => {
             width: 16, height: 16, opacity: "0",
         });
         (radio as any).id = "custom-radio";
-        radio.type = "radio";
 
         loadModules([radio, label]);
 
@@ -248,7 +237,6 @@ describe("DOM problems — visibility edge cases", () => {
             width: 0, height: 0,
         });
         (radio as any).id = "hidden-radio";
-        radio.type = "radio";
 
         loadModules([radio, label]);
 
@@ -282,27 +270,24 @@ describe("DOM problems — label-for dedup", () => {
 
         const radio1 = makeElement("INPUT", { type: "radio", top: 10, left: 10, width: 16, height: 16 });
         (radio1 as any).id = "theme-os";
-        radio1.type = "radio";
         const label1 = makeElement("LABEL", { top: 10, left: 30, width: 100, height: 20 });
         (label1 as any).htmlFor = "theme-os";
-        radio1.parentElement = wrapper;
-        label1.parentElement = wrapper;
+        wrapper.appendChild(radio1);
+        wrapper.appendChild(label1);
 
         const radio2 = makeElement("INPUT", { type: "radio", top: 40, left: 10, width: 16, height: 16 });
         (radio2 as any).id = "theme-day";
-        radio2.type = "radio";
         const label2 = makeElement("LABEL", { top: 40, left: 30, width: 100, height: 20 });
         (label2 as any).htmlFor = "theme-day";
-        radio2.parentElement = wrapper;
-        label2.parentElement = wrapper;
+        wrapper.appendChild(radio2);
+        wrapper.appendChild(label2);
 
         const radio3 = makeElement("INPUT", { type: "radio", top: 70, left: 10, width: 16, height: 16 });
         (radio3 as any).id = "theme-night";
-        radio3.type = "radio";
         const label3 = makeElement("LABEL", { top: 70, left: 30, width: 100, height: 20 });
         (label3 as any).htmlFor = "theme-night";
-        radio3.parentElement = wrapper;
-        label3.parentElement = wrapper;
+        wrapper.appendChild(radio3);
+        wrapper.appendChild(label3);
 
         loadModules([radio1, label1, radio2, label2, radio3, label3]);
 
@@ -387,8 +372,8 @@ describe("DOM problems — disclosure trigger dedup", () => {
             top: 10, left: 0,
             attrs: { "aria-expanded": "false", "aria-controls": "submenu-1" },
         });
-        link.parentElement = parent;
-        btn.parentElement = parent;
+        parent.appendChild(link);
+        parent.appendChild(btn);
 
         loadModules([link, btn]);
         const { hintMode } = getState();
@@ -406,7 +391,7 @@ describe("DOM problems — disclosure trigger dedup", () => {
             top: 10, left: 0,
             attrs: { "aria-expanded": "false", "aria-controls": "panel-1" },
         });
-        btn.parentElement = parent;
+        parent.appendChild(btn);
 
         loadModules([btn]);
         const { hintMode } = getState();
@@ -421,8 +406,8 @@ describe("DOM problems — disclosure trigger dedup", () => {
         const parent = makeElement("LI", { top: 0, left: 0 });
         const link = makeElement("A", { href: "#", top: 10, left: 0 });
         const btn = makeElement("BUTTON", { top: 10, left: 50 });
-        link.parentElement = parent;
-        btn.parentElement = parent;
+        parent.appendChild(link);
+        parent.appendChild(btn);
 
         loadModules([link, btn]);
         const { hintMode } = getState();
@@ -464,8 +449,6 @@ describe("DOM problems — hint target text walker", () => {
             top: 0, left: 30, width: 80, height: 50,
             children: [badgeCount, navText],
         });
-        badgeCount.parentElement = anchor;
-        navText.parentElement = anchor;
 
         loadModules([anchor]);
         const { hintMode } = getState();
@@ -473,9 +456,8 @@ describe("DOM problems — hint target text walker", () => {
         assert.ok(hintMode.isActive());
 
         // Hint position should target navText (top:30), not badge (top:5)
-        const docEl = (globalThis as any).document.documentElement;
-        const overlay = docEl._appendedChildren[0];
-        const hintDiv = overlay.children[0];
+        const overlay = document.documentElement.querySelector(".vimium-hint-overlay")!;
+        const hintDiv = overlay.children[0] as HTMLElement;
         assert.equal(hintDiv.style.top, "30px",
             "Hint should target nav text position, not aria-hidden badge count");
     });
@@ -492,7 +474,6 @@ describe("DOM problems — hint target text walker", () => {
             top: 0, left: 0, width: 600, height: 600,
             children: [visHidden],
         });
-        visHidden.parentElement = button;
 
         loadModules([button]);
         const { hintMode } = getState();
@@ -500,9 +481,8 @@ describe("DOM problems — hint target text walker", () => {
         assert.ok(hintMode.isActive());
 
         // Hint should target the button itself (top:0), not the 1×1 span (top:5)
-        const docEl = (globalThis as any).document.documentElement;
-        const overlay = docEl._appendedChildren[0];
-        const hintDiv = overlay.children[0];
+        const overlay = document.documentElement.querySelector(".vimium-hint-overlay")!;
+        const hintDiv = overlay.children[0] as HTMLElement;
         assert.equal(hintDiv.style.top, "0px",
             "Hint should target button position, not visually-hidden span");
     });
