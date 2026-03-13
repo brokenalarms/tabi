@@ -158,25 +158,26 @@ export class HintMode {
         const icon = icons[0] as HTMLElement;
         const ir = icon.getBoundingClientRect();
         if (ir.width > 0 && ir.height > 0) {
-          // Walk up to the direct child of el that contains the icon
-          let iconAncestor: Element = icon;
-          while (iconAncestor.parentElement && iconAncestor.parentElement !== el) {
-            iconAncestor = iconAncestor.parentElement;
-          }
-          // Leading icon pattern: no text siblings before icon, text after
-          let textBefore = false;
-          let textAfter = false;
-          let seenIcon = false;
-          for (const child of el.children) {
-            if (child === iconAncestor || child.contains(icon)) {
-              seenIcon = true;
-              continue;
+          // Walk up from icon, checking sibling pattern at each ancestor level.
+          // Leading icon = no text siblings before, text siblings after.
+          let ancestor: Element = icon;
+          while (ancestor.parentElement && ancestor !== el) {
+            const parent = ancestor.parentElement;
+            let textBefore = false;
+            let textAfter = false;
+            let seenIcon = false;
+            for (const child of parent.children) {
+              if (child === ancestor) {
+                seenIcon = true;
+                continue;
+              }
+              const hasText = (child.textContent || "").trim().length > 0;
+              if (!seenIcon && hasText) textBefore = true;
+              if (seenIcon && hasText) textAfter = true;
             }
-            const hasText = (child.textContent || "").trim().length > 0;
-            if (!seenIcon && hasText) textBefore = true;
-            if (seenIcon && hasText) textAfter = true;
+            if (!textBefore && textAfter) return icon;
+            ancestor = parent;
           }
-          if (!textBefore && textAfter) return icon;
         }
       }
       if (icons.length === 0) {

@@ -1194,6 +1194,39 @@ describe("DOM problems — native interactive elements prune subtrees", () => {
         assert.equal(x, 15, "Hint should center on leading img icon (5 + 20/2)");
     });
 
+    // ISSUE: x.com wraps icon + label inside a single wrapper div as the only child of <a>.
+    // Sibling check at the direct-child level finds no siblings, so leading icon pattern fails.
+    // FIX: Walk up from icon, check sibling pattern at each ancestor level up to el.
+    // SITE: x.com
+    it("link with icon inside single wrapper div targets the SVG", () => {
+        const link = makeElement("A", { href: "/explore", top: 0, left: 0, width: 250, height: 50,
+            attrs: { role: "link" } });
+        const wrapper = makeElement("DIV", { top: 0, left: 0, width: 250, height: 50 });
+        const iconDiv = makeElement("DIV", { top: 5, left: 5, width: 30, height: 30 });
+        const svg = makeElement("SVG", { top: 8, left: 8, width: 24, height: 24 });
+        iconDiv.appendChild(svg);
+        const textDiv = makeElement("DIV", { top: 5, left: 40, width: 100, height: 30, textContent: "Explore" });
+        wrapper.appendChild(iconDiv);
+        wrapper.appendChild(textDiv);
+        link.appendChild(wrapper);
+
+        loadModules([link, wrapper, iconDiv, svg, textDiv]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [link];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        // Should center on the SVG icon (8 + 24/2 = 20)
+        const x = parseFloat(hints[0].style.left);
+        assert.equal(x, 20, "Hint should center on SVG inside single wrapper (8 + 24/2)");
+    });
+
     it("anchor does not produce hints for interactive children inside it", () => {
         const anchor = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 40 });
         const innerBtn = makeElement("BUTTON", { top: 12, left: 12, width: 80, height: 20 });
