@@ -1229,15 +1229,16 @@ describe("DOM problems — native interactive elements prune subtrees", () => {
 
     // ISSUE: Vertically stacked icon-above-text layouts (LinkedIn nav) falsely match the
     // leading icon pattern because DOM order is icon-then-text in both horizontal and vertical layouts.
-    // FIX: Check that icon and text sibling overlap vertically (same row), not stacked.
+    // FIX: Check that text top is above icon bottom — if text starts below icon, it's stacked.
     // SITE: linkedin.com
     it("vertically stacked icon-above-text does NOT target the SVG", () => {
+        // LinkedIn nav: <a> > <div icon-wrapper> > ... > <svg> + <span label below>
         const link = makeElement("A", { href: "/feed/", top: 0, left: 0, width: 80, height: 70 });
-        const iconWrap = makeElement("SPAN", { top: 5, left: 20, width: 30, height: 24 });
-        const svg = makeElement("SVG", { top: 5, left: 20, width: 24, height: 24 });
+        const iconWrap = makeElement("DIV", { top: 5, left: 20, width: 30, height: 30 });
+        const svg = makeElement("SVG", { top: 8, left: 22, width: 24, height: 24 });
         iconWrap.appendChild(svg);
-        // Text is BELOW the icon, not beside it
-        const label = makeElement("SPAN", { top: 35, left: 10, width: 60, height: 16, textContent: "Home" });
+        // Text label below the icon (top: 40, icon bottom: 32)
+        const label = makeElement("SPAN", { top: 40, left: 10, width: 60, height: 16, textContent: "Home" });
         link.appendChild(iconWrap);
         link.appendChild(label);
 
@@ -1256,6 +1257,55 @@ describe("DOM problems — native interactive elements prune subtrees", () => {
         // Should center on the link itself (0 + 80/2 = 40), NOT on the SVG
         const x = parseFloat(hints[0].style.left);
         assert.equal(x, 40, "Hint should center on the link, not the stacked icon");
+    });
+
+    // ISSUE: Container links (role="link" divs, wide nav items) with no specific visual anchor
+    // get a pointed hint in the middle, which looks arbitrary. Bar style is more appropriate.
+    // FIX: When getHintTargetElement returns the element itself and it has children, use bar style.
+    // SITE: x.com (trending topics), github.com (sidebar sections)
+    it("container link with children gets bar-style hint", () => {
+        const link = makeElement("DIV", { top: 10, left: 10, width: 300, height: 80,
+            attrs: { role: "link", tabindex: "0" } });
+        const subtitle = makeElement("DIV", { top: 15, left: 15, width: 200, height: 16, textContent: "Trending" });
+        const title = makeElement("DIV", { top: 35, left: 15, width: 200, height: 20, textContent: "DOGE" });
+        link.appendChild(subtitle);
+        link.appendChild(title);
+
+        loadModules([link, subtitle, title]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [link];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        assert.ok(hints[0].classList.contains("vimium-hint-bar"), "Container link should use bar-style hint");
+        assert.equal(hints[0].dataset.label, "s", "Bar hint should have label in data-label attribute");
+    });
+
+    // Verify a link with a specific target (heading, icon) still gets a normal pointed hint
+    it("link with heading gets normal pointed hint, not bar", () => {
+        const link = makeElement("A", { href: "/article", top: 10, left: 10, width: 300, height: 80 });
+        const heading = makeElement("H3", { top: 15, left: 15, width: 200, height: 20, textContent: "Article Title" });
+        link.appendChild(heading);
+
+        loadModules([link, heading]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [link];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        assert.ok(!hints[0].classList.contains("vimium-hint-bar"), "Link with heading should use normal hint");
     });
 
     it("anchor does not produce hints for interactive children inside it", () => {
