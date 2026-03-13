@@ -643,6 +643,40 @@ describe("DOM problems — inline element hint alignment", () => {
     });
 });
 
+// GitHub: empty block-level element with zero height but non-zero width (e.g. skip-to-content
+// target div with tabindex) passes the zero-size check because it only requires BOTH dimensions
+// to be zero. The hint renders at (0,0), clipped by the viewport edge.
+// FIX: skip elements where either dimension is zero, not just both.
+describe("DOM problems — zero in one dimension filtered", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("filters out element with zero height but non-zero width", () => {
+        const zeroHeight = makeElement("DIV", {
+            top: 0, left: 0, width: 1024, height: 0,
+            attrs: { tabindex: "0" },
+        });
+        loadModules([zeroHeight]);
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(!hintMode.isActive(), "Zero-height element should not get a hint");
+    });
+
+    it("filters out element with zero width but non-zero height", () => {
+        const zeroWidth = makeElement("DIV", {
+            top: 0, left: 0, width: 0, height: 768,
+            attrs: { tabindex: "0" },
+        });
+        loadModules([zeroWidth]);
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(!hintMode.isActive(), "Zero-width element should not get a hint");
+    });
+});
+
 // X.com trending: div[role="link"] contains a button[role="button"] (the "..." menu).
 // The trend box should get its own hint separate from the button's hint.
 // Previously getHintTargetElement redirected to the inner button, making both hints overlap.

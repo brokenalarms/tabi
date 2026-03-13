@@ -38,7 +38,7 @@ export function walkerFilter(node: Node): number {
   // Effective rect: anchor-child fallback for zero-size <a>,
   // label redirect for zero-size radio/checkbox
   let rect = el.getBoundingClientRect();
-  if (rect.width === 0 && rect.height === 0) {
+  if (rect.width === 0 || rect.height === 0) {
     let fallbackRect: DOMRect | null = null;
     if (el.tagName.toLowerCase() === "a") {
       for (const child of el.children) {
@@ -134,7 +134,7 @@ export function findAssociatedLabel(el: HTMLElement): HTMLElement | null {
 
 function isVisible(el: HTMLElement): boolean {
   const rect = el.getBoundingClientRect();
-  if (rect.width === 0 && rect.height === 0) {
+  if (rect.width === 0 || rect.height === 0) {
     if (el.tagName.toLowerCase() === "a") {
       for (const child of el.children) {
         const cr = (child as HTMLElement).getBoundingClientRect();
