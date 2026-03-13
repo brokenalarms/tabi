@@ -15,10 +15,12 @@ export const CLICKABLE_SELECTOR = [
 
 // --- Walker filter (3-step pipeline) ---
 // Used with document.createTreeWalker to discover clickable, visible elements.
-// FILTER_REJECT prunes entire subtrees (step 1, and step 3 for cascading
-// invisibility like opacity:0 and overflow clipping), FILTER_SKIP skips the
-// node but continues into children (step 2, and elementsFromPoint coverage
-// in step 3), FILTER_ACCEPT yields the element.
+// FILTER_REJECT prunes entire subtrees (step 1: display:none, visibility:hidden,
+// aria-hidden, inert, hidden, disabled, and off-viewport elements).
+// FILTER_SKIP skips the node but continues into children (step 2 for non-clickable
+// nodes, and step 3 for zero-size, opacity:0, and overflow clipping — these must
+// not prune subtrees because children can be visible independently).
+// FILTER_ACCEPT yields the element.
 
 export function walkerFilter(node: Node): number {
   const el = node as HTMLElement;
@@ -53,7 +55,7 @@ export function walkerFilter(node: Node): number {
         }
       }
     }
-    if (!fallbackRect) return NodeFilter.FILTER_REJECT;
+    if (!fallbackRect) return NodeFilter.FILTER_SKIP;
     rect = fallbackRect;
   }
 
@@ -74,7 +76,7 @@ export function walkerFilter(node: Node): number {
         if (label && isVisible(label)) return NodeFilter.FILTER_ACCEPT;
       }
     }
-    return NodeFilter.FILTER_REJECT;
+    return NodeFilter.FILTER_SKIP;
   }
 
   // Clipped by overflow:hidden ancestor
@@ -85,7 +87,7 @@ export function walkerFilter(node: Node): number {
       const ar = ancestor.getBoundingClientRect();
       if (rect.bottom <= ar.top || rect.top >= ar.bottom ||
           rect.right <= ar.left || rect.left >= ar.right) {
-        return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_SKIP;
       }
     }
     ancestor = ancestor.parentElement;
