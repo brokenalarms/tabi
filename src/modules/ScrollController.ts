@@ -1,29 +1,55 @@
 // ScrollController — scroll target detection and scroll commands for Vimium
 // Finds the correct scrollable element and performs directional/absolute scrolling.
-// Uses requestAnimationFrame-based easing for smooth scrolling, since Safari does
-// not reliably support CSS `behavior: "smooth"` on all elements.
+// Uses requestAnimationFrame for smooth scrolling, since Safari does not reliably
+// support CSS `behavior: "smooth"` on all elements.
+//
+// Step keys (j/k/h/l) use velocity-based scrolling: keydown starts a continuous
+// RAF loop at a fixed speed, keyup decelerates to a stop via exponential smoothing.
+// This avoids dependence on OS key repeat and produces smooth scrolling from frame 1.
 
 type Axis = "x" | "y";
 
 interface KeyHandlerLike {
   on(command: string, callback: () => void): void;
+  onKeyUp(command: string, callback: () => void): void;
   off(command: string): void;
 }
 
 export const ScrollConfig = {
-  /** Pixels per j/k keystroke */
+  /** Scroll velocity (px/sec) for held j/k/h/l */
+  scrollSpeed: 800,
+  /** Pixels per single j/k tap (keydown→keyup with no hold) */
   scrollStep: 60,
-  /** Animation duration (ms) for j/k step scrolls */
-  scrollDurationMs: 150,
-  /** Max animation duration (ms) for gg/G jump scrolls */
-  jumpMaxMs: 500,
-  /** Log-scale factor for jump duration — higher = longer animation for large distances */
-  jumpLogScale: 20,
+  /** Smoothing time constant (ms) for deceleration and gg/G */
+  smoothTimeMs: 120,
+  /** Snap threshold (px) — stop animating when this close to target */
+  snapThreshold: 0.5,
 };
+
+// --- Target-chase animation (exponential smoothing) ---
+// Used for gg/G, half-page, and deceleration after key release.
+
+interface ChaseAnimation {
+  targetX: number;
+  targetY: number;
+  rafId: number;
+  lastTime: number;
+}
+
+// --- Velocity-based continuous scroll (held keys) ---
+
+interface VelocityScroll {
+  target: Element;
+  axis: Axis;
+  direction: number; // +1 or -1
+  rafId: number;
+  lastTime: number;
+}
 
 export class ScrollController {
   private _keyHandler: KeyHandlerLike;
-  private static _activeAnimations = new Map<Element, number>();
+  private static _chaseAnimations = new Map<Element, ChaseAnimation>();
+  private static _velocity: VelocityScroll | null = null;
 
   constructor(keyHandler: KeyHandlerLike) {
     this._keyHandler = keyHandler;
@@ -57,43 +83,157 @@ export class ScrollController {
     return el.scrollHeight > el.clientHeight;
   }
 
-  // --- Easing ---
-
-  private static _easeOut(t: number): number {
-    return t * (2 - t);
-  }
-
-  // --- Smooth scroll via requestAnimationFrame ---
+  // --- Chase animation (smooth scroll to target) ---
 
   private static _smoothScroll(
     target: Element,
     deltaX: number,
     deltaY: number,
-    duration: number = ScrollConfig.scrollDurationMs,
   ): void {
-    const existing = ScrollController._activeAnimations.get(target);
-    if (existing) cancelAnimationFrame(existing);
-
-    const startX = target.scrollLeft;
-    const startY = target.scrollTop;
-    const startTime = performance.now();
-
-    function step(now: number) {
-      const elapsed = now - startTime;
-      const progress = Math.min(elapsed / duration, 1);
-      const eased = ScrollController._easeOut(progress);
-
-      target.scrollLeft = startX + deltaX * eased;
-      target.scrollTop = startY + deltaY * eased;
-
-      if (progress < 1) {
-        ScrollController._activeAnimations.set(target, requestAnimationFrame(step));
-      } else {
-        ScrollController._activeAnimations.delete(target);
-      }
+    const existing = ScrollController._chaseAnimations.get(target);
+    if (existing) {
+      existing.targetX += deltaX;
+      existing.targetY += deltaY;
+      return;
     }
 
-    ScrollController._activeAnimations.set(target, requestAnimationFrame(step));
+    const anim: ChaseAnimation = {
+      targetX: target.scrollLeft + deltaX,
+      targetY: target.scrollTop + deltaY,
+      rafId: 0,
+      lastTime: 0, // 0 = first frame not yet recorded
+    };
+
+    function step(now: number) {
+      // First frame: just record the timestamp, skip computation.
+      // Guarantees the next frame has a real dt (~16ms).
+      if (anim.lastTime === 0) {
+        anim.lastTime = now;
+        anim.rafId = requestAnimationFrame(step);
+        return;
+      }
+
+      const dt = now - anim.lastTime;
+      anim.lastTime = now;
+
+      if ("isConnected" in target && !target.isConnected) {
+        ScrollController._chaseAnimations.delete(target);
+        return;
+      }
+
+      const beforeX = target.scrollLeft;
+      const beforeY = target.scrollTop;
+      const remainingX = anim.targetX - beforeX;
+      const remainingY = anim.targetY - beforeY;
+
+      if (Math.abs(remainingX) < ScrollConfig.snapThreshold &&
+          Math.abs(remainingY) < ScrollConfig.snapThreshold) {
+        target.scrollLeft = anim.targetX;
+        target.scrollTop = anim.targetY;
+        ScrollController._chaseAnimations.delete(target);
+        return;
+      }
+
+      const factor = 1 - Math.exp(-dt / ScrollConfig.smoothTimeMs);
+      target.scrollLeft += remainingX * factor;
+      target.scrollTop += remainingY * factor;
+
+      // Browser clamped scroll (boundary or sub-pixel rounding) — snap to target
+      if (target.scrollLeft === beforeX && target.scrollTop === beforeY) {
+        target.scrollLeft = anim.targetX;
+        target.scrollTop = anim.targetY;
+        ScrollController._chaseAnimations.delete(target);
+        return;
+      }
+
+      anim.rafId = requestAnimationFrame(step);
+    }
+
+    ScrollController._chaseAnimations.set(target, anim);
+    anim.rafId = requestAnimationFrame(step);
+  }
+
+  // --- Velocity scroll ---
+
+  private static _startVelocity(axis: Axis, direction: number): void {
+    const v = ScrollController._velocity;
+    // Already scrolling in same direction — ignore key repeat
+    if (v && v.axis === axis && v.direction === direction) return;
+
+    // Stop any existing velocity or chase on this target
+    ScrollController._stopVelocityImmediate();
+    const target = ScrollController.findScrollTarget(axis);
+    const chase = ScrollController._chaseAnimations.get(target);
+    if (chase) {
+      cancelAnimationFrame(chase.rafId);
+      ScrollController._chaseAnimations.delete(target);
+    }
+
+    const vel: VelocityScroll = {
+      target,
+      axis,
+      direction,
+      rafId: 0,
+      lastTime: 0,
+    };
+
+    function step(now: number) {
+      if (vel.lastTime === 0) {
+        vel.lastTime = now;
+        vel.rafId = requestAnimationFrame(step);
+        return;
+      }
+
+      const dt = now - vel.lastTime;
+      vel.lastTime = now;
+
+      if ("isConnected" in vel.target && !vel.target.isConnected) {
+        ScrollController._velocity = null;
+        return;
+      }
+
+      const px = ScrollConfig.scrollSpeed * (dt / 1000) * vel.direction;
+      const before = vel.axis === "y" ? vel.target.scrollTop : vel.target.scrollLeft;
+
+      if (vel.axis === "y") {
+        vel.target.scrollTop += px;
+      } else {
+        vel.target.scrollLeft += px;
+      }
+
+      const after = vel.axis === "y" ? vel.target.scrollTop : vel.target.scrollLeft;
+
+      // Hit boundary
+      if (after === before) {
+        ScrollController._velocity = null;
+        return;
+      }
+
+      vel.rafId = requestAnimationFrame(step);
+    }
+
+    ScrollController._velocity = vel;
+    vel.rafId = requestAnimationFrame(step);
+  }
+
+  private static _stopVelocity(): void {
+    const v = ScrollController._velocity;
+    if (!v) return;
+    cancelAnimationFrame(v.rafId);
+    ScrollController._velocity = null;
+
+    // Hand off momentum for smooth deceleration
+    const remaining = ScrollConfig.scrollStep * v.direction;
+    const dx = v.axis === "x" ? remaining : 0;
+    const dy = v.axis === "y" ? remaining : 0;
+    ScrollController._smoothScroll(v.target, dx, dy);
+  }
+
+  private static _stopVelocityImmediate(): void {
+    const v = ScrollController._velocity;
+    if (!v) return;
+    cancelAnimationFrame(v.rafId);
+    ScrollController._velocity = null;
   }
 
   // --- Scroll operations ---
@@ -105,21 +245,28 @@ export class ScrollController {
     ScrollController._smoothScroll(target, dx, dy);
   }
 
-  private static _jumpDuration(distance: number): number {
-    if (distance === 0) return 0;
-    return Math.min(ScrollConfig.scrollDurationMs + Math.log2(1 + Math.abs(distance)) * ScrollConfig.jumpLogScale, ScrollConfig.jumpMaxMs);
-  }
-
   static scrollToTop(): void {
+    ScrollController._stopVelocityImmediate();
     const target = ScrollController.findScrollTarget("y");
+    ScrollController._cancelChase(target);
     const dy = -target.scrollTop;
-    ScrollController._smoothScroll(target, 0, dy, ScrollController._jumpDuration(dy));
+    ScrollController._smoothScroll(target, 0, dy);
   }
 
   static scrollToBottom(): void {
+    ScrollController._stopVelocityImmediate();
     const target = ScrollController.findScrollTarget("y");
+    ScrollController._cancelChase(target);
     const dy = target.scrollHeight - target.clientHeight - target.scrollTop;
-    ScrollController._smoothScroll(target, 0, dy, ScrollController._jumpDuration(dy));
+    ScrollController._smoothScroll(target, 0, dy);
+  }
+
+  private static _cancelChase(target: Element): void {
+    const existing = ScrollController._chaseAnimations.get(target);
+    if (existing) {
+      cancelAnimationFrame(existing.rafId);
+      ScrollController._chaseAnimations.delete(target);
+    }
   }
 
   // --- Command wiring ---
@@ -127,17 +274,28 @@ export class ScrollController {
   private _wireCommands(): void {
     const kh = this._keyHandler;
 
-    kh.on("scrollDown", () => ScrollController.scrollBy("y", ScrollConfig.scrollStep));
-    kh.on("scrollUp", () => ScrollController.scrollBy("y", -ScrollConfig.scrollStep));
-    kh.on("scrollRight", () => ScrollController.scrollBy("x", ScrollConfig.scrollStep));
-    kh.on("scrollLeft", () => ScrollController.scrollBy("x", -ScrollConfig.scrollStep));
+    // Step scrolls: keydown starts velocity, keyup decelerates
+    const scrollCmds: [string, Axis, number][] = [
+      ["scrollDown", "y", 1],
+      ["scrollUp", "y", -1],
+      ["scrollRight", "x", 1],
+      ["scrollLeft", "x", -1],
+    ];
+    for (const [cmd, axis, dir] of scrollCmds) {
+      kh.on(cmd, () => ScrollController._startVelocity(axis, dir));
+      kh.onKeyUp(cmd, () => ScrollController._stopVelocity());
+    }
 
     kh.on("scrollHalfPageDown", () => {
+      ScrollController._stopVelocityImmediate();
       const target = ScrollController.findScrollTarget("y");
+      ScrollController._cancelChase(target);
       ScrollController.scrollBy("y", Math.round(target.clientHeight / 2));
     });
     kh.on("scrollHalfPageUp", () => {
+      ScrollController._stopVelocityImmediate();
       const target = ScrollController.findScrollTarget("y");
+      ScrollController._cancelChase(target);
       ScrollController.scrollBy("y", -Math.round(target.clientHeight / 2));
     });
 
@@ -150,6 +308,7 @@ export class ScrollController {
   }
 
   destroy(): void {
+    ScrollController._stopVelocityImmediate();
     const commands = [
       "scrollDown", "scrollUp", "scrollRight", "scrollLeft",
       "scrollHalfPageDown", "scrollHalfPageUp",

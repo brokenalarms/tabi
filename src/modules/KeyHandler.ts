@@ -38,11 +38,15 @@ export class KeyHandler {
   private _keyTimer: ReturnType<typeof setTimeout> | null;
   private _bindings: Map<string, Map<string, string>>;
   private _commands: Map<string, () => void>;
+  private _keyUpCommands: Map<string, () => void>;
   private _prefixes: Map<string, Set<string>>;
   private _modeListeners: ModeListener[];
   private _modeKeyDelegate: ((event: KeyboardEvent) => boolean) | null;
+  private _heldCommand: string | null;
+  private _heldCode: string | null;
 
   private readonly _onKeyDown: (event: KeyboardEvent) => void;
+  private readonly _onKeyUp: (event: KeyboardEvent) => void;
   private readonly _onFocusIn: (event: FocusEvent) => void;
   private readonly _onFocusOut: (event: FocusEvent) => void;
 
@@ -53,11 +57,15 @@ export class KeyHandler {
     this._keyTimer = null;
     this._bindings = new Map();
     this._commands = new Map();
+    this._keyUpCommands = new Map();
     this._prefixes = new Map();
     this._modeListeners = [];
     this._modeKeyDelegate = null;
+    this._heldCommand = null;
+    this._heldCode = null;
 
     this._onKeyDown = this._handleKeyDown.bind(this);
+    this._onKeyUp = this._handleKeyUp.bind(this);
     this._onFocusIn = this._handleFocusIn.bind(this);
     this._onFocusOut = this._handleFocusOut.bind(this);
 
@@ -102,6 +110,11 @@ export class KeyHandler {
 
   off(commandName: string): void {
     this._commands.delete(commandName);
+    this._keyUpCommands.delete(commandName);
+  }
+
+  onKeyUp(commandName: string, callback: () => void): void {
+    this._keyUpCommands.set(commandName, callback);
   }
 
   resetBuffer(): void {
@@ -244,12 +257,14 @@ export class KeyHandler {
 
   private _attach(): void {
     document.addEventListener("keydown", this._onKeyDown, true);
+    document.addEventListener("keyup", this._onKeyUp, true);
     document.addEventListener("focusin", this._onFocusIn, true);
     document.addEventListener("focusout", this._onFocusOut, true);
   }
 
   private _detach(): void {
     document.removeEventListener("keydown", this._onKeyDown, true);
+    document.removeEventListener("keyup", this._onKeyUp, true);
     document.removeEventListener("focusin", this._onFocusIn, true);
     document.removeEventListener("focusout", this._onFocusOut, true);
   }
@@ -311,7 +326,13 @@ export class KeyHandler {
       event.preventDefault();
       event.stopPropagation();
       this._resetBuffer();
-      this._dispatch(modeBindings.get(candidate)!);
+      const cmd = modeBindings.get(candidate)!;
+      // Track held key for keyup dispatch (only single-key bindings)
+      if (!candidate.includes(" ") && this._keyUpCommands.has(cmd)) {
+        this._heldCommand = cmd;
+        this._heldCode = event.code;
+      }
+      this._dispatch(cmd);
       return;
     }
 
@@ -331,6 +352,15 @@ export class KeyHandler {
     }
 
     // Single key with no binding — ignore (let browser handle)
+  }
+
+  private _handleKeyUp(event: KeyboardEvent): void {
+    if (this._heldCommand && event.code === this._heldCode) {
+      const handler = this._keyUpCommands.get(this._heldCommand);
+      if (handler) handler();
+      this._heldCommand = null;
+      this._heldCode = null;
+    }
   }
 
   private _startTimeout(): void {

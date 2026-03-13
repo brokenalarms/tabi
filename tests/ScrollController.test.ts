@@ -1,8 +1,6 @@
 // ScrollController unit tests — using Node.js built-in test runner
-// Tests scroll target detection, directional scrolling, half-page scrolling,
-// absolute scrolling, and history navigation command wiring.
-// The smooth-scroll implementation uses requestAnimationFrame; these tests
-// simulate the animation by flushing rAF callbacks to their final frame.
+// Tests scroll target detection, command wiring, and scroll direction.
+// Animation behavior (smoothness, deceleration) is validated visually in-browser.
 
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -25,8 +23,6 @@ function makeElement(opts: Record<string, any> = {}) {
         scrollLeft: opts.scrollLeft || 0,
         scrollTop: opts.scrollTop || 0,
         parentElement: opts.parent || null,
-        scrollBy: mock.fn(),
-        scrollTo: mock.fn(),
         _style: style,
     };
 }
@@ -37,7 +33,6 @@ let capturedListeners: Record<string, Function[]>,
 let documentBody: ReturnType<typeof makeElement>,
     documentScrollingElement: ReturnType<typeof makeElement>;
 
-// rAF simulation: collect callbacks and flush them with a given timestamp.
 let rafQueue: Map<number, FrameRequestCallback>;
 let rafIdCounter: number;
 
@@ -75,10 +70,10 @@ function setupDOM() {
     (globalThis as any).clearTimeout = clearTimeout;
     (globalThis as any).setTimeout = setTimeout;
 
-    // performance.now shim
-    (globalThis as any).performance = { now: () => 0 };
+    let currentTime = 0;
+    (globalThis as any).performance = { now: () => currentTime };
+    (globalThis as any)._setTime = (t: number) => { currentTime = t; };
 
-    // requestAnimationFrame / cancelAnimationFrame shim
     (globalThis as any).requestAnimationFrame = (cb: FrameRequestCallback) => {
         const id = ++rafIdCounter;
         rafQueue.set(id, cb);
@@ -89,16 +84,18 @@ function setupDOM() {
     };
 }
 
-// Flush all pending rAF callbacks, simulating time jumping to `timestamp`.
-// Repeats until no new callbacks are queued (handles chained rAFs).
-function flushRAF(timestamp: number) {
-    let safety = 100;
+// Flush rAF callbacks in 16ms steps up to targetTime.
+function flushRAF(targetTime: number) {
+    const step = 16;
+    let time = (globalThis as any).performance.now();
+    let safety = 500;
     while (rafQueue.size > 0 && safety-- > 0) {
+        time += step;
+        if (time > targetTime) break;
+        (globalThis as any)._setTime(time);
         const batch = new Map(rafQueue);
         rafQueue.clear();
-        for (const cb of batch.values()) {
-            cb(timestamp);
-        }
+        for (const cb of batch.values()) cb(time);
     }
 }
 
@@ -121,8 +118,11 @@ function makeKeyEvent(code: string, opts: Record<string, boolean> = {}) {
 }
 
 function fireKeyDown(event: ReturnType<typeof makeKeyEvent>) {
-    const listeners = capturedListeners["keydown"] || [];
-    for (const fn of listeners) fn(event);
+    for (const fn of capturedListeners["keydown"] || []) fn(event);
+}
+
+function fireKeyUp(event: ReturnType<typeof makeKeyEvent>) {
+    for (const fn of capturedListeners["keyup"] || []) fn(event);
 }
 
 describe("ScrollController", () => {
@@ -133,102 +133,79 @@ describe("ScrollController", () => {
     });
 
     describe("findScrollTarget", () => {
-        // Falls back to document.scrollingElement when active element is body
         it("returns document.scrollingElement when active element is body", () => {
-            const target = ScrollController.findScrollTarget("y");
-            assert.strictEqual(target, documentScrollingElement);
+            assert.strictEqual(ScrollController.findScrollTarget("y"), documentScrollingElement);
         });
 
-        // Finds a scrollable ancestor of the focused element
         it("finds scrollable ancestor of focused element", () => {
             const scrollableDiv = makeElement({
-                overflowY: "auto",
-                scrollHeight: 2000,
-                clientHeight: 400,
+                overflowY: "auto", scrollHeight: 2000, clientHeight: 400,
             });
             const child = makeElement({ parent: scrollableDiv });
             (globalThis as any).document.activeElement = child;
-
-            const target = ScrollController.findScrollTarget("y");
-            assert.strictEqual(target, scrollableDiv);
+            assert.strictEqual(ScrollController.findScrollTarget("y"), scrollableDiv);
         });
 
-        // Falls through non-scrollable ancestors to document.scrollingElement
         it("skips non-scrollable ancestors", () => {
             const nonScrollable = makeElement({ overflowY: "visible" });
             const child = makeElement({ parent: nonScrollable });
             nonScrollable.parentElement = documentBody;
             (globalThis as any).document.activeElement = child;
-
-            const target = ScrollController.findScrollTarget("y");
-            assert.strictEqual(target, documentScrollingElement);
+            assert.strictEqual(ScrollController.findScrollTarget("y"), documentScrollingElement);
         });
 
-        // Detects horizontal scrollability for x-axis
         it("detects horizontal scrollability", () => {
             const hScroll = makeElement({
-                overflowX: "scroll",
-                scrollWidth: 2000,
-                clientWidth: 400,
+                overflowX: "scroll", scrollWidth: 2000, clientWidth: 400,
             });
             const child = makeElement({ parent: hScroll });
             (globalThis as any).document.activeElement = child;
-
-            const target = ScrollController.findScrollTarget("x");
-            assert.strictEqual(target, hScroll);
+            assert.strictEqual(ScrollController.findScrollTarget("x"), hScroll);
         });
     });
 
-    describe("Step scroll (j/k/h/l)", () => {
-        // Pressing j smooth-scrolls the document down by ScrollConfig.scrollStep pixels
-        it("j scrolls down", () => {
+    describe("Scroll commands (j/k/h/l)", () => {
+        it("j starts scrolling down", () => {
             fireKeyDown(makeKeyEvent("KeyJ"));
-            // Flush animation to completion (timestamp well past duration)
-            flushRAF(1000);
-            assert.equal(documentScrollingElement.scrollTop, ScrollConfig.scrollStep);
-            assert.equal(documentScrollingElement.scrollLeft, 0);
+            flushRAF(200);
+            assert.ok(documentScrollingElement.scrollTop > 0, "should scroll down");
         });
 
-        // Pressing k smooth-scrolls the document up by ScrollConfig.scrollStep pixels
-        it("k scrolls up", () => {
-            documentScrollingElement.scrollTop = 200;
+        it("k starts scrolling up", () => {
+            documentScrollingElement.scrollTop = 500;
             fireKeyDown(makeKeyEvent("KeyK"));
-            flushRAF(1000);
-            assert.equal(documentScrollingElement.scrollTop, 200 - ScrollConfig.scrollStep);
+            flushRAF(200);
+            assert.ok(documentScrollingElement.scrollTop < 500, "should scroll up");
         });
 
-        // Pressing l smooth-scrolls right by ScrollConfig.scrollStep pixels
-        it("l scrolls right", () => {
+        it("l starts scrolling right", () => {
             fireKeyDown(makeKeyEvent("KeyL"));
-            flushRAF(1000);
-            assert.equal(documentScrollingElement.scrollLeft, ScrollConfig.scrollStep);
+            flushRAF(200);
+            assert.ok(documentScrollingElement.scrollLeft > 0, "should scroll right");
         });
 
-        // Pressing h smooth-scrolls left by ScrollConfig.scrollStep pixels
-        it("h scrolls left", () => {
-            documentScrollingElement.scrollLeft = 200;
+        it("h starts scrolling left", () => {
+            documentScrollingElement.scrollLeft = 500;
             fireKeyDown(makeKeyEvent("KeyH"));
-            flushRAF(1000);
-            assert.equal(documentScrollingElement.scrollLeft, 200 - ScrollConfig.scrollStep);
+            flushRAF(200);
+            assert.ok(documentScrollingElement.scrollLeft < 500, "should scroll left");
         });
     });
 
     describe("Half-page scroll (d/u)", () => {
-        // Pressing d smooth-scrolls down by half the viewport height
         it("d scrolls half page down", () => {
             fireKeyDown(makeKeyEvent("KeyD"));
-            flushRAF(1000);
+            flushRAF(5000);
             assert.equal(
                 documentScrollingElement.scrollTop,
                 Math.round(documentScrollingElement.clientHeight / 2),
             );
         });
 
-        // Pressing u smooth-scrolls up by half the viewport height
         it("u scrolls half page up", () => {
             documentScrollingElement.scrollTop = 1000;
             fireKeyDown(makeKeyEvent("KeyU"));
-            flushRAF(1000);
+            flushRAF(5000);
             assert.equal(
                 documentScrollingElement.scrollTop,
                 1000 - Math.round(documentScrollingElement.clientHeight / 2),
@@ -237,20 +214,18 @@ describe("ScrollController", () => {
     });
 
     describe("Absolute scroll (gg/G)", () => {
-        // gg smooth-scrolls to the very top of the document
         it("gg scrolls to top", () => {
             documentScrollingElement.scrollTop = 500;
             fireKeyDown(makeKeyEvent("KeyG"));
             fireKeyDown(makeKeyEvent("KeyG"));
-            flushRAF(1000);
+            flushRAF(5000);
             assert.equal(documentScrollingElement.scrollTop, 0);
         });
 
-        // G (Shift+g) smooth-scrolls to the bottom of the document
         it("G scrolls to bottom", () => {
             documentScrollingElement.scrollTop = 0;
             fireKeyDown(makeKeyEvent("KeyG", { shift: true }));
-            flushRAF(1000);
+            flushRAF(5000);
             assert.equal(
                 documentScrollingElement.scrollTop,
                 documentScrollingElement.scrollHeight - documentScrollingElement.clientHeight,
@@ -258,39 +233,12 @@ describe("ScrollController", () => {
         });
     });
 
-    describe("Smooth scroll animation", () => {
-        // Mid-animation the scroll position should be partially advanced
-        it("intermediate frame produces partial scroll", () => {
-            fireKeyDown(makeKeyEvent("KeyJ"));
-            // Flush at half the duration (75ms) — easeOut(0.5) = 0.75
-            flushRAF(75);
-            const expected = ScrollConfig.scrollStep * 0.75;
-            assert.ok(
-                Math.abs(documentScrollingElement.scrollTop - expected) < 1,
-                `expected ~${expected}, got ${documentScrollingElement.scrollTop}`,
-            );
-        });
-
-        // Rapid repeated keys cancel the previous animation and start fresh
-        it("cancels previous animation on same element", () => {
-            fireKeyDown(makeKeyEvent("KeyJ"));
-            // Don't flush — immediately press j again
-            documentScrollingElement.scrollTop = 30; // simulate partial progress
-            fireKeyDown(makeKeyEvent("KeyJ"));
-            flushRAF(1000);
-            // Should have scrolled ScrollConfig.scrollStep from the position at the time of the second press (30)
-            assert.equal(documentScrollingElement.scrollTop, 30 + ScrollConfig.scrollStep);
-        });
-    });
-
     describe("History navigation (H/L)", () => {
-        // Shift+H navigates backward in browser history
         it("H goes back", () => {
             fireKeyDown(makeKeyEvent("KeyH", { shift: true }));
             assert.equal((globalThis as any).history.back.mock.callCount(), 1);
         });
 
-        // Shift+L navigates forward in browser history
         it("L goes forward", () => {
             fireKeyDown(makeKeyEvent("KeyL", { shift: true }));
             assert.equal((globalThis as any).history.forward.mock.callCount(), 1);
@@ -298,7 +246,6 @@ describe("ScrollController", () => {
     });
 
     describe("Page refresh (r)", () => {
-        // Pressing r reloads the current page
         it("r refreshes the page", () => {
             fireKeyDown(makeKeyEvent("KeyR"));
             assert.equal((globalThis as any).location.reload.mock.callCount(), 1);
@@ -306,12 +253,10 @@ describe("ScrollController", () => {
     });
 
     describe("destroy()", () => {
-        // After destroy, scroll commands are unregistered from KeyHandler
         it("unregisters all scroll commands", () => {
             scrollController.destroy();
-            // j should no longer trigger scrolling
             fireKeyDown(makeKeyEvent("KeyJ"));
-            flushRAF(1000);
+            flushRAF(200);
             assert.equal(documentScrollingElement.scrollTop, 0);
         });
     });
