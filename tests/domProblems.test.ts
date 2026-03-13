@@ -469,43 +469,90 @@ describe("DOM problems — generic cursor:pointer wrapper dedup", () => {
     });
 });
 
-// Facebook sidebar: full-width <a> with flex layout makes text span full-width too.
-// Hint lands at element edge instead of near visible text content.
-// FIX: use Range on text node to get actual text bounds when element rect is much wider.
-describe("DOM problems — hint positioned at text, not full-width element", () => {
+// Hint target redirect: a wrapper with a single clickable child should position
+// the hint at the child, not the wrapper. This is the common case of a large
+// card/container wrapping one interactive element.
+describe("DOM problems — hint target redirects to sole clickable child", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
         if (keyHandler) keyHandler.destroy();
     });
 
-    it("uses text range rect when element is wider than its text content", () => {
-        const span = makeElement("SPAN", { top: 10, left: 10, width: 400, height: 36 });
-        span.textContent = "Meta AI";
+    it("does NOT redirect when element contains clickable children", () => {
+        // role="link" div with inner button — hint stays on the element itself,
+        // centered underneath. Inner button gets its own separate hint.
+        const btn = makeElement("BUTTON", { top: 20, left: 300, width: 30, height: 30 });
+        const linkDiv = makeElement("DIV", { top: 0, left: 0, width: 400, height: 60 });
+        linkDiv.setAttribute("role", "link");
+        linkDiv.setAttribute("tabindex", "0");
+        linkDiv.appendChild(btn);
 
-        const link = makeElement("A", { href: "/meta-ai", top: 10, left: 10, width: 400, height: 36, children: [span] });
+        loadModules([linkDiv, btn]);
 
-        loadModules([link]);
-
-        (globalThis as any).document.elementsFromPoint = () => [link];
-
-        // Mock Range to return narrow text bounds
-        const textRect = { top: 10, left: 50, bottom: 30, right: 120, width: 70, height: 20, x: 50, y: 10, toJSON() { return this; } };
-        (globalThis as any).document.createRange = () => ({
-            selectNodeContents: () => {},
-            getBoundingClientRect: () => textRect,
-        });
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            const all = [btn, linkDiv];
+            return all.filter((el: any) => {
+                const r = el.getBoundingClientRect();
+                return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+            });
+        };
 
         const { hintMode } = getState();
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
 
-        // Access hint div position — it should be near the text rect (x=50), not the element edge (x=10)
+        // 2 hints: one for linkDiv centered-bottom, one for button
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hintDiv = overlay?.querySelector(".vimium-hint");
-        assert.ok(hintDiv, "Hint div should exist");
-        const left = parseFloat(hintDiv.style.left);
-        assert.ok(left >= 40 && left <= 60, `Hint left (${left}) should be near text rect left (50), not element left (10)`);
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 2, "Should have 2 hints (link + button)");
+        // Link hint should be centered on linkDiv (200), NOT at button (300+)
+        const linkHintLeft = parseFloat(hints[0].style.left);
+        assert.ok(linkHintLeft >= 190 && linkHintLeft <= 210,
+            `Link hint left (${linkHintLeft}) should be centered on linkDiv (200), not redirected to button (300)`);
+    });
+});
+
+// X.com trending: div[role="link"] contains a button[role="button"] (the "..." menu).
+// The trend box should get its own hint separate from the button's hint.
+// Previously getHintTargetElement redirected to the inner button, making both hints overlap.
+// FIX: don't redirect to clickable children — let each candidate stand on its own.
+describe("DOM problems — role=link with inner button gets separate hints", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("trend box and inner button both get hints", () => {
+        const trendText = makeElement("SPAN", { top: 10, left: 10, width: 200, height: 20, textContent: "DOGE" });
+        const moreBtn = makeElement("BUTTON", { top: 10, left: 300, width: 30, height: 30 });
+        moreBtn.setAttribute("role", "button");
+        moreBtn.setAttribute("aria-label", "More");
+
+        const trendBox = makeElement("DIV", { top: 0, left: 0, width: 350, height: 50 });
+        trendBox.setAttribute("role", "link");
+        trendBox.setAttribute("tabindex", "0");
+        trendBox.appendChild(trendText);
+        trendBox.appendChild(moreBtn);
+
+        loadModules([trendBox, moreBtn]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            const all = [moreBtn, trendText, trendBox];
+            return all.filter((el: any) => {
+                const r = el.getBoundingClientRect();
+                return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+            });
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        // 2 hints → single-char labels "s" and "a"
+        // Type "s" for trend box, "a" for button
+        fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
+        assert.ok(!hintMode.isActive(), "Expected 2 hints (trend box + button), but got fewer");
     });
 });
 

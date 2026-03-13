@@ -155,6 +155,13 @@ export class HintMode {
       }
     }
 
+    // If this element contains other clickable children, don't redirect — keep
+    // the hint on the first-level element. Inner clickable elements get their own hints.
+    const hasClickableChildren = el.querySelector(CLICKABLE_SELECTOR) !== null;
+    if (hasClickableChildren) return el;
+
+    // For generic wrappers with no competing clickable children, find the best
+    // visual target: sole clickable child, or first text-bearing element.
     const clickableChildren = el.querySelectorAll(CLICKABLE_SELECTOR);
     for (let i = 0; i < clickableChildren.length; i++) {
       const child = clickableChildren[i] as HTMLElement;
@@ -205,24 +212,7 @@ export class HintMode {
       }
     }
 
-    // For wide elements, use the actual text bounds instead of the full element rect
-    const textRect = HintMode.getTextRect(target);
-    if (textRect && textRect.width < rect.width * 0.8) return textRect;
-
     return rect;
-  }
-
-  private static getTextRect(el: HTMLElement): DOMRect | null {
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    let node: Text | null;
-    while ((node = walker.nextNode() as Text | null)) {
-      if (!(node.textContent || "").trim()) continue;
-      const range = document.createRange();
-      range.selectNodeContents(node);
-      const r = range.getBoundingClientRect();
-      if (r.width > 1 && r.height > 1) return r;
-    }
-    return null;
   }
 
   // --- Label generation ---
@@ -293,9 +283,10 @@ export class HintMode {
       tail.className = "vimium-hint-tail";
       div.appendChild(tail);
     } else {
-      const pos = this.viewportToDocument(rect.left, rect.top);
+      const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
       div.style.left = Math.max(0, pos.x) + "px";
       div.style.top = Math.max(0, pos.y) + "px";
+      div.style.transform = "translateX(-50%)";
     }
 
     if (this.overlay) this.overlay.appendChild(div);
