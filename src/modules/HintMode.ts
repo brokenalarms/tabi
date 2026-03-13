@@ -215,11 +215,19 @@ export class HintMode {
     // Inline elements have tight text rects — center on nearest block ancestor instead
     // so hints in vertical lists align rather than scattering with text width.
     // Exclude form controls — they are discrete positioned elements that should keep their own rect.
+    // Exclude mixed content — when the parent has sibling text (e.g. <p>text <a>link</a></p>),
+    // the link's natural position is correct.
     const tag = target.tagName.toLowerCase();
     const isFormControl = tag === "input" || tag === "textarea" || tag === "select";
     if (!isFormControl && getComputedStyle(target).display.startsWith("inline") && target.parentElement) {
-      const parentRect = target.parentElement.getBoundingClientRect();
-      rect = new DOMRect(parentRect.left, rect.top, parentRect.width, rect.height);
+      const parent = target.parentElement;
+      const hasMixedContent = Array.from(parent.childNodes).some(
+        n => n !== target && n.nodeType === 3 && (n.textContent || "").trim().length > 0
+      );
+      if (!hasMixedContent) {
+        const parentRect = parent.getBoundingClientRect();
+        rect = new DOMRect(parentRect.left, rect.top, parentRect.width, rect.height);
+      }
     }
 
     return rect;
