@@ -729,6 +729,47 @@ describe("DOM problems — checkbox/radio hint positioning", () => {
     });
 });
 
+// ISSUE: Inline centering logic widens hint to full parent <p> width for an <a> that's
+// part of mixed text content (e.g. "🤖 Generated with <a>Claude Code</a>"), pushing the
+// hint far from the actual link text.
+// SITE: GitHub PR description — "Generated with Claude Code" paragraph
+// FIX: Only apply inline centering when the element is the primary content of its parent
+// (no sibling text nodes with non-whitespace text).
+describe("DOM problems — inline link in mixed text content", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("hint stays near the link, not centered on wide parent paragraph", () => {
+        // <p>🤖 Generated with <a href="...">Claude Code</a></p>
+        const p = makeElement("P", { top: 10, left: 0, width: 800, height: 25, display: "block" });
+
+        // Add text node "🤖 Generated with " as sibling content
+        const w = (globalThis as any).window;
+        const textNode = w.document.createTextNode("🤖 Generated with ");
+        p.appendChild(textNode);
+
+        const link = makeElement("A", { href: "https://claude.com/claude-code", top: 10, left: 200, width: 100, height: 20, display: "inline" });
+        p.appendChild(link);
+
+        loadModules([link]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1, "Should have 1 hint for the link");
+
+        // Hint should be near the link (left=200, width=100, center=250), NOT centered on <p> (center=400)
+        const hintLeft = parseFloat(hints[0].style.left);
+        assert.ok(hintLeft < 300, `Hint left (${hintLeft}) should be near the link (~250), not centered on <p> (~400)`);
+    });
+});
+
 // X.com trending: div[role="link"] contains a button[role="button"] (the "..." menu).
 // The trend box should get its own hint separate from the button's hint.
 // Previously getHintTargetElement redirected to the inner button, making both hints overlap.
