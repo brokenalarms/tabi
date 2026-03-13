@@ -241,22 +241,29 @@ export function setupDOM(elements: any[] = []) {
             }
             return best;
         },
-        createTreeWalker(root: any, whatToShow: number) {
-            // Minimal TreeWalker mock for SHOW_ELEMENT (0x1)
-            // Walks element children depth-first
-            const nodes: any[] = [];
-            function collect(node: any) {
+        createTreeWalker(root: any, whatToShow: number, filterObj?: { acceptNode: (node: any) => number }) {
+            // TreeWalker mock with filter support (ACCEPT=1, REJECT=2, SKIP=3)
+            // REJECT prunes entire subtree, SKIP skips node but visits children
+            const accepted: any[] = [];
+            function walk(node: any) {
                 for (const child of (node.children || [])) {
-                    nodes.push(child);
-                    collect(child);
+                    if (filterObj) {
+                        const verdict = filterObj.acceptNode(child);
+                        if (verdict === 2) continue; // FILTER_REJECT — prune subtree
+                        if (verdict === 1) accepted.push(child); // FILTER_ACCEPT
+                        // FILTER_SKIP (3) or ACCEPT: continue into children
+                    } else {
+                        accepted.push(child);
+                    }
+                    walk(child);
                 }
             }
-            collect(root);
+            walk(root);
             let idx = -1;
             return {
                 nextNode() {
                     idx++;
-                    return idx < nodes.length ? nodes[idx] : null;
+                    return idx < accepted.length ? accepted[idx] : null;
                 },
             };
         },
@@ -299,7 +306,12 @@ export function setupDOM(elements: any[] = []) {
     };
 
     (globalThis as any).CSS = { escape: (s: string) => s };
-    (globalThis as any).NodeFilter = { SHOW_ELEMENT: 1 };
+    (globalThis as any).NodeFilter = {
+        SHOW_ELEMENT: 1,
+        FILTER_ACCEPT: 1,
+        FILTER_REJECT: 2,
+        FILTER_SKIP: 3,
+    };
 
     (globalThis as any).window = {
         innerWidth: 1024,
