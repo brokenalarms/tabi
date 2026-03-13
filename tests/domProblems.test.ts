@@ -998,3 +998,77 @@ describe("DOM problems — cursor:pointer sibling dedup", () => {
     });
 });
 
+// ISSUE: Native interactive elements (button, summary) produce duplicate overlapping hints
+// with their parent containers. E.g. <details> + <summary role="button"> both get hints
+// because the walker descends into accepted interactive elements.
+// SITE: GitHub PR sidebar — each section has <details><summary role="button">...</summary></details>
+// FIX: Native interactive elements are atomic — the walker should prune their subtrees.
+// <details> is a container (delegates to <summary>) and shouldn't be clickable itself.
+describe("DOM problems — native interactive elements prune subtrees", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("summary gets one hint, details does not get a separate hint", () => {
+        const details = makeElement("DETAILS", { top: 10, left: 10, width: 300, height: 30 });
+        const summary = makeElement("SUMMARY", { top: 10, left: 10, width: 300, height: 30 });
+        summary.setAttribute("role", "button");
+        details.appendChild(summary);
+
+        loadModules([details, summary]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [summary, details];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1, "Expected 1 hint (summary only) — details should not get a separate hint");
+    });
+
+    it("button does not produce hints for interactive children inside it", () => {
+        const button = makeElement("BUTTON", { top: 10, left: 10, width: 200, height: 40 });
+        const innerSpan = makeElement("SPAN", { top: 12, left: 12, width: 100, height: 20 });
+        innerSpan.setAttribute("role", "link");
+        innerSpan.setAttribute("tabindex", "0");
+        button.appendChild(innerSpan);
+
+        loadModules([button, innerSpan]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [innerSpan, button];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1, "Expected 1 hint (button only) — inner elements should be pruned");
+    });
+
+    it("anchor does not produce hints for interactive children inside it", () => {
+        const anchor = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 40 });
+        const innerBtn = makeElement("BUTTON", { top: 12, left: 12, width: 80, height: 20 });
+        anchor.appendChild(innerBtn);
+
+        loadModules([anchor, innerBtn]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [innerBtn, anchor];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1, "Expected 1 hint (anchor only) — nested button should be pruned");
+    });
+});
+
