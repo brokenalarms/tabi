@@ -54,11 +54,15 @@ function makeElement(tag, opts = {}) {
             return false;
         },
         closest(sel) {
-            // Minimal closest shim — supports "[inert]" and "label"
+            // Minimal closest shim — matches comma-separated selectors
+            const parts = sel.split(",").map((s) => s.trim());
             let node = this;
             while (node) {
-                if (sel === "[inert]" && node._attrs && node._attrs["inert"] != null) return node;
-                if (sel === "label" && node.tagName === "LABEL") return node;
+                for (const part of parts) {
+                    if (part === "[inert]" && node._attrs && node._attrs["inert"] != null) return node;
+                    if (part === '[aria-hidden="true"]' && node._attrs && node._attrs["aria-hidden"] === "true") return node;
+                    if (part === "label" && node.tagName === "LABEL") return node;
+                }
                 node = node.parentElement;
             }
             return null;

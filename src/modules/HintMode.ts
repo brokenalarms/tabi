@@ -45,87 +45,134 @@ const CLICKABLE_SELECTOR = [
   "[onclick]", "[onmousedown]",
 ].join(", ");
 
+// --- Exclusion pipeline ---
+// Declarative predicates that discard elements from hint discovery.
+// Each returns true → element is excluded.
+
+// Subtree exclude selector: if element or any ancestor matches, discard.
+// Single closest() call handles all subtree-level exclusions.
+const SUBTREE_EXCLUDE_SELECTOR = '[aria-hidden="true"], [inert]';
+
+// Element excludes: checked on the element itself only.
+const ELEMENT_EXCLUDES: Array<(el: HTMLElement) => boolean> = [
+  (el) => !!(el as HTMLButtonElement).disabled,
+  (el) => el.hidden,
+];
+
+// Style excludes: checked via getComputedStyle. Opacity:0 is handled
+// separately in isVisible due to radio/checkbox → label redirect.
+const STYLE_EXCLUDES: Array<(style: CSSStyleDeclaration) => boolean> = [
+  (s) => s.display === "none",
+  (s) => s.visibility === "hidden",
+];
+
 class HintMode {
-  private _keyHandler: KeyHandlerLike;
-  private _active: boolean;
-  private _newTab: boolean;
-  private _hints: Hint[];
-  private _typed: string;
-  private _overlay: HTMLDivElement | null;
-  private _pointerTails: boolean;
-  private _activating: boolean;
-  private readonly _onMouseDown: () => void;
-  private readonly _onScroll: () => void;
+  private keyHandler: KeyHandlerLike;
+  private active: boolean;
+  private newTab: boolean;
+  private hints: Hint[];
+  private typed: string;
+  private overlay: HTMLDivElement | null;
+  private pointerTails: boolean;
+  private activating: boolean;
+  private readonly onMouseDown: () => void;
+  private readonly onScroll: () => void;
 
   constructor(keyHandler: KeyHandlerLike) {
-    this._keyHandler = keyHandler;
-    this._active = false;
-    this._newTab = false;
-    this._hints = [];
-    this._typed = "";
-    this._overlay = null;
-    this._pointerTails = false;
-    this._activating = false;
-    this._onMouseDown = this._deactivate.bind(this);
-    this._onScroll = this._deactivate.bind(this);
+    this.keyHandler = keyHandler;
+    this.active = false;
+    this.newTab = false;
+    this.hints = [];
+    this.typed = "";
+    this.overlay = null;
+    this.pointerTails = false;
+    this.activating = false;
+    this.onMouseDown = this.deactivate.bind(this);
+    this.onScroll = this.deactivate.bind(this);
   }
 
   // --- Public API ---
 
   activate(newTab: boolean): void {
-    if (this._active) {
-      this._deactivate();
+    if (this.active) {
+      this.deactivate();
       return;
     }
-    this._newTab = !!newTab;
-    this._active = true;
-    this._typed = "";
-    this._keyHandler.setMode(Mode.HINTS);
+    this.newTab = !!newTab;
+    this.active = true;
+    this.typed = "";
+    this.keyHandler.setMode(Mode.HINTS);
 
-    const elements = this._discoverElements();
+    const elements = this.discoverElements();
     if (elements.length === 0) {
-      this._deactivate();
+      this.deactivate();
       return;
     }
 
     const labels = HintMode.generateLabels(elements.length);
-    this._createOverlay();
-    this._hints = elements.map((el, i) => {
+    this.createOverlay();
+    this.hints = elements.map((el, i) => {
       const label = labels[i];
-      const div = this._createHintDiv(el, label);
+      const div = this.createHintDiv(el, label);
       return { element: el, label, div };
     });
 
-    this._keyHandler.setModeKeyDelegate(this._handleKey.bind(this));
-    document.addEventListener("mousedown", this._onMouseDown, true);
-    window.addEventListener("scroll", this._onScroll, true);
+    this.keyHandler.setModeKeyDelegate(this.handleKey.bind(this));
+    document.addEventListener("mousedown", this.onMouseDown, true);
+    window.addEventListener("scroll", this.onScroll, true);
   }
 
   deactivate(): void {
-    this._deactivate();
+    if (!this.active) return;
+    this.active = false;
+    this.typed = "";
+    this.activating = false;
+    this.keyHandler.clearModeKeyDelegate();
+    document.removeEventListener("mousedown", this.onMouseDown, true);
+    window.removeEventListener("scroll", this.onScroll, true);
+
+    if (HINT_ANIMATE && this.overlay) {
+      this.overlay.classList.remove("visible");
+      const overlay = this.overlay;
+      overlay.addEventListener("transitionend", () => {
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      }, { once: true });
+      this.overlay = null;
+    } else if (this.overlay && this.overlay.parentNode) {
+      this.overlay.parentNode.removeChild(this.overlay);
+      this.overlay = null;
+    }
+
+    this.hints = [];
+    this.keyHandler.setMode(Mode.NORMAL);
   }
 
   isActive(): boolean {
-    return this._active;
+    return this.active;
   }
 
   setPointerTails(enabled: boolean): void {
-    this._pointerTails = enabled;
+    this.pointerTails = enabled;
   }
 
   wireCommands(): void {
-    this._keyHandler.on("activateHints", () => this.activate(false));
-    this._keyHandler.on("activateHintsNewTab", () => this.activate(true));
+    this.keyHandler.on("activateHints", () => this.activate(false));
+    this.keyHandler.on("activateHintsNewTab", () => this.activate(true));
   }
 
   unwireCommands(): void {
-    this._keyHandler.off("activateHints");
-    this._keyHandler.off("activateHintsNewTab");
+    this.keyHandler.off("activateHints");
+    this.keyHandler.off("activateHintsNewTab");
+  }
+
+  destroy(): void {
+    this.deactivate();
+    this.unwireCommands();
   }
 
   // --- Element discovery ---
 
-  private _discoverElements(): HTMLElement[] {
+  private discoverElements(): HTMLElement[] {
     // Step 1: Find all clickable elements
     const seen = new Set<Element>();
     const result: HTMLElement[] = [];
@@ -135,7 +182,7 @@ class HintMode {
       for (const el of nodes) {
         if (seen.has(el)) continue;
         seen.add(el);
-        if (this._isInteractive(el as HTMLElement) && this._isVisible(el as HTMLElement)) result.push(el as HTMLElement);
+        if (this.isInteractive(el as HTMLElement) && this.isVisible(el as HTMLElement)) result.push(el as HTMLElement);
       }
 
       // Check for shadow roots
@@ -173,13 +220,13 @@ class HintMode {
       }
     }
     for (const el of pointerExtras) {
-      if (this._isVisible(el)) result.push(el);
+      if (!this.isExcluded(el) && this.isVisible(el)) result.push(el);
     }
 
     // Sort by viewport position: top-left elements get shortest labels
     result.sort((a, b) => {
-      const ra = this._getHintRect(a);
-      const rb = this._getHintRect(b);
+      const ra = this.getHintRect(a);
+      const rb = this.getHintRect(b);
       return (ra.top - rb.top) || (ra.left - rb.left);
     });
 
@@ -213,9 +260,9 @@ class HintMode {
 
     // Resolve each group
     for (const [root, descendants] of childrenOf) {
-      const rootType = HintMode._interactiveType(root);
-      const allSameType = descendants.every(d => HintMode._interactiveType(d) === rootType);
-      const allGeneric = descendants.every(d => HintMode._interactiveType(d) === "generic");
+      const rootType = HintMode.interactiveType(root);
+      const allSameType = descendants.every(d => HintMode.interactiveType(d) === rootType);
+      const allGeneric = descendants.every(d => HintMode.interactiveType(d) === "generic");
 
       if (allGeneric) {
         // All descendants are generic (divs, spans) — keep root only
@@ -229,7 +276,7 @@ class HintMode {
     }
 
     // Label-for dedup: remove label[for] when its associated input is already
-    // a candidate (the input's hint targets the label's position via _findAssociatedLabel)
+    // a candidate (the input's hint targets the label's position via findAssociatedLabel)
     const labelForIds = new Set<string>();
     for (const el of result) {
       if (el.tagName === "LABEL" && (el as HTMLLabelElement).htmlFor) {
@@ -276,7 +323,7 @@ class HintMode {
 
   // Returns the interactive "type" of an element — used to determine whether
   // an ancestor and descendant are the same target or independent controls.
-  private static _interactiveType(el: HTMLElement): string {
+  private static interactiveType(el: HTMLElement): string {
     const tag = el.tagName;
     const role = el.getAttribute("role");
     if (tag === "A" || role === "link") return "link";
@@ -288,15 +335,12 @@ class HintMode {
     return "generic";
   }
 
-  // Non-semantic elements (divs, spans, etc.) must show visual interactivity
-  // signals to be considered real click targets. Without this, container wrappers
-  // with tabindex or onclick produce false hints.
-  private _isInteractive(el: HTMLElement): boolean {
-    // Disabled elements and aria-hidden trees are never interactive
-    if ((el as HTMLButtonElement).disabled) return false;
-    if (el.getAttribute("aria-hidden") === "true") return false;
-    // Elements inside an inert subtree are non-interactive
-    if (el.closest("[inert]")) return false;
+  private isExcluded(el: HTMLElement): boolean {
+    return !!el.closest(SUBTREE_EXCLUDE_SELECTOR) || ELEMENT_EXCLUDES.some(fn => fn(el));
+  }
+
+  private isInteractive(el: HTMLElement): boolean {
+    if (this.isExcluded(el)) return false;
 
     const tag = el.tagName;
     if (tag === "A" || tag === "BUTTON" || tag === "INPUT" ||
@@ -304,19 +348,17 @@ class HintMode {
         tag === "SUMMARY" || tag === "DETAILS" || tag === "LABEL") {
       return true;
     }
-    // ARIA widget roles indicate intentional interactivity
     const role = el.getAttribute("role");
     if (role === "button" || role === "link" || role === "tab" ||
         role === "menuitem" || role === "option" ||
         role === "checkbox" || role === "radio" || role === "switch") {
       return true;
     }
-    // Generic elements need cursor:pointer — real custom buttons set this
     const style = getComputedStyle(el);
     return style.cursor === "pointer";
   }
 
-  private _findAssociatedLabel(el: HTMLElement): HTMLElement | null {
+  private findAssociatedLabel(el: HTMLElement): HTMLElement | null {
     if (el.id) {
       const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
       if (label) return label as HTMLElement;
@@ -326,25 +368,22 @@ class HintMode {
     return null;
   }
 
-  private _isVisible(el: HTMLElement): boolean {
-    if (el.hidden) return false;
+  private isVisible(el: HTMLElement): boolean {
     const rect = el.getBoundingClientRect();
     if (rect.width === 0 && rect.height === 0) {
-      // Anchor elements with display:contents (e.g. Google search links)
-      // have zero-size rects. Find the first child with a real bounding box.
       if (el.tagName === "A") {
         for (const child of el.children) {
           const cr = (child as HTMLElement).getBoundingClientRect();
           if (cr.width > 0 && cr.height > 0) {
-            return this._isVisible(child as HTMLElement);
+            return this.isVisible(child as HTMLElement);
           }
         }
       }
       if (el.tagName === "INPUT") {
         const type = ((el as HTMLInputElement).type || "").toLowerCase();
         if (type === "radio" || type === "checkbox") {
-          const label = this._findAssociatedLabel(el);
-          if (label) return this._isVisible(label);
+          const label = this.findAssociatedLabel(el);
+          if (label) return this.isVisible(label);
         }
       }
       return false;
@@ -353,13 +392,14 @@ class HintMode {
     if (rect.right < 0 || rect.left > window.innerWidth) return false;
 
     const style = getComputedStyle(el);
-    if (style.visibility === "hidden" || style.display === "none") return false;
+    if (STYLE_EXCLUDES.some(fn => fn(style))) return false;
+    // Opacity:0 — excluded, with radio/checkbox → label redirect
     if (parseFloat(style.opacity) === 0) {
       if (el.tagName === "INPUT") {
         const type = ((el as HTMLInputElement).type || "").toLowerCase();
         if (type === "radio" || type === "checkbox") {
-          const label = this._findAssociatedLabel(el);
-          if (label) return this._isVisible(label);
+          const label = this.findAssociatedLabel(el);
+          if (label) return this.isVisible(label);
         }
       }
       return false;
@@ -380,11 +420,8 @@ class HintMode {
     }
 
     // Check if element is actually reachable (not fully covered by another element).
-    // Use elementsFromPoint (plural) so elements behind transparent overlays
-    // (e.g. anchor overlays on top of labels) are still detected.
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    // Clamp to viewport
     const px = Math.min(Math.max(centerX, 0), window.innerWidth - 1);
     const py = Math.min(Math.max(centerY, 0), window.innerHeight - 1);
 
@@ -397,7 +434,6 @@ class HintMode {
 
     const centerHits = document.elementsFromPoint(px, py);
     if (centerHits.length > 0 && !elMatchesPoint(centerHits)) {
-      // Also try the top-left corner in case the center is covered
       const tlHits = document.elementsFromPoint(
         Math.min(Math.max(rect.left + 2, 0), window.innerWidth - 1),
         Math.min(Math.max(rect.top + 2, 0), window.innerHeight - 1)
@@ -410,25 +446,19 @@ class HintMode {
     return true;
   }
 
-  // --- Hint rect fallback for zero-size anchors ---
-
-  // Returns the best visual target element for a hint — the element whose
-  // bounding area the tag points to. Used for both tag placement and selection flash.
-  private _getHintTargetElement(el: HTMLElement): HTMLElement {
+  private getHintTargetElement(el: HTMLElement): HTMLElement {
     const rect = el.getBoundingClientRect();
 
-    // Radio/checkbox inputs → associated label
     if (el.tagName === "INPUT") {
       const type = ((el as HTMLInputElement).type || "").toLowerCase();
       if (type === "radio" || type === "checkbox") {
         if ((rect.width === 0 && rect.height === 0) || parseFloat(getComputedStyle(el).opacity) === 0) {
-          const label = this._findAssociatedLabel(el);
+          const label = this.findAssociatedLabel(el);
           if (label) return label;
         }
       }
     }
 
-    // Zero-size anchor → first visible child
     if (el.tagName === "A" && rect.width === 0 && rect.height === 0) {
       for (const child of el.children) {
         const cr = (child as HTMLElement).getBoundingClientRect();
@@ -436,7 +466,6 @@ class HintMode {
       }
     }
 
-    // First descendant matching CLICKABLE_SELECTOR (visual affordance)
     const clickableChildren = el.querySelectorAll(CLICKABLE_SELECTOR);
     for (let i = 0; i < clickableChildren.length; i++) {
       const child = clickableChildren[i] as HTMLElement;
@@ -445,23 +474,19 @@ class HintMode {
       if (cr.width > 0 && cr.height > 0) return child;
     }
 
-    // First descendant with direct text content (what the user reads)
     if (typeof document.createTreeWalker === "function") {
       const walker = document.createTreeWalker(el, 0x1 /* NodeFilter.SHOW_ELEMENT */);
       let node = walker.nextNode() as HTMLElement | null;
       while (node) {
         if (node !== el) {
-          // Skip aria-hidden nodes — decorative content like badge counts
           if (node.getAttribute && node.getAttribute("aria-hidden") === "true") {
             node = walker.nextNode() as HTMLElement | null;
             continue;
           }
-          // Check for direct text content (not just inherited from children)
           for (let i = 0; i < node.childNodes.length; i++) {
             const child = node.childNodes[i];
             if (child.nodeType === 3 && (child.textContent || "").trim().length > 0) {
               const cr = node.getBoundingClientRect();
-              // Require minimum size — filters visually-hidden 1×1px elements
               if (cr.width > 4 && cr.height > 4) return node;
             }
           }
@@ -473,11 +498,10 @@ class HintMode {
     return el;
   }
 
-  private _getHintRect(el: HTMLElement): DOMRect {
-    const target = this._getHintTargetElement(el);
+  private getHintRect(el: HTMLElement): DOMRect {
+    const target = this.getHintTargetElement(el);
     const rect = target.getBoundingClientRect();
 
-    // For wide-element children, adjust for padding
     if (el !== target && el.getBoundingClientRect().width > window.innerWidth * 0.25) {
       const paddingTop = parseFloat(getComputedStyle(target).paddingTop) || 0;
       if (paddingTop > 0) {
@@ -486,8 +510,6 @@ class HintMode {
     }
 
     if (el.tagName === "A") {
-      // Use getClientRects() for inline elements — gives per-line-box rects,
-      // avoiding inflated bounding rects from visually-hidden child spans
       const clientRects = (el === target ? el : target).getClientRects();
       if (clientRects.length > 0) {
         for (let i = 0; i < clientRects.length; i++) {
@@ -507,7 +529,6 @@ class HintMode {
     const chars = HINT_CHARS.split("");
     const base = chars.length;
 
-    // Determine minimum label length to fit all hints
     let len = 1;
     let capacity = base;
     while (capacity < count) {
@@ -532,12 +553,10 @@ class HintMode {
 
   // --- Overlay rendering ---
 
-  // Convert viewport-relative rect to document-relative coordinates
-  private _viewportToDocument(x: number, y: number): { x: number; y: number } {
+  private viewportToDocument(x: number, y: number): { x: number; y: number } {
     const docEl = document.documentElement;
     const rect = docEl.getBoundingClientRect();
     const style = getComputedStyle(docEl);
-    // Match Vimium's getViewportTopLeft approach
     if (style.position === "static" && !/content|paint|strict/.test(style.contain || "")) {
       const marginTop = parseFloat(style.marginTop) || 0;
       const marginLeft = parseFloat(style.marginLeft) || 0;
@@ -549,27 +568,24 @@ class HintMode {
     }
   }
 
-  private _createOverlay(): void {
-    this._overlay = document.createElement("div") as HTMLDivElement;
-    this._overlay.className = "vimium-hint-overlay";
-    if (HINT_ANIMATE) this._overlay.classList.add("vimium-hint-animate");
-    // Append to documentElement (not body) to avoid containing-block issues
-    // from transforms/filters on body that break position:fixed
-    document.documentElement.appendChild(this._overlay);
+  private createOverlay(): void {
+    this.overlay = document.createElement("div") as HTMLDivElement;
+    this.overlay.className = "vimium-hint-overlay";
+    if (HINT_ANIMATE) this.overlay.classList.add("vimium-hint-animate");
+    document.documentElement.appendChild(this.overlay);
     if (HINT_ANIMATE) {
-      void this._overlay.offsetHeight;
-      this._overlay.classList.add("visible");
+      void this.overlay.offsetHeight;
+      this.overlay.classList.add("visible");
     }
   }
 
-  private _createHintDiv(element: HTMLElement, label: string): HTMLDivElement {
-    const rect = this._getHintRect(element);
+  private createHintDiv(element: HTMLElement, label: string): HTMLDivElement {
+    const rect = this.getHintRect(element);
     const div = document.createElement("div") as HTMLDivElement;
     div.className = "vimium-hint";
     div.textContent = label;
-    if (this._pointerTails) {
-      // Floating mode: centered below element, tail points up
-      const pos = this._viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
+    if (this.pointerTails) {
+      const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
       div.style.left = Math.max(0, pos.x) + "px";
       div.style.top = Math.max(0, pos.y) + "px";
       div.style.transform = "translateX(-50%)";
@@ -577,83 +593,74 @@ class HintMode {
       tail.className = "vimium-hint-tail";
       div.appendChild(tail);
     } else {
-      // Inline mode: at left edge of element, overlapping text
-      const pos = this._viewportToDocument(rect.left, rect.top);
+      const pos = this.viewportToDocument(rect.left, rect.top);
       div.style.left = Math.max(0, pos.x) + "px";
       div.style.top = Math.max(0, pos.y) + "px";
     }
 
-    if (this._overlay) this._overlay.appendChild(div);
+    if (this.overlay) this.overlay.appendChild(div);
     return div;
   }
 
-  // --- Key handling during HINTS mode (called via KeyHandler delegate) ---
+  // --- Key handling ---
 
-  private _handleKey(event: KeyboardEvent): boolean {
-    if (!this._active) return false;
+  private handleKey(event: KeyboardEvent): boolean {
+    if (!this.active) return false;
 
-    // Swallow all keys while a hint is activating (animation in progress)
-    if (this._activating) {
+    if (this.activating) {
       event.preventDefault();
       event.stopPropagation();
       return true;
     }
 
-    // 'f' with no modifiers toggles hints off
     if (event.code === "KeyF" && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
       event.preventDefault();
       event.stopPropagation();
-      this._deactivate();
+      this.deactivate();
       return true;
     }
 
-    // Let Escape fall through to KeyHandler's exitToNormal dispatch
     if (event.code === "Escape") return false;
 
     event.preventDefault();
     event.stopPropagation();
 
-    // Backspace removes last typed character
     if (event.code === "Backspace") {
-      if (this._typed.length > 0) {
-        this._typed = this._typed.slice(0, -1);
-        this._updateHintVisibility();
+      if (this.typed.length > 0) {
+        this.typed = this.typed.slice(0, -1);
+        this.updateHintVisibility();
       }
       return true;
     }
 
-    // Only accept hint characters; any other key dismisses
     const char = event.key ? event.key.toLowerCase() : "";
     if (!HINT_CHARS.includes(char) || char.length !== 1) {
-      this._deactivate();
+      this.deactivate();
       return true;
     }
 
-    this._typed += char;
-    this._updateHintVisibility();
+    this.typed += char;
+    this.updateHintVisibility();
 
-    // Deactivate if no hints match the typed prefix
-    if (!this._hints.some(h => h.label.startsWith(this._typed))) {
-      this._deactivate();
+    if (!this.hints.some(h => h.label.startsWith(this.typed))) {
+      this.deactivate();
       return true;
     }
 
-    // Check for exact match
-    const match = this._hints.find((h) => h.label === this._typed);
+    const match = this.hints.find((h) => h.label === this.typed);
     if (match) {
-      this._activateHint(match);
+      this.activateHint(match);
     }
     return true;
   }
 
-  private _updateHintVisibility(): void {
-    for (const hint of this._hints) {
-      const matches = hint.label.startsWith(this._typed);
+  private updateHintVisibility(): void {
+    for (const hint of this.hints) {
+      const matches = hint.label.startsWith(this.typed);
       hint.div.style.display = matches ? "" : "none";
       if (matches) {
-        // Highlight already-typed prefix
-        const matched = hint.label.slice(0, this._typed.length);
-        const remaining = hint.label.slice(this._typed.length);
+        const matched = hint.label.slice(0, this.typed.length);
+        const remaining = hint.label.slice(this.typed.length);
         hint.div.innerHTML = "";
         if (matched) {
           const span = document.createElement("span");
@@ -666,18 +673,15 @@ class HintMode {
     }
   }
 
-  private _activateHint(hint: Hint): void {
+  private activateHint(hint: Hint): void {
     const element = hint.element;
+    this.activating = true;
 
-    this._activating = true;
-
-    // Hide all other hints, animate only the matched one
-    for (const h of this._hints) {
+    for (const h of this.hints) {
       if (h !== hint) h.div.style.display = "none";
     }
 
-    // Compute offset from tag toward center of the target element
-    const targetRect = this._getHintRect(element);
+    const targetRect = this.getHintRect(element);
     const tagRect = hint.div.getBoundingClientRect ? hint.div.getBoundingClientRect() : null;
     if (tagRect && tagRect.width > 0) {
       const dx = (targetRect.left + targetRect.width / 2) - (tagRect.left + tagRect.width / 2);
@@ -689,9 +693,9 @@ class HintMode {
     if (hint.div.classList) hint.div.classList.add("vimium-hint-active");
 
     const afterCollapse = (): void => {
-      this._deactivate();
+      this.deactivate();
 
-      if (this._newTab && element.tagName === "A" && (element as HTMLAnchorElement).href) {
+      if (this.newTab && element.tagName === "A" && (element as HTMLAnchorElement).href) {
         browser.runtime.sendMessage({
           command: "createTab",
           url: (element as HTMLAnchorElement).href,
@@ -707,38 +711,6 @@ class HintMode {
     } else {
       afterCollapse();
     }
-  }
-
-  // --- Cleanup ---
-
-  private _deactivate(): void {
-    if (!this._active) return;
-    this._active = false;
-    this._typed = "";
-    this._activating = false;
-    this._keyHandler.clearModeKeyDelegate();
-    document.removeEventListener("mousedown", this._onMouseDown, true);
-    window.removeEventListener("scroll", this._onScroll, true);
-
-    if (HINT_ANIMATE && this._overlay) {
-      this._overlay.classList.remove("visible");
-      const overlay = this._overlay;
-      overlay.addEventListener("transitionend", () => {
-        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-      }, { once: true });
-      this._overlay = null;
-    } else if (this._overlay && this._overlay.parentNode) {
-      this._overlay.parentNode.removeChild(this._overlay);
-      this._overlay = null;
-    }
-
-    this._hints = [];
-    this._keyHandler.setMode(Mode.NORMAL);
-  }
-
-  destroy(): void {
-    this._deactivate();
-    this.unwireCommands();
   }
 }
 

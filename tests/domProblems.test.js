@@ -103,7 +103,8 @@ describe("DOM problems — element discovery", () => {
         assert.ok(!hintMode.isActive(), "Element with aria-hidden=true should be filtered");
     });
 
-    it("keeps element inside aria-hidden ancestor", () => {
+    // aria-hidden="true" excludes the entire subtree — children should not get hints
+    it("filters element inside aria-hidden ancestor", () => {
         const wrapper = makeElement("DIV", {
             top: 0, left: 0,
             attrs: { "aria-hidden": "true" },
@@ -115,7 +116,7 @@ describe("DOM problems — element discovery", () => {
         loadModules([btn]);
         const { hintMode } = getState();
         hintMode.activate(false);
-        assert.ok(hintMode.isActive(), "Element inside aria-hidden ancestor should still get a hint");
+        assert.ok(!hintMode.isActive(), "Element inside aria-hidden ancestor should be filtered");
     });
 
     // el.hidden (HTML hidden attribute) should prevent hint generation.
