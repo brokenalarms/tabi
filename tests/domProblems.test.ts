@@ -4,6 +4,8 @@
 import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
+import { createDOM } from "./helpers/dom";
+import { discoverElements } from "../src/modules/ElementGatherer";
 
 describe("DOM problems — element discovery", () => {
     afterEach(() => {
@@ -368,6 +370,70 @@ describe("DOM problems — disclosure trigger dedup", () => {
         assert.ok(hintMode.isActive(), "Should reactivate with 2 hints (button not filtered)");
         fireKeyDown(makeKeyEvent("KeyA", { key: "a" }));
         assert.equal(btn.click.mock.callCount(), 1, "Button hint should work (not filtered)");
+    });
+});
+
+// Regression: zero-size flex containers must not prune clickable descendants.
+// GitHub PR pages nest links inside <nav> → <ul style="display:flex"> → <li>,
+// where <ul> and <li> report zero-size rects (no layout engine). Previously
+// walkerFilter used FILTER_REJECT for zero-size elements, pruning the entire
+// subtree and dropping all the <a> links inside.
+describe("DOM problems — flex container with zero-size parents", () => {
+    let cleanup: () => void;
+
+    afterEach(() => {
+        if (cleanup) cleanup();
+    });
+
+    // Links inside zero-size flex containers are discovered by the walker
+    it("discovers links nested inside zero-size flex containers", () => {
+        const env = createDOM(`
+            <nav aria-label="Repository">
+              <ul style="display: flex; list-style: none;">
+                <li style="display: inline-flex;">
+                  <a id="code-tab" href="/repo">Code</a>
+                </li>
+                <li style="display: inline-flex;">
+                  <a id="issues-tab" href="/repo/issues">Issues</a>
+                </li>
+                <li style="display: inline-flex;">
+                  <a id="pull-requests-tab" href="/repo/pulls">Pull requests</a>
+                </li>
+              </ul>
+            </nav>
+        `);
+        cleanup = env.cleanup;
+
+        // Patch getBoundingClientRect on the <a> elements only — give them visible rects.
+        // The <nav>, <ul>, <li> keep their default zero-size rects (happy-dom has no layout).
+        const links = env.document.querySelectorAll("a");
+        let top = 10;
+        for (const link of links) {
+            const rect = { top, left: top * 5, bottom: top + 20, right: top * 5 + 80, width: 80, height: 20, x: top * 5, y: top, toJSON() { return this; } };
+            (link as any).getBoundingClientRect = () => rect;
+            (link as any).getClientRects = () => [rect];
+            top += 30;
+        }
+
+        // Mock elementsFromPoint — return the link whose rect contains the point
+        (env.document as any).elementsFromPoint = (x: number, y: number) => {
+            const hits: Element[] = [];
+            for (const link of links) {
+                const r = (link as any).getBoundingClientRect();
+                if (x >= r.left && x < r.right && y >= r.top && y < r.bottom) {
+                    hits.push(link as unknown as Element);
+                }
+            }
+            return hits;
+        };
+
+        const found = discoverElements((el) => el.getBoundingClientRect());
+        const foundIds = found.map((el) => el.id);
+
+        assert.ok(foundIds.includes("code-tab"), "code-tab link should be discovered");
+        assert.ok(foundIds.includes("issues-tab"), "issues-tab link should be discovered");
+        assert.ok(foundIds.includes("pull-requests-tab"), "pull-requests-tab link should be discovered");
+        assert.equal(found.length, 3, "Should find exactly 3 links");
     });
 });
 
