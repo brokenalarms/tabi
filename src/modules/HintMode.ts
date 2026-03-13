@@ -3,6 +3,7 @@
 // clicks when the user types the matching label characters.
 
 import type { ModeValue } from "../types";
+import { DEFAULTS } from "../types";
 import { discoverElements, findAssociatedLabel, CLICKABLE_SELECTOR } from "./ElementGatherer";
 import { Mode } from "../commands";
 
@@ -260,7 +261,9 @@ export class HintMode {
 
   private createOverlay(): void {
     this.overlay = document.createElement("div");
-    this.overlay.className = "vimium-hint-overlay vimium-hint-animate";
+    this.overlay.className = DEFAULTS.animate
+      ? "vimium-hint-overlay vimium-hint-animate"
+      : "vimium-hint-overlay";
     document.documentElement.appendChild(this.overlay);
     void this.overlay.offsetHeight;
     this.overlay.classList.add("visible");

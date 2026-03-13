@@ -19,7 +19,7 @@ class SettingsManager {
     }
 
     var theme: String {
-        get { defaults.string(forKey: Self.themeKey) ?? "classic" }
+        get { defaults.string(forKey: Self.themeKey) ?? "auto" }
         set { defaults.set(newValue, forKey: Self.themeKey) }
     }
 }

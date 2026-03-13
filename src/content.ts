@@ -2,6 +2,7 @@
 // Runs on every page to handle keyboard navigation
 
 import type { KeyBindingMode, ModeValue, Theme, VimiumSettings } from "./types";
+import { DEFAULTS } from "./types";
 import { Mode } from "./commands";
 import { KeyHandler } from "./modules/KeyHandler";
 import { ScrollController } from "./modules/ScrollController";
@@ -81,13 +82,12 @@ function applyTheme(theme: Theme): void {
 }
 
 function initialize(settings: Partial<VimiumSettings>): void {
+  const resolved = { ...DEFAULTS, ...settings };
   const keyHandler = new KeyHandler();
 
   // Apply initial settings
-  if (settings.keyBindingMode) {
-    keyHandler.setKeyBindingMode(settings.keyBindingMode);
-  }
-  applyTheme(settings.theme || "auto");
+  keyHandler.setKeyBindingMode(resolved.keyBindingMode);
+  applyTheme(resolved.theme);
 
   // Scroll and history navigation
   const scrollController = new ScrollController(keyHandler);
@@ -95,9 +95,7 @@ function initialize(settings: Partial<VimiumSettings>): void {
   // Link hint navigation
   const hintMode = new HintMode(keyHandler);
   hintMode.wireCommands();
-  if (settings.enablePointerTails === "true") {
-    hintMode.setPointerTails(true);
-  }
+  hintMode.setPointerTails(resolved.enablePointerTails === "true");
 
   // In-page find
   const findMode = new FindMode(keyHandler);
