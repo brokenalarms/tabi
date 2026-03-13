@@ -1,155 +1,48 @@
-// FindMode unit tests — using Node.js built-in test runner
+// FindMode unit tests — using Node.js built-in test runner + happy-dom
 // FindMode is a thin wrapper that dispatches Cmd+F to trigger Safari's
 // native find bar. Tests verify command wiring, lifecycle, and cleanup.
 
-import { describe, it, beforeEach, afterEach, mock } from "node:test";
+import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import { createDOM, type DOMEnvironment } from "./helpers/dom";
 import { KeyHandler } from "../src/modules/KeyHandler";
 import { FindMode } from "../src/modules/FindMode";
 
-// --- Minimal DOM shim ---
-
-let capturedListeners: Record<string, Function>,
-    keyHandler: InstanceType<typeof KeyHandler>,
-    findMode: InstanceType<typeof FindMode>;
-let bodyEl: any;
-let dispatchedEvents: any[];
-
-function makeElement(tag: string, opts: any = {}) {
-    return {
-        tagName: tag,
-        type: opts.type || "",
-        isContentEditable: false,
-        className: "",
-        placeholder: "",
-        value: opts.value || "",
-        parentNode: opts.parentNode || bodyEl,
-        style: {},
-        _children: [] as any[],
-        _listeners: {} as Record<string, Function>,
-        focus: mock.fn(),
-        blur: mock.fn(),
-        click: mock.fn(),
-        select: mock.fn(),
-        setAttribute(k: string, v: string) { (this as any)["_attr_" + k] = v; },
-        appendChild(child: any) { child.parentNode = this; this._children.push(child); return child; },
-        removeChild(child: any) {
-            const idx = this._children.indexOf(child);
-            if (idx >= 0) this._children.splice(idx, 1);
-            child.parentNode = null;
-            return child;
-        },
-        addEventListener(type: string, fn: Function) { this._listeners[type] = fn; },
-        removeEventListener(type: string, fn: Function) { delete this._listeners[type]; },
-    };
-}
-
-function setupDOM() {
-    capturedListeners = {};
-    dispatchedEvents = [];
-
-    bodyEl = makeElement("BODY");
-    bodyEl.parentNode = null;
-
-    (globalThis as any).document = {
-        body: bodyEl,
-        head: makeElement("HEAD"),
-        documentElement: makeElement("HTML"),
-        activeElement: bodyEl,
-        createElement(tag: string) {
-            return makeElement(tag.toUpperCase());
-        },
-        addEventListener(type: string, fn: Function, opts?: any) {
-            capturedListeners[type] = fn;
-        },
-        removeEventListener(type: string, fn: Function, opts?: any) {
-            if (capturedListeners[type] === fn) delete capturedListeners[type];
-        },
-        querySelectorAll() { return []; },
-        dispatchEvent(event: any) {
-            dispatchedEvents.push(event);
-        },
-    };
-
-    (globalThis as any).window = {
-        innerWidth: 1024,
-        innerHeight: 768,
-        find() { return true; },
-        getSelection() { return { removeAllRanges() {} }; },
-    };
-
-    (globalThis as any).KeyboardEvent = class KeyboardEvent {
-        type: string;
-        key: string;
-        code: string;
-        metaKey: boolean;
-        bubbles: boolean;
-        cancelable: boolean;
-        constructor(type: string, init: any = {}) {
-            this.type = type;
-            this.key = init.key || "";
-            this.code = init.code || "";
-            this.metaKey = init.metaKey || false;
-            this.bubbles = init.bubbles || false;
-            this.cancelable = init.cancelable || false;
-        }
-    };
-
-    (globalThis as any).getComputedStyle = () => ({
-        visibility: "visible",
-        display: "block",
-        opacity: "1",
-        cursor: "default",
-    });
-}
-
-function teardownDOM() {
-    delete (globalThis as any).document;
-    delete (globalThis as any).window;
-    delete (globalThis as any).KeyboardEvent;
-    delete (globalThis as any).getComputedStyle;
-}
-
-function fireKeyDown(code: string, opts: any = {}) {
-    const event = {
-        code,
-        key: opts.key || "",
-        shiftKey: opts.shiftKey || false,
-        ctrlKey: opts.ctrlKey || false,
-        altKey: opts.altKey || false,
-        metaKey: opts.metaKey || false,
-        _prevented: false,
-        _stopped: false,
-        preventDefault() { this._prevented = true; },
-        stopPropagation() { this._stopped = true; },
-    };
-    if (capturedListeners.keydown) {
-        capturedListeners.keydown(event);
-    }
-    return event;
-}
-
-// --- Tests ---
+let env: DOMEnvironment;
+let keyHandler: KeyHandler;
+let findMode: FindMode;
+let dispatchedEvents: Event[];
 
 describe("FindMode", () => {
     beforeEach(() => {
-        setupDOM();
+        env = createDOM();
         dispatchedEvents = [];
+
+        // Listen for the synthetic Cmd+F keydown events dispatched by FindMode
+        env.document.addEventListener("keydown", (event: Event) => {
+            const ke = event as KeyboardEvent;
+            if (ke.metaKey && ke.key === "f") {
+                dispatchedEvents.push(ke);
+            }
+        });
+
         keyHandler = new KeyHandler();
         findMode = new FindMode(keyHandler);
     });
 
     afterEach(() => {
-        if (findMode) findMode.destroy();
-        if (keyHandler) keyHandler.destroy();
-        teardownDOM();
+        findMode.destroy();
+        keyHandler.destroy();
+        env.cleanup();
     });
 
     describe("native find dispatch", () => {
+        // Verifies that the "/" binding synthesizes a Cmd+F keydown event
+        // so Safari's built-in find bar opens
         it("dispatches Cmd+F KeyboardEvent on enterFindMode", () => {
             keyHandler._dispatch("enterFindMode");
             assert.equal(dispatchedEvents.length, 1);
-            const evt = dispatchedEvents[0];
+            const evt = dispatchedEvents[0] as KeyboardEvent;
             assert.equal(evt.type, "keydown");
             assert.equal(evt.key, "f");
             assert.equal(evt.code, "KeyF");
@@ -157,6 +50,7 @@ describe("FindMode", () => {
             assert.equal(evt.bubbles, true);
         });
 
+        // Confirms the command can fire multiple times in a session
         it("dispatches on repeated invocations", () => {
             keyHandler._dispatch("enterFindMode");
             keyHandler._dispatch("enterFindMode");
@@ -165,12 +59,15 @@ describe("FindMode", () => {
     });
 
     describe("isActive", () => {
+        // FindMode delegates entirely to Safari's native find —
+        // it never reports itself as active
         it("always returns false (native find manages lifecycle)", () => {
             assert.equal(findMode.isActive(), false);
         });
     });
 
     describe("deactivate", () => {
+        // deactivate is a no-op since native find manages its own lifecycle
         it("is a no-op and does not throw", () => {
             assert.doesNotThrow(() => findMode.deactivate(true));
             assert.doesNotThrow(() => findMode.deactivate(false));
@@ -178,13 +75,14 @@ describe("FindMode", () => {
     });
 
     describe("destroy", () => {
+        // After destroy, the enterFindMode command should be unwired
         it("unwires enterFindMode command", () => {
             findMode.destroy();
-            // After destroy, enterFindMode should not dispatch
             keyHandler._dispatch("enterFindMode");
             assert.equal(dispatchedEvents.length, 0);
         });
 
+        // Ensures idempotent cleanup
         it("can be called multiple times without error", () => {
             assert.doesNotThrow(() => {
                 findMode.destroy();

@@ -37,6 +37,7 @@ export function createDOM(html?: string): DOMEnvironment {
   (globalThis as any).CSS = (window as any).CSS ?? { escape: (s: string) => s };
   (globalThis as any).DOMRect = (window as any).DOMRect;
   (globalThis as any).HTMLElement = (window as any).HTMLElement;
+  (globalThis as any).KeyboardEvent = (window as any).KeyboardEvent;
   (globalThis as any).clearTimeout = globalThis.clearTimeout;
 
   const cleanup = (): void => {
@@ -48,6 +49,7 @@ export function createDOM(html?: string): DOMEnvironment {
     delete (globalThis as any).CSS;
     delete (globalThis as any).DOMRect;
     delete (globalThis as any).HTMLElement;
+    delete (globalThis as any).KeyboardEvent;
   };
 
   return { window, document, cleanup };
