@@ -163,25 +163,23 @@ export class HintMode {
       if (cr.width > 0 && cr.height > 0) return child;
     }
 
-    if (typeof document.createTreeWalker === "function") {
-      const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT);
-      let node = walker.nextNode() as HTMLElement | null;
-      while (node) {
-        if (node !== el) {
-          if (node.getAttribute && node.getAttribute("aria-hidden") === "true") {
-            node = walker.nextNode() as HTMLElement | null;
-            continue;
-          }
-          for (let i = 0; i < node.childNodes.length; i++) {
-            const child = node.childNodes[i];
-            if (child.nodeType === 3 && (child.textContent || "").trim().length > 0) {
-              const cr = node.getBoundingClientRect();
-              if (cr.width > 4 && cr.height > 4) return node;
-            }
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT);
+    let node = walker.nextNode() as HTMLElement | null;
+    while (node) {
+      if (node !== el) {
+        if (node.getAttribute && node.getAttribute("aria-hidden") === "true") {
+          node = walker.nextNode() as HTMLElement | null;
+          continue;
+        }
+        for (let i = 0; i < node.childNodes.length; i++) {
+          const child = node.childNodes[i];
+          if (child.nodeType === 3 && (child.textContent || "").trim().length > 0) {
+            const cr = node.getBoundingClientRect();
+            if (cr.width > 4 && cr.height > 4) return node;
           }
         }
-        node = walker.nextNode() as HTMLElement | null;
       }
+      node = walker.nextNode() as HTMLElement | null;
     }
 
     return el;
