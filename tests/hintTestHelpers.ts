@@ -6,6 +6,8 @@ import { HintMode } from "../src/modules/HintMode";
 import { Mode } from "../src/commands";
 import { CLICKABLE_TAGS, CLICKABLE_ROLES } from "../src/modules/ElementGatherer";
 
+const CLICKABLE_TAGS_UPPER = new Set(CLICKABLE_TAGS.map(t => t.toUpperCase()));
+
 let capturedListeners: Record<string, Function[]>;
 let keyHandler: KeyHandler;
 let hintMode: HintMode;
@@ -110,10 +112,7 @@ export function makeElement(tag: string, opts: any = {}) {
             // Return children that match (simplified: return all children)
             if (sel === "*") return this.children;
             // For CLICKABLE_SELECTOR, return children that are "clickable"
-            return this.children.filter((c: any) => {
-                const clickableTags = ["A", "BUTTON", "INPUT", "TEXTAREA", "SELECT", "SUMMARY", "DETAILS"];
-                return clickableTags.includes(c.tagName);
-            });
+            return this.children.filter((c: any) => CLICKABLE_TAGS_UPPER.has(c.tagName));
         },
     };
 }
@@ -181,17 +180,11 @@ export function setupDOM(elements: any[] = []) {
         querySelectorAll(sel: string) {
             if (sel === "*") return elements;
             return elements.filter((e: any) => {
-                const clickableTags = ["A", "BUTTON", "INPUT", "TEXTAREA", "SELECT", "SUMMARY", "DETAILS"];
-                if (clickableTags.includes(e.tagName)) return true;
-                // Match label[for]
+                if (CLICKABLE_TAGS_UPPER.has(e.tagName)) return true;
                 if (e.tagName === "LABEL" && e.htmlFor) return true;
-                // Match ARIA roles from CLICKABLE_SELECTOR
                 const role = e._attrs && e._attrs["role"];
-                const clickableRoles = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch"];
-                if (role && clickableRoles.includes(role)) return true;
-                // Match [onclick] / [onmousedown]
+                if (role && CLICKABLE_ROLES.includes(role)) return true;
                 if (e._attrs && (e._attrs["onclick"] != null || e._attrs["onmousedown"] != null)) return true;
-                // Match elements with tabindex (mimics [tabindex]:not([tabindex='-1']))
                 if (e._tabindex !== undefined && e._tabindex !== "-1") return true;
                 return false;
             });
