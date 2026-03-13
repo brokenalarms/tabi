@@ -159,14 +159,15 @@ export class HintMode {
       if (cr.width > 0 && cr.height > 0) return child;
     }
 
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT);
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT, {
+      acceptNode: (node) =>
+        (node as HTMLElement).getAttribute("aria-hidden") === "true"
+          ? NodeFilter.FILTER_REJECT
+          : NodeFilter.FILTER_ACCEPT,
+    });
     let node = walker.nextNode() as HTMLElement | null;
     while (node) {
       if (node !== el) {
-        if (node.getAttribute && node.getAttribute("aria-hidden") === "true") {
-          node = walker.nextNode() as HTMLElement | null;
-          continue;
-        }
         for (let i = 0; i < node.childNodes.length; i++) {
           const child = node.childNodes[i];
           if (child.nodeType === 3 && (child.textContent || "").trim().length > 0) {
