@@ -97,17 +97,17 @@
     text-align: center;
     border-radius: 0;
     border: none;
-    box-shadow: none;
+    box-shadow: 0 0 6px 1px var(--vimium-hint-bar-glow);
     background: none;
-    height: 2px;
+    height: 1px;
     padding: 0;
     font-size: 0;
     overflow: visible;
     background-image: linear-gradient(
         to right,
         transparent,
-        var(--vimium-hint-border) 20%,
-        var(--vimium-hint-border) 80%,
+        var(--vimium-hint-bar-line) 30%,
+        var(--vimium-hint-bar-line) 70%,
         transparent
     );
 }
@@ -115,7 +115,7 @@
 .vimium-hint-bar::after {
     content: attr(data-label);
     position: absolute;
-    top: 4px;
+    bottom: 0;
     left: 50%;
     transform: translateX(-50%);
     font: bold 12px/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif;

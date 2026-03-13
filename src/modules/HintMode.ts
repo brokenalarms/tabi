@@ -242,7 +242,10 @@ export class HintMode {
 
   private getHintInfo(el: HTMLElement): { rect: DOMRect; container: boolean } {
     const target = this.getHintTargetElement(el);
-    const container = target === el && el.children.length > 0;
+    // Bar style for containers where no specific anchor was found,
+    // but not when the element has many clickable children (too busy).
+    const container = target === el && el.children.length > 0 &&
+      el.querySelectorAll(CLICKABLE_SELECTOR).length <= 1;
     let rect = target.getBoundingClientRect();
 
     if (el !== target && el.getBoundingClientRect().width > window.innerWidth * 0.25) {
@@ -342,10 +345,11 @@ export class HintMode {
     div.textContent = label;
 
     if (container) {
-      // Bar style: centered at bottom of container, 50% width
+      // Bar style: centered at bottom edge of container, 25% width
       const elRect = element.getBoundingClientRect();
-      const barWidth = elRect.width * 0.5;
-      const pos = this.viewportToDocument(elRect.left + elRect.width / 2, elRect.bottom);
+      const barWidth = elRect.width * 0.25;
+      // Position at bottom border of container (intrudes slightly)
+      const pos = this.viewportToDocument(elRect.left + elRect.width / 2, elRect.bottom - 1);
       div.style.left = Math.max(0, pos.x) + "px";
       div.style.top = Math.max(0, pos.y) + "px";
       div.style.transform = "translateX(-50%)";
