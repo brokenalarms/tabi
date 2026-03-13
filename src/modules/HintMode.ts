@@ -398,7 +398,10 @@ export class HintMode {
     const afterCollapse = (): void => {
       this.deactivate();
 
-      if (newTab && element.tagName.toLowerCase() === "a" && (element as HTMLAnchorElement).href) {
+      const isLink = element.tagName.toLowerCase() === "a" && (element as HTMLAnchorElement).href;
+      const opensNewWindow = isLink && (newTab || (element as HTMLAnchorElement).target === "_blank");
+
+      if (opensNewWindow) {
         browser.runtime.sendMessage({
           command: "createTab",
           url: (element as HTMLAnchorElement).href,

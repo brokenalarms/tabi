@@ -350,6 +350,27 @@ describe("HintMode", () => {
             fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
             assert.equal(btn.click.mock.callCount(), 1);
         });
+
+        // ISSUE: Links with target="_blank" are blocked by Safari popup blocker
+        // when activated via element.click() (not a trusted user gesture).
+        // SITE: linkedin.com — nav links with target="_blank"
+        // FIX: Route target="_blank" links through createTab (extension API),
+        // same as Shift+F mode, to bypass popup blocking.
+        it("sends createTab for target=_blank links in f-mode", () => {
+            const link = makeElement("A", { href: "https://www.linkedin.com/learning/", top: 10, left: 0 });
+            link.setAttribute("target", "_blank");
+            loadModules([link]);
+            const { hintMode } = getState();
+            hintMode.activate(false); // f-mode (current tab)
+
+            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
+            // Should use createTab, NOT element.click()
+            assert.equal((globalThis as any).browser.runtime.sendMessage.mock.callCount(), 1);
+            const msg = (globalThis as any).browser.runtime.sendMessage.mock.calls[0].arguments[0];
+            assert.equal(msg.command, "createTab");
+            assert.equal(msg.url, "https://www.linkedin.com/learning/");
+            assert.equal(link.click.mock.callCount(), 0, "Should not call element.click() for target=_blank");
+        });
     });
 
     describe("Command wiring", () => {
