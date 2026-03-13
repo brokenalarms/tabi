@@ -1168,6 +1168,32 @@ describe("DOM problems — native interactive elements prune subtrees", () => {
         assert.equal(x, 13, "Hint should center on SVG icon after spacer (5 + 16/2)");
     });
 
+    // ISSUE: Leading icon can be an <img> (favicons, avatars), not just SVG.
+    // FIX: Icon detection covers both SVG and img elements.
+    it("link with leading img icon targets the img", () => {
+        const link = makeElement("A", { href: "/user", top: 0, left: 0, width: 200, height: 40 });
+        const img = makeElement("IMG", { top: 5, left: 5, width: 20, height: 20 });
+        const label = makeElement("SPAN", { top: 5, left: 30, width: 80, height: 20, textContent: "User" });
+        link.appendChild(img);
+        link.appendChild(label);
+
+        loadModules([link, img, label]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [link];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        // Should center on the img icon (5 + 20/2 = 15)
+        const x = parseFloat(hints[0].style.left);
+        assert.equal(x, 15, "Hint should center on leading img icon (5 + 20/2)");
+    });
+
     it("anchor does not produce hints for interactive children inside it", () => {
         const anchor = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 40 });
         const innerBtn = makeElement("BUTTON", { top: 12, left: 12, width: 80, height: 20 });
