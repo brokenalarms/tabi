@@ -436,15 +436,15 @@ export class HintMode {
 
     hint.div.classList.add("vimium-hint-active");
 
-    // Focus ring around target element (appended to documentElement so it
-    // survives overlay removal and can fade out after the click)
+    // Focus ring around the full clickable element (not the text target)
     const ring = document.createElement("div");
     ring.className = "vimium-hint-ring";
-    const pos = this.viewportToDocument(targetRect.left, targetRect.top);
+    const ringRect = element.getBoundingClientRect();
+    const pos = this.viewportToDocument(ringRect.left, ringRect.top);
     ring.style.left = pos.x - 2 + "px";
     ring.style.top = pos.y - 2 + "px";
-    ring.style.width = targetRect.width + 4 + "px";
-    ring.style.height = targetRect.height + 4 + "px";
+    ring.style.width = ringRect.width + 4 + "px";
+    ring.style.height = ringRect.height + 4 + "px";
     document.documentElement.appendChild(ring);
 
     const afterCollapse = (): void => {
