@@ -35,6 +35,24 @@ export function walkerFilter(node: Node): number {
   if (style.display === "none") return NodeFilter.FILTER_REJECT;
   if (style.visibility === "hidden") return NodeFilter.FILTER_REJECT;
 
+  // Visually-hidden pattern: clip/clip-path reducing visible area to zero
+  // (e.g. "skip to content" links, sr-only elements)
+  const clipPath = style.clipPath || el.style.clipPath;
+  if (clipPath && clipPath !== "none") {
+    const m = clipPath.match(/inset\((\d+)%/);
+    if (m && parseInt(m[1]) >= 50) return NodeFilter.FILTER_REJECT;
+  }
+  const clip = style.getPropertyValue("clip") || el.style.getPropertyValue("clip");
+  if (clip && clip !== "auto") {
+    const m = clip.match(/rect\(([^)]+)\)/);
+    if (m) {
+      const vals = m[1].split(/[,\s]+/).map(parseFloat).filter(v => !isNaN(v));
+      if (vals.length >= 4 && (vals[2] - vals[0]) <= 1 && (vals[1] - vals[3]) <= 1) {
+        return NodeFilter.FILTER_REJECT;
+      }
+    }
+  }
+
   // Effective rect: anchor-child fallback for zero-size <a>,
   // label redirect for zero-size radio/checkbox
   let rect = el.getBoundingClientRect();
@@ -158,6 +176,24 @@ function isVisible(el: HTMLElement): boolean {
   const style = getComputedStyle(el);
   if (style.display === "none") return false;
   if (style.visibility === "hidden") return false;
+
+  // Visually-hidden: clip/clip-path reducing visible area to zero
+  const clipPath = style.clipPath || el.style.clipPath;
+  if (clipPath && clipPath !== "none") {
+    const cm = clipPath.match(/inset\((\d+)%/);
+    if (cm && parseInt(cm[1]) >= 50) return false;
+  }
+  const clip = style.getPropertyValue("clip") || el.style.getPropertyValue("clip");
+  if (clip && clip !== "auto") {
+    const cm = clip.match(/rect\(([^)]+)\)/);
+    if (cm) {
+      const vals = cm[1].split(/[,\s]+/).map(parseFloat).filter(v => !isNaN(v));
+      if (vals.length >= 4 && (vals[2] - vals[0]) <= 1 && (vals[1] - vals[3]) <= 1) {
+        return false;
+      }
+    }
+  }
+
   // Opacity:0 — excluded, with radio/checkbox → label redirect
   if (parseFloat(style.opacity) === 0) {
     if (el.tagName.toLowerCase() === "input") {

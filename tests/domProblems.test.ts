@@ -772,6 +772,70 @@ describe("DOM problems — role=link with inner button gets separate hints", () 
     });
 });
 
+// ISSUE: Elements hidden via CSS clip/clip-path (visually-hidden / sr-only pattern)
+// still receive hints because they have non-zero bounding rects.
+// SITE: github.com — "Skip to content" link hidden with show-on-focus class
+// FIX: Check for clip/clip-path that reduce visible area to near-zero in walkerFilter
+describe("DOM problems — clip/clip-path visually-hidden elements", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("filters element hidden with clip-path: inset(50%)", () => {
+        const skipLink = makeElement("A", {
+            href: "#start-of-content", top: 0, left: 0, width: 200, height: 30,
+        });
+        skipLink.style.position = "fixed";
+        skipLink.style.clipPath = "inset(50%)";
+
+        loadModules([skipLink]);
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(!hintMode.isActive(), "clip-path: inset(50%) element should not get a hint");
+    });
+
+    it("filters element hidden with clip: rect(0px, 0px, 0px, 0px)", () => {
+        const skipLink = makeElement("A", {
+            href: "#start-of-content", top: 0, left: 0, width: 200, height: 30,
+        });
+        skipLink.style.position = "fixed";
+        (skipLink.style as any).clip = "rect(0px, 0px, 0px, 0px)";
+
+        loadModules([skipLink]);
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(!hintMode.isActive(), "clip: rect(0,0,0,0) element should not get a hint");
+    });
+
+    it("filters element hidden with clip: rect(1px, 1px, 1px, 1px)", () => {
+        const skipLink = makeElement("A", {
+            href: "#start-of-content", top: 0, left: 0, width: 200, height: 30,
+        });
+        skipLink.style.position = "fixed";
+        (skipLink.style as any).clip = "rect(1px, 1px, 1px, 1px)";
+
+        loadModules([skipLink]);
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(!hintMode.isActive(), "clip: rect(1px,1px,1px,1px) element should not get a hint");
+    });
+
+    it("keeps element with non-hiding clip-path", () => {
+        const link = makeElement("A", {
+            href: "/page", top: 10, left: 10, width: 200, height: 30,
+        });
+        // clip-path that doesn't hide the element
+        link.style.clipPath = "none";
+
+        loadModules([link]);
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(), "clip-path: none should not filter the element");
+    });
+});
+
 // ISSUE: Non-interactive cursor:pointer divs (overlays, icon containers) get
 // separate hints alongside the real interactive sibling (input, button, etc.)
 // SITE: linkedin.com/feed — search bar has overlay div, icon div, and input
