@@ -1259,6 +1259,55 @@ describe("DOM problems — native interactive elements prune subtrees", () => {
         assert.equal(x, 40, "Hint should center on the link, not the stacked icon");
     });
 
+    // ISSUE: Container links (role="link" divs, wide nav items) with no specific visual anchor
+    // get a pointed hint in the middle, which looks arbitrary. Bar style is more appropriate.
+    // FIX: When getHintTargetElement returns the element itself and it has children, use bar style.
+    // SITE: x.com (trending topics), github.com (sidebar sections)
+    it("container link with children gets bar-style hint", () => {
+        const link = makeElement("DIV", { top: 10, left: 10, width: 300, height: 80,
+            attrs: { role: "link", tabindex: "0" } });
+        const subtitle = makeElement("DIV", { top: 15, left: 15, width: 200, height: 16, textContent: "Trending" });
+        const title = makeElement("DIV", { top: 35, left: 15, width: 200, height: 20, textContent: "DOGE" });
+        link.appendChild(subtitle);
+        link.appendChild(title);
+
+        loadModules([link, subtitle, title]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [link];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        assert.ok(hints[0].classList.contains("vimium-hint-bar"), "Container link should use bar-style hint");
+        assert.equal(hints[0].dataset.label, "s", "Bar hint should have label in data-label attribute");
+    });
+
+    // Verify a link with a specific target (heading, icon) still gets a normal pointed hint
+    it("link with heading gets normal pointed hint, not bar", () => {
+        const link = makeElement("A", { href: "/article", top: 10, left: 10, width: 300, height: 80 });
+        const heading = makeElement("H3", { top: 15, left: 15, width: 200, height: 20, textContent: "Article Title" });
+        link.appendChild(heading);
+
+        loadModules([link, heading]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [link];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        assert.ok(!hints[0].classList.contains("vimium-hint-bar"), "Link with heading should use normal hint");
+    });
+
     it("anchor does not produce hints for interactive children inside it", () => {
         const anchor = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 40 });
         const innerBtn = makeElement("BUTTON", { top: 12, left: 12, width: 80, height: 20 });

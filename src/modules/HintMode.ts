@@ -4,7 +4,7 @@
 
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
-import { discoverElements, findAssociatedLabel, CLICKABLE_SELECTOR, NATIVE_INTERACTIVE_ELEMENTS } from "./ElementGatherer";
+import { discoverElements, findAssociatedLabel, CLICKABLE_SELECTOR, NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_ROLES } from "./ElementGatherer";
 import { Mode } from "../commands";
 
 declare const browser: {
@@ -64,7 +64,7 @@ export class HintMode {
     this.typed = "";
     this.keyHandler.setMode(Mode.HINTS);
 
-    const elements = discoverElements(this.getHintRect.bind(this));
+    const elements = discoverElements((el: HTMLElement) => this.getHintInfo(el).rect);
     if (elements.length === 0) {
       this.deactivate();
       return;
@@ -152,7 +152,10 @@ export class HintMode {
     // 2. Heading (no icons) → hint on the heading (article card links)
     // 3. Otherwise → the element itself
     const tag = el.tagName.toLowerCase();
-    if (NATIVE_INTERACTIVE_ELEMENTS.includes(tag)) {
+    const role = el.getAttribute("role") || "";
+    const isInteractive = NATIVE_INTERACTIVE_ELEMENTS.includes(tag) ||
+      CLICKABLE_ROLES.includes(role);
+    if (isInteractive) {
       const icons = el.querySelectorAll("svg, img");
       if (icons.length === 1) {
         const icon = icons[0] as HTMLElement;
@@ -237,8 +240,9 @@ export class HintMode {
     return el;
   }
 
-  private getHintRect(el: HTMLElement): DOMRect {
+  private getHintInfo(el: HTMLElement): { rect: DOMRect; container: boolean } {
     const target = this.getHintTargetElement(el);
+    const container = target === el && el.children.length > 0;
     let rect = target.getBoundingClientRect();
 
     if (el !== target && el.getBoundingClientRect().width > window.innerWidth * 0.25) {
@@ -274,7 +278,7 @@ export class HintMode {
       }
     }
 
-    return rect;
+    return { rect, container };
   }
 
   // --- Label generation ---
@@ -332,17 +336,31 @@ export class HintMode {
   }
 
   private createHintDiv(element: HTMLElement, label: string): HTMLDivElement {
-    const rect = this.getHintRect(element);
+    const { rect, container } = this.getHintInfo(element);
     const div = document.createElement("div");
-    div.className = "vimium-hint";
+    div.className = container ? "vimium-hint vimium-hint-bar" : "vimium-hint";
     div.textContent = label;
-    const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
-    div.style.left = Math.max(0, pos.x) + "px";
-    div.style.top = Math.max(0, pos.y) + "px";
-    div.style.transform = "translateX(-50%)";
-    const tail = document.createElement("div");
-    tail.className = "vimium-hint-tail";
-    div.appendChild(tail);
+
+    if (container) {
+      // Bar style: centered at bottom of container, 50% width
+      const elRect = element.getBoundingClientRect();
+      const barWidth = elRect.width * 0.5;
+      const pos = this.viewportToDocument(elRect.left + elRect.width / 2, elRect.bottom);
+      div.style.left = Math.max(0, pos.x) + "px";
+      div.style.top = Math.max(0, pos.y) + "px";
+      div.style.transform = "translateX(-50%)";
+      div.style.width = barWidth + "px";
+      div.textContent = "";
+      div.dataset.label = label;
+    } else {
+      const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
+      div.style.left = Math.max(0, pos.x) + "px";
+      div.style.top = Math.max(0, pos.y) + "px";
+      div.style.transform = "translateX(-50%)";
+      const tail = document.createElement("div");
+      tail.className = "vimium-hint-tail";
+      div.appendChild(tail);
+    }
 
     if (this.overlay) this.overlay.appendChild(div);
     return div;
@@ -410,14 +428,18 @@ export class HintMode {
       if (matches) {
         const matched = hint.label.slice(0, this.typed.length);
         const remaining = hint.label.slice(this.typed.length);
-        hint.div.innerHTML = "";
-        if (matched) {
-          const span = document.createElement("span");
-          span.className = "vimium-hint-matched";
-          span.textContent = matched;
-          hint.div.appendChild(span);
+        if (hint.div.classList.contains("vimium-hint-bar")) {
+          hint.div.dataset.label = hint.label;
+        } else {
+          hint.div.innerHTML = "";
+          if (matched) {
+            const span = document.createElement("span");
+            span.className = "vimium-hint-matched";
+            span.textContent = matched;
+            hint.div.appendChild(span);
+          }
+          hint.div.appendChild(document.createTextNode(remaining));
         }
-        hint.div.appendChild(document.createTextNode(remaining));
       }
     }
   }
@@ -431,7 +453,7 @@ export class HintMode {
       if (h !== hint) h.div.style.display = "none";
     }
 
-    const targetRect = this.getHintRect(element);
+    const targetRect = this.getHintInfo(element).rect;
     const tagRect = hint.div.getBoundingClientRect();
     if (tagRect.width > 0) {
       const dx = (targetRect.left + targetRect.width / 2) - (tagRect.left + tagRect.width / 2);
