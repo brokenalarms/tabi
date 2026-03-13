@@ -117,19 +117,6 @@ function interactiveType(el: HTMLElement): string {
   return "generic";
 }
 
-// --- Subtree pruning ---
-
-function shouldPrune(el: HTMLElement): boolean {
-  if (el.getAttribute("aria-hidden") === "true") return true;
-  if (el.hasAttribute("inert")) return true;
-  if (el.hidden) return true;
-  if ((el as HTMLButtonElement).disabled) return true;
-  const style = getComputedStyle(el);
-  if (style.display === "none") return true;
-  if (style.visibility === "hidden") return true;
-  return false;
-}
-
 // --- Element discovery ---
 // BFS level-by-level: read children flat, prune hidden subtrees without
 // visiting their descendants, then advance to the next level.  O(n+m)
@@ -154,10 +141,16 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
         const el = node as HTMLElement;
         if (!el.tagName) continue;
 
-        // Prune: discard entire subtree
-        if (shouldPrune(el)) continue;
+        // Prune: discard entire subtree for hidden/inert elements
+        if (el.getAttribute("aria-hidden") === "true") continue;
+        if (el.hasAttribute("inert")) continue;
+        if (el.hidden) continue;
+        if ((el as HTMLButtonElement).disabled) continue;
+        const style = getComputedStyle(el);
+        if (style.display === "none") continue;
+        if (style.visibility === "hidden") continue;
 
-        if (el.matches(CLICKABLE_SELECTOR) || getComputedStyle(el).cursor === "pointer") {
+        if (el.matches(CLICKABLE_SELECTOR) || style.cursor === "pointer") {
           if (isVisible(el)) result.push(el);
         }
 
