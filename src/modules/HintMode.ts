@@ -147,62 +147,57 @@ export class HintMode {
       }
     }
 
+    // Native interactive elements are atomic. If the element contains a heading
+    // and no SVGs, use the heading as the hint target (e.g. article card links).
+    // Otherwise use the element itself.
     const tag = el.tagName.toLowerCase();
-    const isNativeInteractive = NATIVE_INTERACTIVE_ELEMENTS.includes(tag);
-
-    // Generic wrappers: check for clickable children
-    if (!isNativeInteractive) {
-      const hasClickableChildren = el.querySelector(CLICKABLE_SELECTOR) !== null;
-      if (hasClickableChildren) return el;
-
-      const clickableChildren = el.querySelectorAll(CLICKABLE_SELECTOR);
-      for (let i = 0; i < clickableChildren.length; i++) {
-        const child = clickableChildren[i] as HTMLElement;
-        if (child === el) continue;
-        const cr = child.getBoundingClientRect();
-        if (cr.width > 0 && cr.height > 0) return child;
+    if (NATIVE_INTERACTIVE_ELEMENTS.includes(tag)) {
+      if (!el.querySelector("svg")) {
+        const heading = el.querySelector("h1, h2, h3, h4, h5, h6") as HTMLElement | null;
+        if (heading) {
+          const hr = heading.getBoundingClientRect();
+          if (hr.width > 0 && hr.height > 0) return heading;
+        }
       }
+      return el;
     }
 
-    // Find the best text-bearing descendant.
-    // Native interactive: prefer the most prominent heading (h1 > h2 > ... > h6 > other).
-    // Generic wrappers: return the first text-bearing element.
+    // If this element contains other clickable children, don't redirect — keep
+    // the hint on the first-level element. Inner clickable elements get their own hints.
+    const hasClickableChildren = el.querySelector(CLICKABLE_SELECTOR) !== null;
+    if (hasClickableChildren) return el;
+
+    // For generic wrappers with no competing clickable children, find the best
+    // visual target: sole clickable child, or first text-bearing element.
+    const clickableChildren = el.querySelectorAll(CLICKABLE_SELECTOR);
+    for (let i = 0; i < clickableChildren.length; i++) {
+      const child = clickableChildren[i] as HTMLElement;
+      if (child === el) continue;
+      const cr = child.getBoundingClientRect();
+      if (cr.width > 0 && cr.height > 0) return child;
+    }
+
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT, {
       acceptNode: (node) =>
         (node as HTMLElement).getAttribute("aria-hidden") === "true"
           ? NodeFilter.FILTER_REJECT
           : NodeFilter.FILTER_ACCEPT,
     });
-    let bestText: HTMLElement | null = null;
-    let bestLevel = 7; // h1=1 .. h6=6, non-heading=7
     let node = walker.nextNode() as HTMLElement | null;
     while (node) {
       if (node !== el) {
-        let hasText = false;
         for (let i = 0; i < node.childNodes.length; i++) {
           const child = node.childNodes[i];
           if (child.nodeType === 3 && (child.textContent || "").trim().length > 0) {
-            hasText = true;
-            break;
-          }
-        }
-        if (hasText) {
-          const cr = node.getBoundingClientRect();
-          if (cr.width > 4 && cr.height > 4) {
-            if (!isNativeInteractive) return node;
-            const m = node.tagName.match(/^H([1-6])$/i);
-            const level = m ? parseInt(m[1]) : 7;
-            if (!bestText || level < bestLevel) {
-              bestText = node;
-              bestLevel = level;
-            }
+            const cr = node.getBoundingClientRect();
+            if (cr.width > 4 && cr.height > 4) return node;
           }
         }
       }
       node = walker.nextNode() as HTMLElement | null;
     }
 
-    return bestText || el;
+    return el;
   }
 
   private getHintRect(el: HTMLElement): DOMRect {
@@ -213,14 +208,6 @@ export class HintMode {
       const paddingTop = parseFloat(getComputedStyle(target).paddingTop) || 0;
       if (paddingTop > 0) {
         rect = new DOMRect(rect.left, rect.top + paddingTop, rect.width, rect.height - paddingTop);
-      }
-    }
-
-    // Native interactive elements with preceding non-text content (icons):
-    // anchor at the text's left edge so hints align in vertical lists.
-    if (NATIVE_INTERACTIVE_ELEMENTS.includes(el.tagName.toLowerCase()) && target !== el) {
-      if (HintMode.hasPrecedingNonTextContent(el, target)) {
-        return new DOMRect(rect.left, rect.top, 0, rect.height);
       }
     }
 
@@ -251,24 +238,6 @@ export class HintMode {
     }
 
     return rect;
-  }
-
-  // Walk from target up toward root. At each level, if a preceding sibling
-  // is visible but contains no text, it's non-text content (icon, image, etc.).
-  private static hasPrecedingNonTextContent(root: HTMLElement, target: HTMLElement): boolean {
-    let current: HTMLElement | null = target;
-    while (current && current !== root) {
-      let sib = current.previousElementSibling;
-      while (sib) {
-        if (!(sib as HTMLElement).textContent?.trim()) {
-          const r = (sib as HTMLElement).getBoundingClientRect();
-          if (r.width > 0 && r.height > 0) return true;
-        }
-        sib = sib.previousElementSibling;
-      }
-      current = current.parentElement;
-    }
-    return false;
   }
 
   // --- Label generation ---
