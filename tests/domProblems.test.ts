@@ -677,6 +677,58 @@ describe("DOM problems — zero in one dimension filtered", () => {
     });
 });
 
+// ISSUE: Inline centering logic widens hint position to parent container for all inline elements,
+// but checkboxes/radios are discrete controls — their hints should stay near the control, not
+// drift to the center of the parent text line.
+// SITE: GitHub PR task lists
+// FIX: Exclude checkbox and radio inputs from inline centering.
+describe("DOM problems — checkbox/radio hint positioning", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("checkbox hint stays near the control, not centered on parent", () => {
+        const li = makeElement("LI", { top: 10, left: 0, width: 600, height: 25, display: "block" });
+        const checkbox = makeElement("INPUT", { type: "checkbox", top: 10, left: 10, width: 16, height: 16, display: "inline" });
+        li.appendChild(checkbox);
+
+        loadModules([checkbox]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1, "Should have 1 hint for checkbox");
+
+        // Hint should be near the checkbox (left=10, width=16, center=18), NOT centered on li (center=300)
+        const hintLeft = parseFloat(hints[0].style.left);
+        assert.ok(hintLeft < 50, `Checkbox hint left (${hintLeft}) should be near the control (~18), not centered on parent (~300)`);
+    });
+
+    it("radio hint stays near the control, not centered on parent", () => {
+        const li = makeElement("LI", { top: 10, left: 0, width: 600, height: 25, display: "block" });
+        const radio = makeElement("INPUT", { type: "radio", top: 10, left: 10, width: 16, height: 16, display: "inline" });
+        li.appendChild(radio);
+
+        loadModules([radio]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1, "Should have 1 hint for radio");
+
+        const hintLeft = parseFloat(hints[0].style.left);
+        assert.ok(hintLeft < 50, `Radio hint left (${hintLeft}) should be near the control (~18), not centered on parent (~300)`);
+    });
+});
+
 // X.com trending: div[role="link"] contains a button[role="button"] (the "..." menu).
 // The trend box should get its own hint separate from the button's hint.
 // Previously getHintTargetElement redirected to the inner button, making both hints overlap.
