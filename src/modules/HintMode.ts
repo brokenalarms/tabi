@@ -73,11 +73,16 @@ export class HintMode {
 
     const labels = HintMode.generateLabels(elements.length);
     this.createOverlay();
+    if (this.willOpenNewTab && this.overlay) {
+      this.overlay.classList.add("vimium-newtab");
+    }
     this.hints = elements.map((el, i) => {
       const label = labels[i];
       const div = this.createHintDiv(el, label);
       return { element: el, label, div };
     });
+
+    if (!this.pointerTails) this.markRowHints();
 
     this.keyHandler.setModeKeyDelegate(this.handleKey.bind(this));
     document.addEventListener("mousedown", this.onMouseDown, true);
@@ -284,6 +289,31 @@ export class HintMode {
     return div;
   }
 
+  private markRowHints(): void {
+    // Group hints by approximate vertical position (within 6px = same row)
+    const buckets = new Map<number, Hint[]>();
+    for (const hint of this.hints) {
+      const rect = this.getHintRect(hint.element);
+      let placed = false;
+      for (const [key, group] of buckets) {
+        if (Math.abs(rect.top - key) < 6) {
+          group.push(hint);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) buckets.set(rect.top, [hint]);
+    }
+    // Mark hints in groups of 2+ as row hints
+    for (const group of buckets.values()) {
+      if (group.length >= 2) {
+        for (const hint of group) {
+          hint.div.classList.add("vimium-hint-row");
+        }
+      }
+    }
+  }
+
   // --- Key handling ---
 
   private handleKey(event: KeyboardEvent): boolean {
@@ -331,7 +361,10 @@ export class HintMode {
 
     const match = this.hints.find((h) => h.label === this.typed);
     if (match) {
-      if (event.shiftKey) this.willOpenNewTab = true;
+      if (event.shiftKey) {
+        this.willOpenNewTab = true;
+        if (this.overlay) this.overlay.classList.add("vimium-newtab");
+      }
       this.activateHint(match);
     }
     return true;
