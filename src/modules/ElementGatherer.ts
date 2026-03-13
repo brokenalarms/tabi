@@ -1,6 +1,7 @@
 // ElementGatherer — element discovery, filtering, and deduplication for hint mode.
-// Uses a top-down TreeWalker with FILTER_REJECT to prune entire hidden subtrees
-// without visiting children, then deduplicates via containment analysis.
+// Uses TreeWalker with a 3-step walkerFilter to prune hidden subtrees, skip
+// non-clickable nodes, and yield visible clickable elements, then deduplicates
+// via containment analysis.
 
 export const CLICKABLE_TAGS = ["a", "button", "input", "textarea", "select", "summary", "details"];
 export const CLICKABLE_ROLES = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch"];
@@ -221,53 +222,38 @@ function interactiveType(el: HTMLElement): string {
 }
 
 // --- Element discovery ---
-// BFS level-by-level: read children flat, prune hidden subtrees without
-// visiting their descendants, then advance to the next level.  O(n+m)
-// where n = visited nodes, m = pruned subtree roots.
+// Uses TreeWalker with walkerFilter to discover clickable, visible elements.
+// The walker prunes invisible subtrees (REJECT), skips non-clickable nodes
+// (SKIP, still walking children), and yields clickable visible nodes (ACCEPT).
+// Shadow roots are collected from any non-rejected node and recursed into.
 
 export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTMLElement[] {
-  const seen = new Set<Element>();
   const result: HTMLElement[] = [];
 
   const collectFromRoot = (root: Document | ShadowRoot): void => {
     const walkRoot = root === document ? document.body || document.documentElement : root;
     if (!walkRoot) return;
 
-    let level: Element[] = Array.from(walkRoot.children);
-
-    while (level.length > 0) {
-      const next: Element[] = [];
-      for (const node of level) {
-        if (!node || seen.has(node)) continue;
-        seen.add(node);
-
-        const el = node as HTMLElement;
-        if (!el.tagName) continue;
-
-        // Prune: discard entire subtree for hidden/inert elements
-        if (el.getAttribute("aria-hidden") === "true") continue;
-        if (el.hasAttribute("inert")) continue;
-        if (el.hidden) continue;
-        if ((el as HTMLButtonElement).disabled) continue;
-        const style = getComputedStyle(el);
-        if (style.display === "none") continue;
-        if (style.visibility === "hidden") continue;
-
-        if (el.matches(CLICKABLE_SELECTOR) || style.cursor === "pointer") {
-          if (isVisible(el)) result.push(el);
-        }
-
-        if (el.shadowRoot) {
-          collectFromRoot(el.shadowRoot);
-        }
-
-        // Queue children for the next level
-        const children = el.children;
-        for (let i = 0; i < children.length; i++) {
-          next.push(children[i]);
-        }
+    // Wrap walkerFilter to also collect shadow roots from non-rejected nodes
+    const shadowRoots: ShadowRoot[] = [];
+    const filter = (node: Node): number => {
+      const verdict = walkerFilter(node);
+      if (verdict !== NodeFilter.FILTER_REJECT) {
+        const sr = (node as HTMLElement).shadowRoot;
+        if (sr) shadowRoots.push(sr);
       }
-      level = next;
+      return verdict;
+    };
+
+    const walker = document.createTreeWalker(walkRoot, NodeFilter.SHOW_ELEMENT, { acceptNode: filter });
+
+    let node: Node | null;
+    while ((node = walker.nextNode()) !== null) {
+      result.push(node as HTMLElement);
+    }
+
+    for (const sr of shadowRoots) {
+      collectFromRoot(sr);
     }
   };
 
