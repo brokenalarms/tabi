@@ -595,6 +595,54 @@ describe("DOM problems — fixed elements inside off-viewport ancestors", () => 
     });
 });
 
+// ISSUE: Inline elements (e.g. <a>) use their tight text rect for hint centering,
+// causing hints to scatter horizontally in vertical lists where links have different text widths.
+// SITE: amazon.com.au footer
+// FIX: When element is inline, use nearest block-level ancestor's horizontal bounds for centering.
+describe("DOM problems — inline element hint alignment", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("centers hints on block-level ancestor for inline links in a list", () => {
+        const ul = makeElement("UL", { top: 0, left: 10, width: 300, height: 100 });
+
+        const li1 = makeElement("LI", { top: 10, left: 10, width: 300, height: 25, display: "block" });
+        const a1 = makeElement("A", { href: "/brand", top: 10, left: 10, width: 250, height: 20, display: "inline" });
+        li1.appendChild(a1);
+        ul.appendChild(li1);
+
+        const li2 = makeElement("LI", { top: 40, left: 10, width: 300, height: 25, display: "block" });
+        const a2 = makeElement("A", { href: "/sell", top: 40, left: 10, width: 120, height: 20, display: "inline" });
+        li2.appendChild(a2);
+        ul.appendChild(li2);
+
+        const li3 = makeElement("LI", { top: 70, left: 10, width: 300, height: 25, display: "block" });
+        const a3 = makeElement("A", { href: "/fba", top: 70, left: 10, width: 180, height: 20, display: "inline" });
+        li3.appendChild(a3);
+        ul.appendChild(li3);
+
+        loadModules([a1, a2, a3]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 3, "Should have 3 hints");
+
+        // All hints should have the same x position (centered on <li> width, not <a> text width)
+        const x1 = parseFloat(hints[0].style.left);
+        const x2 = parseFloat(hints[1].style.left);
+        const x3 = parseFloat(hints[2].style.left);
+        assert.equal(x1, x2, `Hints should align (same x): got ${x1} vs ${x2}`);
+        assert.equal(x2, x3, `Hints should align (same x): got ${x2} vs ${x3}`);
+    });
+});
+
 // X.com trending: div[role="link"] contains a button[role="button"] (the "..." menu).
 // The trend box should get its own hint separate from the button's hint.
 // Previously getHintTargetElement redirected to the inner button, making both hints overlap.
