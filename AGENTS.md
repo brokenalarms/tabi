@@ -21,7 +21,8 @@ When the user pastes a **DOM snippet, screenshot and URL** showing a hint mode b
 
 - **Simplify the DOM**: Distill the pasted snippet down to the minimal structure that reproduces the issue. Strip out irrelevant attributes, classes, and sibling elements. The test fixture should be the smallest DOM tree that triggers the bug — not a copy-paste of the full site markup.
 
-- **Verify** that your understanding of the issue is correct before proceeding. Echo back to the user in the following format:
+- **Verify** that your understanding of the issue is correct before proceeding. Do NOT start fixing the problem without verifying, your guess is often wrong!
+  Echo back to the user in the following format:
   - ISSUE: Your understanding of what the issue is, in a generalizable way
   - SITE: URL where seen
   - DOM: The simplified representation
