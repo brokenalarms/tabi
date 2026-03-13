@@ -14,9 +14,14 @@ When the user pastes a **DOM snippet and/or screenshot** showing a hint mode bug
 
 - **Understand the scenario**: Read the DOM structure and screenshot to identify what's wrong (e.g. duplicate hints, missing hints, hint on wrong element).
 
-- **Verify** that your understanding of the issue is correct before proceeding. 
-
 - **Simplify the DOM**: Distill the pasted snippet down to the minimal structure that reproduces the issue. Strip out irrelevant attributes, classes, and sibling elements. The test fixture should be the smallest DOM tree that triggers the bug — not a copy-paste of the full site markup.
+
+- **Verify** that your understanding of the issue is correct before proceeding. Echo back to the user
+  - ISSUE: Your understanding of what the issue is
+  - DOM: The simplified representation
+  - FIX: Your proposed fix, using the same language of the issue
+
+If the user agrees, you may proceed:
 
 - **Write a TDD test first that should be broken at first**: Before the fix, add a test in `tests/HintMode.test.js` that:
    - Reconstruct that simplified DOM using `makeElement()` helpers, wiring up `parentElement`/`children` relationships to match.
