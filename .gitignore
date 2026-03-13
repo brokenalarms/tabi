@@ -12,6 +12,7 @@ build/
 
 # Build output (compiled from src/*.ts)
 Vimium/Safari Extension/Resources/**/*.js
+!Vimium/Safari Extension/Resources/settings-popup.js
 
 # Playwright
 tests/integration/harness.js
