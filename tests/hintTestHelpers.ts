@@ -205,6 +205,11 @@ export function setupDOM(elements: any[] = []) {
                 classList: {
                     add(c: string) { classes.add(c); },
                     remove(c: string) { classes.delete(c); },
+                    toggle(c: string, force?: boolean) {
+                        const on = force !== undefined ? force : !classes.has(c);
+                        if (on) classes.add(c); else classes.delete(c);
+                        return on;
+                    },
                     contains(c: string) { return classes.has(c); },
                 },
                 offsetHeight: 0,
