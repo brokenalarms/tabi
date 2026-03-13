@@ -117,20 +117,19 @@ export function walkerFilter(node: Node): number {
   const px = Math.min(Math.max(centerX, 0), window.innerWidth - 1);
   const py = Math.min(Math.max(centerY, 0), window.innerHeight - 1);
 
-  const elMatchesPoint = (point: Element[]): boolean => {
-    for (const hit of point) {
-      if (el.contains(hit) || hit.contains(el)) return true;
-    }
-    return false;
+  const topHitMatches = (point: Element[]): boolean => {
+    if (point.length === 0) return false;
+    const top = point[0];
+    return el.contains(top) || top.contains(el);
   };
 
   const centerHits = document.elementsFromPoint(px, py);
-  if (centerHits.length > 0 && !elMatchesPoint(centerHits)) {
+  if (centerHits.length > 0 && !topHitMatches(centerHits)) {
     const tlHits = document.elementsFromPoint(
       Math.min(Math.max(rect.left + 2, 0), window.innerWidth - 1),
       Math.min(Math.max(rect.top + 2, 0), window.innerHeight - 1)
     );
-    if (tlHits.length === 0 || !elMatchesPoint(tlHits)) {
+    if (tlHits.length === 0 || !topHitMatches(tlHits)) {
       return NodeFilter.FILTER_SKIP;
     }
   }
@@ -226,20 +225,19 @@ function isVisible(el: HTMLElement): boolean {
   const px = Math.min(Math.max(centerX, 0), window.innerWidth - 1);
   const py = Math.min(Math.max(centerY, 0), window.innerHeight - 1);
 
-  const elMatchesPoint = (point: Element[]): boolean => {
-    for (const hit of point) {
-      if (el.contains(hit) || hit.contains(el)) return true;
-    }
-    return false;
+  const topHitMatches = (point: Element[]): boolean => {
+    if (point.length === 0) return false;
+    const top = point[0];
+    return el.contains(top) || top.contains(el);
   };
 
   const centerHits = document.elementsFromPoint(px, py);
-  if (centerHits.length > 0 && !elMatchesPoint(centerHits)) {
+  if (centerHits.length > 0 && !topHitMatches(centerHits)) {
     const tlHits = document.elementsFromPoint(
       Math.min(Math.max(rect.left + 2, 0), window.innerWidth - 1),
       Math.min(Math.max(rect.top + 2, 0), window.innerHeight - 1)
     );
-    if (tlHits.length === 0 || !elMatchesPoint(tlHits)) {
+    if (tlHits.length === 0 || !topHitMatches(tlHits)) {
       return false;
     }
   }
