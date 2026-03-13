@@ -395,7 +395,18 @@ export class HintMode {
 
     hint.div.classList.add("vimium-hint-active");
 
+    // Focus ring around target element
+    const ring = document.createElement("div");
+    ring.className = "vimium-hint-ring";
+    const pos = this.viewportToDocument(targetRect.left, targetRect.top);
+    ring.style.left = pos.x - 2 + "px";
+    ring.style.top = pos.y - 2 + "px";
+    ring.style.width = targetRect.width + 4 + "px";
+    ring.style.height = targetRect.height + 4 + "px";
+    if (this.overlay) this.overlay.appendChild(ring);
+
     const afterCollapse = (): void => {
+      ring.remove();
       this.deactivate();
 
       if (newTab && element.tagName.toLowerCase() === "a" && (element as HTMLAnchorElement).href) {
