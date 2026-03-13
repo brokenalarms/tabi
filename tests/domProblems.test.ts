@@ -1052,36 +1052,48 @@ describe("DOM problems — native interactive elements prune subtrees", () => {
         assert.equal(hints?.length, 1, "Expected 1 hint (button only) — inner elements should be pruned");
     });
 
-    // ISSUE: Hints on native interactive elements scatter horizontally because
-    // getHintTargetElement redirects to inner text-bearing spans of varying width.
-    // SITE: x.com sidebar nav — vertical list of <a> links with nested divs/svgs/spans
-    // FIX: Native interactive elements are atomic — positioning should use the element's
-    // own rect, not drill into children for a text target. Same NATIVE_INTERACTIVE set
-    // governs both discovery (prune subtrees) and positioning (don't redirect).
-    it("hints on native interactive elements use the element's own rect, not inner text", () => {
-        // Two <a> links with different-width text spans at different x-offsets
+    // ISSUE: Hints on nav links with icons + text scatter horizontally because
+    // positioning centers on text spans of varying width.
+    // SITE: x.com sidebar nav — <a> links with SVG icon divs before text labels
+    // FIX: For native interactive elements, find the most prominent text descendant
+    // and anchor at its left edge when preceded by non-text content (icons).
+    it("hints on icon+text links anchor at text start, aligned across items", () => {
         const nav = makeElement("NAV", { top: 0, left: 0, width: 250, height: 120 });
 
+        // <a><div><div><svg/></div><div><span>Home</span></div></div></a>
         const link1 = makeElement("A", { href: "/home", top: 0, left: 0, width: 250, height: 60 });
-        const icon1 = makeElement("DIV", { top: 10, left: 10, width: 24, height: 24 });
-        const text1 = makeElement("SPAN", { top: 15, left: 50, width: 60, height: 20, textContent: "Home" });
-        link1.appendChild(icon1);
-        link1.appendChild(text1);
+        const wrap1 = makeElement("DIV", { top: 0, left: 0, width: 250, height: 60 });
+        const iconDiv1 = makeElement("DIV", { top: 10, left: 10, width: 24, height: 24 });
+        const svg1 = makeElement("SVG", { top: 10, left: 10, width: 24, height: 24 });
+        iconDiv1.appendChild(svg1);
+        const textDiv1 = makeElement("DIV", { top: 10, left: 50, width: 60, height: 24 });
+        const text1 = makeElement("SPAN", { top: 12, left: 50, width: 60, height: 20, textContent: "Home" });
+        textDiv1.appendChild(text1);
+        wrap1.appendChild(iconDiv1);
+        wrap1.appendChild(textDiv1);
+        link1.appendChild(wrap1);
 
         const link2 = makeElement("A", { href: "/notifications", top: 60, left: 0, width: 250, height: 60 });
-        const icon2 = makeElement("DIV", { top: 70, left: 10, width: 24, height: 24 });
-        const text2 = makeElement("SPAN", { top: 75, left: 50, width: 140, height: 20, textContent: "Notifications" });
-        link2.appendChild(icon2);
-        link2.appendChild(text2);
+        const wrap2 = makeElement("DIV", { top: 60, left: 0, width: 250, height: 60 });
+        const iconDiv2 = makeElement("DIV", { top: 70, left: 10, width: 24, height: 24 });
+        const svg2 = makeElement("SVG", { top: 70, left: 10, width: 24, height: 24 });
+        iconDiv2.appendChild(svg2);
+        const textDiv2 = makeElement("DIV", { top: 70, left: 50, width: 140, height: 24 });
+        const text2 = makeElement("SPAN", { top: 72, left: 50, width: 140, height: 20, textContent: "Notifications" });
+        textDiv2.appendChild(text2);
+        wrap2.appendChild(iconDiv2);
+        wrap2.appendChild(textDiv2);
+        link2.appendChild(wrap2);
 
         nav.appendChild(link1);
         nav.appendChild(link2);
 
-        loadModules([nav, link1, icon1, text1, link2, icon2, text2]);
+        loadModules([nav, link1, wrap1, iconDiv1, svg1, textDiv1, text1,
+                     link2, wrap2, iconDiv2, svg2, textDiv2, text2]);
 
         (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
-            if (y < 60) return [text1, link1, nav];
-            return [text2, link2, nav];
+            if (y < 60) return [text1, textDiv1, wrap1, link1, nav];
+            return [text2, textDiv2, wrap2, link2, nav];
         };
 
         const { hintMode } = getState();
@@ -1091,10 +1103,11 @@ describe("DOM problems — native interactive elements prune subtrees", () => {
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 2, "Expected 2 hints (one per link)");
 
-        // Both hints should have the same x position (centered on the <a>, not the inner span)
+        // Both hints at text left edge (x=50), not centered on different-width spans
         const x1 = parseFloat(hints[0].style.left);
         const x2 = parseFloat(hints[1].style.left);
         assert.equal(x1, x2, `Hints should align horizontally: got ${x1} vs ${x2}`);
+        assert.equal(x1, 50, "Hint should anchor at start of text");
     });
 
     it("anchor does not produce hints for interactive children inside it", () => {
