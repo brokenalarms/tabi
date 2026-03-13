@@ -1,277 +1,14 @@
-// HintMode unit tests — using Node.js built-in test runner
-// Tests label generation, element discovery filtering, hint overlay
-// rendering, progressive filtering, and click dispatch.
+// HintMode unit tests — behavioral tests for label generation, progressive
+// filtering, click dispatch, layout independence, and command wiring.
+// Selector pipeline / DOM problem tests live in domProblems.test.js.
 
-const { describe, it, beforeEach, afterEach, mock } = require("node:test");
+const { describe, it, beforeEach, afterEach } = require("node:test");
 const assert = require("node:assert/strict");
-
-// --- Minimal DOM shim ---
-
-let capturedListeners, keyHandler, hintMode;
-let bodyEl, htmlEl;
-
-function makeElement(tag, opts = {}) {
-    const rect = {
-        top: opts.top ?? 0,
-        left: opts.left ?? 0,
-        bottom: opts.bottom ?? 20,
-        right: opts.right ?? 100,
-        width: opts.width ?? 100,
-        height: opts.height ?? 20,
-    };
-    const style = {
-        visibility: opts.visibility || "visible",
-        display: opts.display || "block",
-        opacity: opts.opacity ?? "1",
-        cursor: opts.cursor || "default",
-        overflow: opts.overflow || "visible",
-        paddingTop: opts.paddingTop || "0px",
-    };
-    const children = opts.children || [];
-    return {
-        tagName: tag,
-        href: opts.href || "",
-        type: opts.type || "",
-        hidden: opts.hidden || false,
-        isContentEditable: false,
-        shadowRoot: opts.shadowRoot || null,
-        parentNode: opts.parentNode || null,
-        parentElement: opts.parentElement || null,
-        firstElementChild: children[0] || null,
-        children: children,
-        getBoundingClientRect: () => rect,
-        getClientRects: () => {
-            if (rect.width > 1 && rect.height > 1) return [rect];
-            return [];
-        },
-        _style: style,
-        _children: children,
-        _attrs: opts.attrs || {},
-        getAttribute(name) { return this._attrs[name] ?? null; },
-        contains(other) {
-            let node = other;
-            while (node) {
-                if (node === this) return true;
-                node = node.parentElement;
-            }
-            return false;
-        },
-        closest(sel) {
-            // Minimal closest shim — supports "[inert]" and "label"
-            let node = this;
-            while (node) {
-                if (sel === "[inert]" && node._attrs && node._attrs["inert"] != null) return node;
-                if (sel === "label" && node.tagName === "LABEL") return node;
-                node = node.parentElement;
-            }
-            return null;
-        },
-        focus: mock.fn(),
-        click: mock.fn(),
-        addEventListener(type, fn) {
-            if (type === "animationend" || type === "transitionend") fn();
-        },
-        querySelector(sel) {
-            const matches = this.querySelectorAll(sel);
-            return matches.length > 0 ? matches[0] : null;
-        },
-        querySelectorAll(sel) {
-            // Return children that match (simplified: return all children)
-            if (sel === "*") return this._children;
-            // For CLICKABLE_SELECTOR, return children that are "clickable"
-            return this._children.filter((c) => {
-                const clickableTags = ["A", "BUTTON", "INPUT", "TEXTAREA", "SELECT", "SUMMARY", "DETAILS"];
-                return clickableTags.includes(c.tagName);
-            });
-        },
-    };
-}
-
-function makeKeyEvent(code, opts = {}) {
-    return {
-        code,
-        key: opts.key || "",
-        shiftKey: opts.shift || false,
-        ctrlKey: opts.ctrl || false,
-        altKey: opts.alt || false,
-        metaKey: opts.meta || false,
-        preventDefault: mock.fn(),
-        stopPropagation: mock.fn(),
-    };
-}
-
-function setupDOM(elements = []) {
-    capturedListeners = {};
-    bodyEl = makeElement("BODY");
-    htmlEl = makeElement("HTML");
-
-    const createdEls = [];
-
-    global.document = {
-        addEventListener(type, fn, capture) {
-            if (!capturedListeners[type]) capturedListeners[type] = [];
-            capturedListeners[type].push(fn);
-        },
-        removeEventListener(type, fn, capture) {
-            if (capturedListeners[type]) {
-                capturedListeners[type] = capturedListeners[type].filter((f) => f !== fn);
-            }
-        },
-        activeElement: bodyEl,
-        body: bodyEl,
-        documentElement: htmlEl,
-        head: htmlEl,
-        visibilityState: "visible",
-        querySelectorAll(sel) {
-            if (sel === "*") return elements;
-            return elements.filter((e) => {
-                const clickableTags = ["A", "BUTTON", "INPUT", "TEXTAREA", "SELECT", "SUMMARY", "DETAILS"];
-                if (clickableTags.includes(e.tagName)) return true;
-                // Match label[for]
-                if (e.tagName === "LABEL" && e.htmlFor) return true;
-                // Match ARIA roles from CLICKABLE_SELECTOR
-                const role = e._attrs && e._attrs["role"];
-                const clickableRoles = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch"];
-                if (role && clickableRoles.includes(role)) return true;
-                // Match [onclick] / [onmousedown]
-                if (e._attrs && (e._attrs["onclick"] != null || e._attrs["onmousedown"] != null)) return true;
-                // Match elements with tabindex (mimics [tabindex]:not([tabindex='-1']))
-                if (e._tabindex !== undefined && e._tabindex !== "-1") return true;
-                return false;
-            });
-        },
-        getElementById(id) {
-            return elements.find((e) => e.id === id) || null;
-        },
-        createElement(tag) {
-            const classes = new Set();
-            const el = {
-                tagName: tag.toUpperCase(),
-                className: "",
-                textContent: "",
-                innerHTML: "",
-                style: {},
-                children: [],
-                parentNode: null,
-                classList: {
-                    add(c) { classes.add(c); },
-                    remove(c) { classes.delete(c); },
-                    contains(c) { return classes.has(c); },
-                },
-                offsetHeight: 0,
-                // Fire animation/transition listeners synchronously (no real animations in tests)
-                addEventListener(type, fn) {
-                    if (type === "animationend" || type === "transitionend") fn();
-                },
-                appendChild(child) {
-                    this.children.push(child);
-                    child.parentNode = this;
-                },
-                removeChild(child) {
-                    this.children = this.children.filter((c) => c !== child);
-                    child.parentNode = null;
-                },
-            };
-            createdEls.push(el);
-            return el;
-        },
-        createTextNode(text) {
-            return { nodeType: 3, textContent: text };
-        },
-        elementFromPoint(x, y) {
-            // Return smallest element whose rect contains the point
-            let best = null;
-            let bestArea = Infinity;
-            for (const el of elements) {
-                const rect = el.getBoundingClientRect();
-                if (x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom) {
-                    const area = rect.width * rect.height;
-                    if (area < bestArea) { best = el; bestArea = area; }
-                }
-            }
-            return best;
-        },
-        elementsFromPoint(x, y) {
-            // Return all elements whose rect contains the point, smallest first
-            const hits = [];
-            for (const el of elements) {
-                const rect = el.getBoundingClientRect();
-                if (x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom) {
-                    hits.push(el);
-                }
-            }
-            hits.sort((a, b) => {
-                const ra = a.getBoundingClientRect();
-                const rb = b.getBoundingClientRect();
-                return (ra.width * ra.height) - (rb.width * rb.height);
-            });
-            return hits;
-        },
-    };
-
-    // Make body appendable
-    bodyEl.appendChild = function (child) {
-        child.parentNode = bodyEl;
-    };
-    bodyEl.removeChild = function (child) {
-        child.parentNode = null;
-    };
-    htmlEl.appendChild = function (child) {
-        child.parentNode = htmlEl;
-    };
-    htmlEl.removeChild = function (child) {
-        child.parentNode = null;
-    };
-
-    global.CSS = { escape: (s) => s };
-
-    global.window = {
-        innerWidth: 1024,
-        innerHeight: 768,
-        focus: mock.fn(),
-        addEventListener: mock.fn(),
-        removeEventListener: mock.fn(),
-    };
-    global.getComputedStyle = (el) => el._style || { visibility: "visible", display: "block", opacity: "1", cursor: "default" };
-    global.clearTimeout = clearTimeout;
-    global.browser = {
-        runtime: { sendMessage: mock.fn() },
-    };
-}
-
-function loadModules(elements = []) {
-    setupDOM(elements);
-    const path = require("node:path");
-    const cmdPath = path.resolve(__dirname, "../Vimium/Safari Extension/Resources/commands.js");
-    const khPath = path.resolve(__dirname, "../Vimium/Safari Extension/Resources/modules/KeyHandler.js");
-    const hmPath = path.resolve(__dirname, "../Vimium/Safari Extension/Resources/modules/HintMode.js");
-    delete require.cache[cmdPath];
-    delete require.cache[khPath];
-    delete require.cache[hmPath];
-    require(cmdPath);
-    require(khPath);
-    require(hmPath);
-    keyHandler = new global.KeyHandler();
-    hintMode = new global.HintMode(keyHandler);
-    hintMode.wireCommands();
-    keyHandler.on("exitToNormal", () => {
-        if (hintMode.isActive()) hintMode.deactivate();
-        keyHandler.setMode(global.Mode.NORMAL);
-    });
-}
-
-function fireKeyDown(event) {
-    const listeners = capturedListeners["keydown"] || [];
-    for (const fn of [...listeners]) fn(event);
-}
-
-function fireMouseDown() {
-    const listeners = capturedListeners["mousedown"] || [];
-    for (const fn of [...listeners]) fn({});
-}
+const { makeElement, makeKeyEvent, loadModules, fireKeyDown, fireMouseDown, getState } = require("./hintTestHelpers");
 
 describe("HintMode", () => {
     afterEach(() => {
+        const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
         if (keyHandler) keyHandler.destroy();
     });
@@ -316,6 +53,7 @@ describe("HintMode", () => {
         it("sets HINTS mode on activation", () => {
             const link = makeElement("A", { href: "https://example.com", top: 10, left: 10 });
             loadModules([link]);
+            const { hintMode, keyHandler } = getState();
             hintMode.activate(false);
             assert.equal(keyHandler.getMode(), "HINTS");
             assert.ok(hintMode.isActive());
@@ -325,6 +63,7 @@ describe("HintMode", () => {
         it("returns to NORMAL mode on deactivation", () => {
             const link = makeElement("A", { href: "https://example.com", top: 10, left: 10 });
             loadModules([link]);
+            const { hintMode, keyHandler } = getState();
             hintMode.activate(false);
             hintMode.deactivate();
             assert.equal(keyHandler.getMode(), "NORMAL");
@@ -334,399 +73,10 @@ describe("HintMode", () => {
         // Deactivates immediately when no elements found
         it("deactivates if no visible elements found", () => {
             loadModules([]);
+            const { hintMode, keyHandler } = getState();
             hintMode.activate(false);
             assert.equal(keyHandler.getMode(), "NORMAL");
             assert.ok(!hintMode.isActive());
-        });
-    });
-
-    describe("Element discovery", () => {
-        // Skips elements outside the viewport
-        it("filters out elements below viewport", () => {
-            const visible = makeElement("A", { href: "#", top: 10, left: 0 });
-            const below = makeElement("A", { href: "#", top: 1000, bottom: 1020 });
-            loadModules([visible, below]);
-            hintMode.activate(false);
-            // Only one hint should be created (the visible one)
-            // The below-viewport element has top > innerHeight (768)
-            assert.ok(hintMode.isActive());
-        });
-
-        // Skips hidden elements (display:none)
-        it("filters out display:none elements", () => {
-            const hidden = makeElement("A", { href: "#", display: "none", top: 10, left: 0 });
-            loadModules([hidden]);
-            hintMode.activate(false);
-            // No visible elements → deactivates
-            assert.ok(!hintMode.isActive());
-        });
-
-        // Skips zero-size elements
-        it("filters out zero-size elements", () => {
-            const zeroSize = makeElement("A", { href: "#", width: 0, height: 0, top: 10, left: 0 });
-            loadModules([zeroSize]);
-            hintMode.activate(false);
-            assert.ok(!hintMode.isActive());
-        });
-
-        // ISSUE: zero-size anchor wrapping a visible child gets no hint
-        // FIX: fall back to firstElementChild rect for zero-size anchors
-        it("falls back to firstElementChild for zero-size anchors", () => {
-            const dom = '<a href="#" style="width:0;height:0"><h3>Title</h3></a>';
-            const child = makeElement("H3", { top: 10, left: 20, width: 200, height: 24 });
-            const anchor = makeElement("A", { href: "#", width: 0, height: 0, top: 0, left: 0, children: [child] });
-            loadModules([anchor]);
-            hintMode.activate(false);
-            assert.ok(hintMode.isActive());
-        });
-
-        // ISSUE: label[for] not discovered as clickable — CSS checkbox hack menus use label as the visible "button"
-        // FIX: add label[for] to clickable selector
-        it("discovers label[for] as a clickable element", () => {
-            const dom = '<label for="menu-toggle">Menu</label>';
-            const label = makeElement("LABEL", { top: 10, left: 10, width: 80, height: 20 });
-            label.htmlFor = "menu-toggle";
-            loadModules([label]);
-            hintMode.activate(false);
-            assert.ok(hintMode.isActive(), "label[for] should be discovered as clickable");
-            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
-            assert.ok(!hintMode.isActive());
-            assert.equal(label.click.mock.callCount(), 1);
-        });
-
-        // ISSUE: hints appear on buttons inside collapsed menus
-        // SITE: apple.com nav
-        // FIX: filter elements inside inert subtrees
-        it("filters out elements inside an inert subtree", () => {
-            const dom = '<div inert><button>Shop</button></div>';
-            const inertContainer = makeElement("DIV", {
-                top: 0, left: 0,
-                attrs: { "inert": "" },
-            });
-            const btn = makeElement("BUTTON", { top: 10, left: 10 });
-            btn.parentElement = inertContainer;
-            btn.parentNode = inertContainer;
-
-            loadModules([btn]);
-            hintMode.activate(false);
-            assert.ok(!hintMode.isActive(), "Button inside inert subtree should be filtered");
-        });
-
-        // ISSUE: hints appear on elements with aria-hidden="true" (but NOT inherited from ancestors)
-        // FIX: filter elements with aria-hidden="true" directly, keep descendants of aria-hidden ancestors
-        it("filters element with aria-hidden=true", () => {
-            const dom = '<button aria-hidden="true">Hidden</button>';
-            const btn = makeElement("BUTTON", {
-                top: 10, left: 10,
-                attrs: { "aria-hidden": "true" },
-            });
-            loadModules([btn]);
-            hintMode.activate(false);
-            assert.ok(!hintMode.isActive(), "Element with aria-hidden=true should be filtered");
-        });
-
-        it("keeps element inside aria-hidden ancestor", () => {
-            const wrapper = makeElement("DIV", {
-                top: 0, left: 0,
-                attrs: { "aria-hidden": "true" },
-            });
-            const btn = makeElement("BUTTON", { top: 10, left: 10 });
-            btn.parentElement = wrapper;
-            btn.parentNode = wrapper;
-
-            loadModules([btn]);
-            hintMode.activate(false);
-            assert.ok(hintMode.isActive(), "Element inside aria-hidden ancestor should still get a hint");
-        });
-
-        // el.hidden (HTML hidden attribute) should prevent hint generation.
-        it("filters out elements with hidden attribute", () => {
-            const btn = makeElement("BUTTON", { top: 10, left: 10, hidden: true });
-            loadModules([btn]);
-            hintMode.activate(false);
-            assert.ok(!hintMode.isActive(), "Hidden element should be filtered");
-        });
-
-        // Wrapper div with tabindex containing a textarea — only textarea gets a hint
-        it("filters out ancestor wrapper when descendant is also a candidate", () => {
-            const textarea = makeElement("TEXTAREA", { top: 10, left: 10 });
-            const wrapper = makeElement("DIV", { top: 10, left: 10 });
-            wrapper._tabindex = "0";
-            textarea.parentElement = wrapper;
-            textarea.parentNode = wrapper;
-            wrapper._children = [textarea];
-            wrapper.children = [textarea];
-
-            loadModules([wrapper, textarea]);
-
-            // Need elementFromPoint/elementsFromPoint to return the element itself for visibility
-            global.document.elementFromPoint = (x, y) => {
-                // Return the textarea for any point check (both are at same position)
-                return textarea;
-            };
-            global.document.elementsFromPoint = (x, y) => {
-                return [textarea, wrapper];
-            };
-
-            hintMode.activate(false);
-            assert.ok(hintMode.isActive());
-            // Access internal hints via the overlay children count
-            // Only 1 hint (textarea), not 2 (wrapper filtered out)
-            const overlay = global.document.body.children
-                ? global.document.body.children[0]
-                : null;
-            // hintMode._hints is private, so check via label: with 1 element, label is "s"
-            // Type "s" to activate — if there were 2 hints, labels would be "ss","sa" (2-char)
-            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
-            // If only 1 hint, typing "s" activates it and deactivates hint mode
-            assert.ok(!hintMode.isActive(), "Expected 1 hint (textarea only), but got more — wrapper was not filtered");
-        });
-    });
-
-    describe("Visibility edge cases", () => {
-        // ISSUE: element behind a transparent overlay gets no hint — elementFromPoint misses it
-        // FIX: use elementsFromPoint to detect elements in the full stacking context
-        it("detects element behind transparent overlay via elementsFromPoint", () => {
-            const overlay = makeElement("A", { href: "#", top: 10, left: 10, width: 200, height: 40 });
-            const btn = makeElement("BUTTON", { top: 10, left: 10, width: 200, height: 40 });
-
-            loadModules([overlay, btn]);
-
-            // overlay is topmost; btn is underneath
-            global.document.elementsFromPoint = (x, y) => {
-                return [overlay, btn];
-            };
-
-            hintMode.activate(false);
-            assert.ok(hintMode.isActive());
-            // Both should be visible — 2 hints → single-char labels s, a
-            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
-            assert.equal(overlay.click.mock.callCount(), 1, "Overlay element should be hintable");
-            hintMode.activate(false);
-            fireKeyDown(makeKeyEvent("KeyA", { key: "a" }));
-            assert.equal(btn.click.mock.callCount(), 1, "Element behind overlay should be hintable via elementsFromPoint");
-        });
-
-        // ISSUE: hints appear on elements visually clipped by overflow:hidden ancestor
-        // FIX: check if element rect intersects ancestor's clip rect
-        it("filters element clipped by overflow:hidden ancestor", () => {
-            const container = makeElement("DIV", {
-                top: 0, left: 0, width: 200, height: 50,
-                overflow: "hidden",
-            });
-            // Button is positioned below the container's bottom edge
-            const btn = makeElement("BUTTON", { top: 60, bottom: 80, left: 10, width: 80, height: 20 });
-            btn.parentElement = container;
-            btn.parentNode = container;
-
-            loadModules([btn]);
-            hintMode.activate(false);
-            assert.ok(!hintMode.isActive(), "Element clipped by overflow:hidden ancestor should be filtered");
-        });
-
-        // ISSUE: custom-styled radio with opacity:0 gets no hint because it fails visibility check
-        // FIX: redirect visibility check to associated label when radio is invisible
-        it("redirects visibility of opacity:0 radio to associated label", () => {
-            const dom = '<input type="radio" id="r" style="opacity:0"><label for="r">Option</label>';
-            const label = makeElement("LABEL", { top: 10, left: 30, width: 100, height: 20 });
-            label.htmlFor = "custom-radio";
-            const radio = makeElement("INPUT", {
-                type: "radio", top: 10, left: 10,
-                width: 16, height: 16, opacity: "0",
-            });
-            radio.id = "custom-radio";
-            radio.type = "radio";
-
-            loadModules([radio, label]);
-
-            global.document.querySelector = (sel) => {
-                if (sel.includes("custom-radio")) return label;
-                return null;
-            };
-            global.document.elementsFromPoint = (x, y) => {
-                // Label is visible at its position
-                if (x >= 30 && x < 130) return [label];
-                return [radio];
-            };
-
-            hintMode.activate(false);
-            assert.ok(hintMode.isActive(), "Opacity:0 radio with visible label should get a hint");
-        });
-
-        // Zero-size radio input redirects visibility to associated label.
-        it("redirects visibility of zero-size radio to associated label", () => {
-            const label = makeElement("LABEL", { top: 10, left: 30, width: 100, height: 20 });
-            label.htmlFor = "hidden-radio";
-            const radio = makeElement("INPUT", {
-                type: "radio", top: 10, left: 10,
-                width: 0, height: 0,
-            });
-            radio.id = "hidden-radio";
-            radio.type = "radio";
-
-            loadModules([radio, label]);
-
-            global.document.querySelector = (sel) => {
-                if (sel.includes("hidden-radio")) return label;
-                return null;
-            };
-            global.document.elementsFromPoint = (x, y) => {
-                if (x >= 30 && x < 130) return [label];
-                return [];
-            };
-
-            hintMode.activate(false);
-            assert.ok(hintMode.isActive(), "Zero-size radio with visible label should get a hint");
-        });
-    });
-
-    describe("Label-for dedup", () => {
-        // ISSUE: each radio gets two hints (input + label) — duplicate hints on theme picker
-        // SITE: wikipedia.org theme picker
-        // FIX: filter label[for] when the associated radio input is already a candidate
-        it("filters label[for] when associated radio input is a candidate", () => {
-            const dom = '<div><input type="radio" id="X"><label for="X">Text</label></div> × 3';
-            const wrapper = makeElement("DIV", { top: 0, left: 0, width: 300, height: 120 });
-
-            const radio1 = makeElement("INPUT", { type: "radio", top: 10, left: 10, width: 16, height: 16 });
-            radio1.id = "theme-os";
-            radio1.type = "radio";
-            const label1 = makeElement("LABEL", { top: 10, left: 30, width: 100, height: 20 });
-            label1.htmlFor = "theme-os";
-            radio1.parentElement = wrapper;
-            label1.parentElement = wrapper;
-
-            const radio2 = makeElement("INPUT", { type: "radio", top: 40, left: 10, width: 16, height: 16 });
-            radio2.id = "theme-day";
-            radio2.type = "radio";
-            const label2 = makeElement("LABEL", { top: 40, left: 30, width: 100, height: 20 });
-            label2.htmlFor = "theme-day";
-            radio2.parentElement = wrapper;
-            label2.parentElement = wrapper;
-
-            const radio3 = makeElement("INPUT", { type: "radio", top: 70, left: 10, width: 16, height: 16 });
-            radio3.id = "theme-night";
-            radio3.type = "radio";
-            const label3 = makeElement("LABEL", { top: 70, left: 30, width: 100, height: 20 });
-            label3.htmlFor = "theme-night";
-            radio3.parentElement = wrapper;
-            label3.parentElement = wrapper;
-
-            loadModules([radio1, label1, radio2, label2, radio3, label3]);
-
-            global.document.elementsFromPoint = (x, y) => {
-                const all = [radio1, label1, radio2, label2, radio3, label3];
-                return all.filter((el) => {
-                    const r = el.getBoundingClientRect();
-                    return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
-                });
-            };
-
-            hintMode.activate(false);
-            assert.ok(hintMode.isActive());
-            // 3 hints (radios only) → single-char labels s, a, d
-            // If labels weren't deduped we'd have 6 → two-char labels
-            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
-            assert.ok(!hintMode.isActive(), "Expected 3 hints (radios only), got more — label[for] was not filtered");
-        });
-    });
-
-    describe("Hash-link/label dedup", () => {
-        // ISSUE: duplicate hints — hash-link anchor and label[for] both target the same toggle
-        // FIX: remove hash-link anchor when a label[for] with the same ID is a candidate
-        it("removes hash-link anchor when label[for] with same ID exists", () => {
-            const dom = '<a href="#toggle-1">Toggle</a><label for="toggle-1">Toggle</label>';
-            const label = makeElement("LABEL", { top: 10, left: 10, width: 80, height: 20 });
-            label.htmlFor = "toggle-1";
-            const anchor = makeElement("A", {
-                href: "#toggle-1", top: 10, left: 0, width: 200, height: 20,
-                attrs: { href: "#toggle-1" },
-            });
-
-            loadModules([label, anchor]);
-
-            global.document.elementsFromPoint = (x, y) => {
-                return [anchor, label];
-            };
-
-            hintMode.activate(false);
-            assert.ok(hintMode.isActive());
-            // 1 hint (label only) → single-char label "s"
-            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
-            assert.ok(!hintMode.isActive(), "Expected 1 hint (label only) — hash-link anchor should be removed");
-        });
-
-        // Hash-link anchor kept when there's no corresponding label[for]
-        it("keeps hash-link anchor when no matching label exists", () => {
-            const anchor = makeElement("A", {
-                href: "#section-2", top: 10, left: 0, width: 200, height: 20,
-                attrs: { href: "#section-2" },
-            });
-
-            loadModules([anchor]);
-            hintMode.activate(false);
-            assert.ok(hintMode.isActive());
-            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
-            assert.ok(!hintMode.isActive(), "Hash-link without matching label should be kept");
-            assert.equal(anchor.click.mock.callCount(), 1);
-        });
-    });
-
-    describe("Disclosure trigger dedup", () => {
-        // Disclosure button filtered when sibling link exists
-        it("filters disclosure button when sibling link exists", () => {
-            const parent = makeElement("LI", { top: 0, left: 0 });
-            const link = makeElement("A", { href: "#", top: 10, left: 0 });
-            const btn = makeElement("BUTTON", {
-                top: 10, left: 0,
-                attrs: { "aria-expanded": "false", "aria-controls": "submenu-1" },
-            });
-            link.parentElement = parent;
-            btn.parentElement = parent;
-
-            loadModules([link, btn]);
-            hintMode.activate(false);
-            assert.ok(hintMode.isActive());
-            // 1 hint → single-char label "s"; typing "s" activates it
-            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
-            assert.ok(!hintMode.isActive(), "Expected 1 hint (link only), disclosure button should be filtered");
-        });
-
-        // Disclosure button kept when alone in parent (accordion pattern)
-        it("keeps disclosure button when alone in parent", () => {
-            const parent = makeElement("DIV", { top: 0, left: 0 });
-            const btn = makeElement("BUTTON", {
-                top: 10, left: 0,
-                attrs: { "aria-expanded": "false", "aria-controls": "panel-1" },
-            });
-            btn.parentElement = parent;
-
-            loadModules([btn]);
-            hintMode.activate(false);
-            assert.ok(hintMode.isActive());
-            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
-            assert.ok(!hintMode.isActive(), "Expected 1 hint (lone disclosure button should be kept)");
-        });
-
-        // Regular button without aria-expanded is not affected
-        it("does not filter regular button without aria-expanded", () => {
-            const parent = makeElement("LI", { top: 0, left: 0 });
-            const link = makeElement("A", { href: "#", top: 10, left: 0 });
-            const btn = makeElement("BUTTON", { top: 10, left: 50 });
-            link.parentElement = parent;
-            btn.parentElement = parent;
-
-            loadModules([link, btn]);
-            hintMode.activate(false);
-            assert.ok(hintMode.isActive());
-            // 2 hints → single-char labels "s" and "a"
-            // Type "s" to activate link, then reactivate and type "a" to activate button
-            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
-            assert.equal(link.click.mock.callCount(), 1, "Link hint should work");
-            hintMode.activate(false);
-            assert.ok(hintMode.isActive(), "Should reactivate with 2 hints (button not filtered)");
-            fireKeyDown(makeKeyEvent("KeyA", { key: "a" }));
-            assert.equal(btn.click.mock.callCount(), 1, "Button hint should work (not filtered)");
         });
     });
 
@@ -739,6 +89,7 @@ describe("HintMode", () => {
                 links.push(makeElement("A", { href: "#" + i, top: i * 20, left: 0 }));
             }
             loadModules(links);
+            const { hintMode } = getState();
             hintMode.activate(false);
             assert.ok(hintMode.isActive());
 
@@ -752,6 +103,7 @@ describe("HintMode", () => {
         it("deactivates on Escape", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode, keyHandler } = getState();
             hintMode.activate(false);
             fireKeyDown(makeKeyEvent("Escape"));
             assert.ok(!hintMode.isActive());
@@ -765,6 +117,7 @@ describe("HintMode", () => {
                 links.push(makeElement("A", { href: "#" + i, top: i * 20, left: 0 }));
             }
             loadModules(links);
+            const { hintMode } = getState();
             hintMode.activate(false);
 
             fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
@@ -777,6 +130,7 @@ describe("HintMode", () => {
         it("deactivates on non-hint key", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode, keyHandler } = getState();
             hintMode.activate(false);
 
             fireKeyDown(makeKeyEvent("KeyZ", { key: "z" }));
@@ -788,6 +142,7 @@ describe("HintMode", () => {
         it("deactivates when typed hint char matches no prefix", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode, keyHandler } = getState();
             hintMode.activate(false);
             assert.ok(hintMode.isActive());
 
@@ -802,6 +157,7 @@ describe("HintMode", () => {
         it("deactivates on mousedown", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode, keyHandler } = getState();
             hintMode.activate(false);
 
             fireMouseDown();
@@ -815,6 +171,7 @@ describe("HintMode", () => {
         it("normal commands work after hint cancellation", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode, keyHandler } = getState();
 
             let scrollDownCalled = false;
             keyHandler.on("scrollDown", () => { scrollDownCalled = true; });
@@ -835,6 +192,7 @@ describe("HintMode", () => {
         it("normal commands work after no-match prefix cancellation", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode, keyHandler } = getState();
 
             let scrollDownCalled = false;
             keyHandler.on("scrollDown", () => { scrollDownCalled = true; });
@@ -852,6 +210,7 @@ describe("HintMode", () => {
         it("normal commands work after Escape cancellation", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode, keyHandler } = getState();
 
             let scrollDownCalled = false;
             keyHandler.on("scrollDown", () => { scrollDownCalled = true; });
@@ -868,6 +227,7 @@ describe("HintMode", () => {
         it("normal commands work after hint activation", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode, keyHandler } = getState();
 
             let scrollDownCalled = false;
             keyHandler.on("scrollDown", () => { scrollDownCalled = true; });
@@ -890,6 +250,7 @@ describe("HintMode", () => {
                 links.push(makeElement("A", { href: "#" + i, top: i * 20, left: 0 }));
             }
             loadModules(links);
+            const { hintMode } = getState();
             hintMode.activate(false);
 
             // Simulate a non-QWERTY layout: physical KeyD produces "h" on this layout.
@@ -906,6 +267,7 @@ describe("HintMode", () => {
         it("ignores event.code for hint matching", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode } = getState();
             hintMode.activate(false);
 
             // Label is "s". Send event with code=KeyO but key="s" (remapped layout).
@@ -919,6 +281,7 @@ describe("HintMode", () => {
         it("positional/character key binding mode does not affect hint typing", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode, keyHandler } = getState();
             keyHandler.setKeyBindingMode("character");
 
             hintMode.activate(false);
@@ -935,6 +298,7 @@ describe("HintMode", () => {
         it("location key binding mode does not affect hint typing", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode, keyHandler } = getState();
             keyHandler.setKeyBindingMode("location");
 
             hintMode.activate(false);
@@ -951,6 +315,7 @@ describe("HintMode", () => {
         it("clicks element for f-mode (current tab)", () => {
             const link = makeElement("A", { href: "https://example.com", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode } = getState();
             hintMode.activate(false);
 
             // With 1 element, label is single char "s"
@@ -963,6 +328,7 @@ describe("HintMode", () => {
         it("sends createTab message for F-mode on links", () => {
             const link = makeElement("A", { href: "https://example.com", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode } = getState();
             hintMode.activate(true);
 
             fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
@@ -977,6 +343,7 @@ describe("HintMode", () => {
         it("falls back to click for non-link elements in F-mode", () => {
             const btn = makeElement("BUTTON", { top: 10, left: 0 });
             loadModules([btn]);
+            const { hintMode } = getState();
             hintMode.activate(true);
 
             fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
@@ -989,6 +356,7 @@ describe("HintMode", () => {
         it("f triggers hint activation via command", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode, keyHandler } = getState();
 
             // Simulate pressing f in NORMAL mode
             fireKeyDown(makeKeyEvent("KeyF"));
@@ -1000,6 +368,7 @@ describe("HintMode", () => {
         it("Shift+F triggers new-tab hint activation", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode } = getState();
 
             fireKeyDown(makeKeyEvent("KeyF", { shift: true }));
             assert.ok(hintMode.isActive());
@@ -1009,6 +378,7 @@ describe("HintMode", () => {
         it("unwireCommands disables hint activation", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode } = getState();
             hintMode.unwireCommands();
 
             fireKeyDown(makeKeyEvent("KeyF"));
@@ -1019,6 +389,7 @@ describe("HintMode", () => {
         it("wireCommands re-enables hint activation", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode } = getState();
             hintMode.unwireCommands();
             hintMode.wireCommands();
 
@@ -1032,6 +403,7 @@ describe("HintMode", () => {
         it("unregisters hint commands from KeyHandler", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
+            const { hintMode } = getState();
             hintMode.destroy();
 
             // f should no longer activate hints
