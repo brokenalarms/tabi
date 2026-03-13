@@ -15,8 +15,10 @@ export const CLICKABLE_SELECTOR = [
 
 // --- Walker filter (3-step pipeline) ---
 // Used with document.createTreeWalker to discover clickable, visible elements.
-// FILTER_REJECT prunes entire subtrees (step 1), FILTER_SKIP skips the node
-// but continues into children (steps 2–3), FILTER_ACCEPT yields the element.
+// FILTER_REJECT prunes entire subtrees (step 1, and step 3 for cascading
+// invisibility like opacity:0 and overflow clipping), FILTER_SKIP skips the
+// node but continues into children (step 2, and elementsFromPoint coverage
+// in step 3), FILTER_ACCEPT yields the element.
 
 export function walkerFilter(node: Node): number {
   const el = node as HTMLElement;
@@ -72,7 +74,7 @@ export function walkerFilter(node: Node): number {
         if (label && isVisible(label)) return NodeFilter.FILTER_ACCEPT;
       }
     }
-    return NodeFilter.FILTER_SKIP;
+    return NodeFilter.FILTER_REJECT;
   }
 
   // Clipped by overflow:hidden ancestor
@@ -83,7 +85,7 @@ export function walkerFilter(node: Node): number {
       const ar = ancestor.getBoundingClientRect();
       if (rect.bottom <= ar.top || rect.top >= ar.bottom ||
           rect.right <= ar.left || rect.left >= ar.right) {
-        return NodeFilter.FILTER_SKIP;
+        return NodeFilter.FILTER_REJECT;
       }
     }
     ancestor = ancestor.parentElement;
