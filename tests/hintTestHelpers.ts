@@ -146,11 +146,7 @@ export function setupDOM(elements: any[] = []) {
     (globalThis as any).CSS = (w as any).CSS ?? { escape: (s: string) => s };
     (globalThis as any).DOMRect = (w as any).DOMRect;
     (globalThis as any).HTMLElement = (w as any).HTMLElement;
-    (globalThis as any).MouseEvent = (w as any).MouseEvent;
-    (globalThis as any).PointerEvent = (w as any).PointerEvent ?? (w as any).MouseEvent;
     (globalThis as any).clearTimeout = globalThis.clearTimeout;
-    // Run setTimeout callbacks synchronously so hint click dispatch completes in tests
-    (globalThis as any).setTimeout = (fn: Function) => { fn(); return 0; };
 
     // Mock elementsFromPoint/elementFromPoint (happy-dom has no layout)
     const testElements = elements;

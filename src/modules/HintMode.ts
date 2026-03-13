@@ -398,26 +398,10 @@ export class HintMode {
         });
       } else {
         element.focus();
-        this.simulateClick(element);
+        element.click();
       }
     };
 
     hint.div.addEventListener("animationend", afterCollapse, { once: true });
-  }
-
-  private simulateClick(element: HTMLElement): void {
-    const rect = element.getBoundingClientRect();
-    const x = rect.left + rect.width / 2;
-    const y = rect.top + rect.height / 2;
-    const shared = { bubbles: true, cancelable: true, view: window, clientX: x, clientY: y };
-
-    element.dispatchEvent(new PointerEvent("pointerdown", { ...shared, pointerId: 1 }));
-    element.dispatchEvent(new MouseEvent("mousedown", shared));
-
-    setTimeout(() => {
-      element.dispatchEvent(new PointerEvent("pointerup", { ...shared, pointerId: 1 }));
-      element.dispatchEvent(new MouseEvent("mouseup", shared));
-      element.click();
-    }, 30 + Math.random() * 50);
   }
 }
