@@ -437,3 +437,35 @@ describe("DOM problems — flex container with zero-size parents", () => {
     });
 });
 
+// Facebook "Create story" card: cursor:pointer wrapper div around an <a> produces
+// duplicate hints because dedup didn't remove generic roots with specific descendants.
+describe("DOM problems — generic cursor:pointer wrapper dedup", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("removes generic cursor:pointer wrapper when it contains a link", () => {
+        const link = makeElement("A", { href: "/stories/create/", top: 60, left: 60, width: 200, height: 300 });
+        link.setAttribute("role", "link");
+        link.setAttribute("tabindex", "0");
+
+        const wrapper = makeElement("DIV", { top: 60, left: 60, width: 200, height: 300, cursor: "pointer" });
+        wrapper.appendChild(link);
+
+        loadModules([wrapper, link]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [link, wrapper];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        // 1 hint (link only) → single-char label "s"
+        fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
+        assert.ok(!hintMode.isActive(), "Expected 1 hint (link only) — generic wrapper should be removed");
+    });
+});
+

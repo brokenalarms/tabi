@@ -288,27 +288,9 @@ export class HintMode {
   }
 
   private markRowHints(): void {
-    // Group hints by approximate vertical position (within 6px = same row)
-    const buckets = new Map<number, Hint[]>();
+    if (this.hints.length < 2) return;
     for (const hint of this.hints) {
-      const rect = this.getHintRect(hint.element);
-      let placed = false;
-      for (const [key, group] of buckets) {
-        if (Math.abs(rect.top - key) < 6) {
-          group.push(hint);
-          placed = true;
-          break;
-        }
-      }
-      if (!placed) buckets.set(rect.top, [hint]);
-    }
-    // Mark hints in groups of 2+ as row hints
-    for (const group of buckets.values()) {
-      if (group.length >= 2) {
-        for (const hint of group) {
-          hint.div.classList.add("vimium-hint-row");
-        }
-      }
+      hint.div.classList.add("vimium-hint-row");
     }
   }
 
@@ -432,11 +414,10 @@ export class HintMode {
     element.dispatchEvent(new PointerEvent("pointerdown", { ...shared, pointerId: 1 }));
     element.dispatchEvent(new MouseEvent("mousedown", shared));
 
-    const delay = 30 + Math.random() * 50;
     setTimeout(() => {
       element.dispatchEvent(new PointerEvent("pointerup", { ...shared, pointerId: 1 }));
       element.dispatchEvent(new MouseEvent("mouseup", shared));
-      element.dispatchEvent(new MouseEvent("click", shared));
-    }, delay);
+      element.click();
+    }, 30 + Math.random() * 50);
   }
 }

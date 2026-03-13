@@ -306,6 +306,8 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
 
     if (allGeneric) {
       for (const d of descendants) toRemove.add(d);
+    } else if (rootType === "generic") {
+      toRemove.add(root);
     } else if (allSameType) {
       toRemove.add(root);
     }
