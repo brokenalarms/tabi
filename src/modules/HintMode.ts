@@ -326,7 +326,7 @@ class HintMode {
   private static interactiveType(el: HTMLElement): string {
     const tag = el.tagName.toLowerCase();
     const role = el.getAttribute("role")?.toLowerCase();
-    if (tag === "A" || role === "link") return "link";
+    if (tag === "a" || role === "link") return "link";
     if (tag === "button" || role === "button" || role === "menuitem") return "action";
     if (tag === "input" || tag === "textarea" || tag === "select" ||
         role === "checkbox" || role === "radio" || role === "switch" || role === "option") return "form";
@@ -342,13 +342,13 @@ class HintMode {
   private isInteractive(el: HTMLElement): boolean {
     if (this.isExcluded(el)) return false;
 
-    const tag = el.tagName;
-    if (tag === "A" || tag === "BUTTON" || tag === "INPUT" ||
-        tag === "TEXTAREA" || tag === "SELECT" ||
-        tag === "SUMMARY" || tag === "DETAILS" || tag === "LABEL") {
+    const tag = el.tagName.toLowerCase();
+    if (tag === "a" || tag === "button" || tag === "input" ||
+        tag === "textarea" || tag === "select" ||
+        tag === "summary" || tag === "details" || tag === "label") {
       return true;
     }
-    const role = el.getAttribute("role");
+    const role = el.getAttribute("role")?.toLowerCase();
     if (role === "button" || role === "link" || role === "tab" ||
         role === "menuitem" || role === "option" ||
         role === "checkbox" || role === "radio" || role === "switch") {
