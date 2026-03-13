@@ -31,7 +31,7 @@ const HINT_CHARS = "sadgjklewcmpoh";
 export class HintMode {
   private keyHandler: KeyHandlerLike;
   private active: boolean;
-  private newTab: boolean;
+  private shiftHeld: boolean;
   private hints: Hint[];
   private typed: string;
   private overlay: HTMLDivElement | null;
@@ -39,11 +39,13 @@ export class HintMode {
   private activating: boolean;
   private readonly onMouseDown: () => void;
   private readonly onScroll: () => void;
+  private readonly onShiftDown: (e: KeyboardEvent) => void;
+  private readonly onShiftUp: (e: KeyboardEvent) => void;
 
   constructor(keyHandler: KeyHandlerLike) {
     this.keyHandler = keyHandler;
     this.active = false;
-    this.newTab = false;
+    this.shiftHeld = false;
     this.hints = [];
     this.typed = "";
     this.overlay = null;
@@ -51,16 +53,22 @@ export class HintMode {
     this.activating = false;
     this.onMouseDown = this.deactivate.bind(this);
     this.onScroll = this.deactivate.bind(this);
+    this.onShiftDown = (e: KeyboardEvent) => {
+      if (e.key === "Shift") this.setShiftHeld(true);
+    };
+    this.onShiftUp = (e: KeyboardEvent) => {
+      if (e.key === "Shift") this.setShiftHeld(false);
+    };
   }
 
   // --- Public API ---
 
-  activate(newTab: boolean): void {
+  activate(shiftHeld: boolean): void {
     if (this.active) {
       this.deactivate();
       return;
     }
-    this.newTab = newTab;
+    this.shiftHeld = shiftHeld;
     this.active = true;
     this.typed = "";
     this.keyHandler.setMode(Mode.HINTS);
@@ -73,6 +81,9 @@ export class HintMode {
 
     const labels = HintMode.generateLabels(elements.length);
     this.createOverlay();
+    if (this.shiftHeld && this.overlay) {
+      this.overlay.classList.add("vimium-newtab");
+    }
     this.hints = elements.map((el, i) => {
       const label = labels[i];
       const div = this.createHintDiv(el, label);
@@ -81,6 +92,8 @@ export class HintMode {
 
     this.keyHandler.setModeKeyDelegate(this.handleKey.bind(this));
     document.addEventListener("mousedown", this.onMouseDown, true);
+    document.addEventListener("keydown", this.onShiftDown, true);
+    document.addEventListener("keyup", this.onShiftUp, true);
     window.addEventListener("scroll", this.onScroll, true);
   }
 
@@ -88,9 +101,12 @@ export class HintMode {
     if (!this.active) return;
     this.active = false;
     this.typed = "";
+    this.shiftHeld = false;
     this.activating = false;
     this.keyHandler.clearModeKeyDelegate();
     document.removeEventListener("mousedown", this.onMouseDown, true);
+    document.removeEventListener("keydown", this.onShiftDown, true);
+    document.removeEventListener("keyup", this.onShiftUp, true);
     window.removeEventListener("scroll", this.onScroll, true);
 
     if (this.overlay) {
@@ -112,6 +128,14 @@ export class HintMode {
 
   setPointerTails(enabled: boolean): void {
     this.pointerTails = enabled;
+  }
+
+  private setShiftHeld(held: boolean): void {
+    if (held === this.shiftHeld || !this.active) return;
+    this.shiftHeld = held;
+    if (this.overlay) {
+      this.overlay.classList.toggle("vimium-newtab", held);
+    }
   }
 
   wireCommands(): void {
@@ -356,6 +380,7 @@ export class HintMode {
 
   private activateHint(hint: Hint): void {
     const element = hint.element;
+    const newTab = this.shiftHeld;
     this.activating = true;
 
     for (const h of this.hints) {
@@ -376,7 +401,7 @@ export class HintMode {
     const afterCollapse = (): void => {
       this.deactivate();
 
-      if (this.newTab && element.tagName.toLowerCase() === "a" && (element as HTMLAnchorElement).href) {
+      if (newTab && element.tagName.toLowerCase() === "a" && (element as HTMLAnchorElement).href) {
         browser.runtime.sendMessage({
           command: "createTab",
           url: (element as HTMLAnchorElement).href,
