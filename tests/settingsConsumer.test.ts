@@ -1,43 +1,47 @@
 // Settings consumer tests — verifies that content.ts applies theme and
 // keyBindingMode settings, and that live updates via storage.onChanged work.
 
-import { describe, it } from "node:test";
+import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
+import { createDOM, type DOMEnvironment } from "./helpers/dom.js";
 
 // Inline applyTheme logic matching content.ts for unit testing
-function applyTheme(theme: string, element: any) {
+function applyTheme(theme: string, element: Element) {
     element.setAttribute("data-vimium-theme", theme);
 }
 
-describe("applyTheme", () => {
-    function makeElement() {
-        // Minimal stub that tracks attributes
-        const attrs: Record<string, string> = {};
-        return {
-            setAttribute(name: string, value: string) { attrs[name] = value; },
-            removeAttribute(name: string) { delete attrs[name]; },
-            getAttribute(name: string) { return attrs[name] ?? null; },
-        };
-    }
+let env: DOMEnvironment;
 
+afterEach(() => {
+    env?.cleanup();
+});
+
+describe("applyTheme", () => {
+    // Verifies that applying a named theme sets the correct data attribute
+    // on a real DOM element, so CSS theme selectors can match.
     it("sets data-vimium-theme attribute for named themes", () => {
+        env = createDOM();
         for (const theme of ["classic", "dark", "light"]) {
-            const el = makeElement();
+            const el = env.document.createElement("div");
             applyTheme(theme, el);
             assert.equal(el.getAttribute("data-vimium-theme"), theme);
         }
     });
 
+    // Verifies that switching to "auto" replaces any previously set theme.
     it("sets data-vimium-theme to auto for auto theme", () => {
-        const el = makeElement();
+        env = createDOM();
+        const el = env.document.createElement("div");
         applyTheme("dark", el);
         assert.equal(el.getAttribute("data-vimium-theme"), "dark");
         applyTheme("auto", el);
         assert.equal(el.getAttribute("data-vimium-theme"), "auto");
     });
 
+    // Verifies that setAttribute overwrites the previous value (no stale themes).
     it("overwrites previous theme when switching", () => {
-        const el = makeElement();
+        env = createDOM();
+        const el = env.document.createElement("div");
         applyTheme("dark", el);
         applyTheme("light", el);
         assert.equal(el.getAttribute("data-vimium-theme"), "light");
@@ -45,8 +49,8 @@ describe("applyTheme", () => {
 });
 
 describe("storage.onChanged listener", () => {
+    // Verifies that the onChanged handler updates keyBindingMode for local storage events.
     it("applies keyBindingMode changes from storage events", () => {
-        // Simulate the logic in content.ts onChanged handler
         let currentMode = "location";
         function handleChange(changes: any, areaName: string) {
             if (areaName !== "local") return;
@@ -62,6 +66,7 @@ describe("storage.onChanged listener", () => {
         assert.equal(currentMode, "location");
     });
 
+    // Verifies that storage events from "sync" area are ignored — only "local" matters.
     it("ignores changes from non-local storage areas", () => {
         let currentMode = "location";
         function handleChange(changes: any, areaName: string) {
@@ -75,8 +80,10 @@ describe("storage.onChanged listener", () => {
         assert.equal(currentMode, "location");
     });
 
+    // Verifies that theme changes via storage events apply to a real DOM element.
     it("applies theme changes from storage events", () => {
-        const el = makeElement();
+        env = createDOM();
+        const el = env.document.createElement("div");
         function handleChange(changes: any, areaName: string) {
             if (areaName !== "local") return;
             if (changes.theme?.newValue) {
@@ -90,13 +97,4 @@ describe("storage.onChanged listener", () => {
         handleChange({ theme: { newValue: "auto" } }, "local");
         assert.equal(el.getAttribute("data-vimium-theme"), "auto");
     });
-
-    function makeElement() {
-        const attrs: Record<string, string> = {};
-        return {
-            setAttribute(name: string, value: string) { attrs[name] = value; },
-            removeAttribute(name: string) { delete attrs[name]; },
-            getAttribute(name: string) { return attrs[name] ?? null; },
-        };
-    }
 });
