@@ -7,7 +7,15 @@ export interface VimiumSettings {
   keyBindingMode: KeyBindingMode;
   theme: Theme;
   enablePointerTails: string;
+  animate: boolean;
 }
+
+export const DEFAULTS: VimiumSettings = {
+  theme: "auto",
+  enablePointerTails: "true",
+  keyBindingMode: "location",
+  animate: true,
+};
 
 export interface TabInfo {
   id: number;

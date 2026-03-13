@@ -28,6 +28,10 @@ interface Hint {
 
 const HINT_CHARS = "sadgjklewcmpoh";
 
+export interface HintModeOptions {
+  animate?: boolean;
+}
+
 export class HintMode {
   private keyHandler: KeyHandlerLike;
   private active: boolean;
@@ -36,11 +40,12 @@ export class HintMode {
   private typed: string;
   private overlay: HTMLDivElement | null;
   private pointerTails: boolean;
+  private animate: boolean;
   private activating: boolean;
   private readonly onMouseDown: () => void;
   private readonly onScroll: () => void;
 
-  constructor(keyHandler: KeyHandlerLike) {
+  constructor(keyHandler: KeyHandlerLike, options?: HintModeOptions) {
     this.keyHandler = keyHandler;
     this.active = false;
     this.willOpenNewTab = false;
@@ -48,6 +53,7 @@ export class HintMode {
     this.typed = "";
     this.overlay = null;
     this.pointerTails = false;
+    this.animate = options?.animate ?? true;
     this.activating = false;
     this.onMouseDown = this.deactivate.bind(this);
     this.onScroll = this.deactivate.bind(this);
@@ -255,7 +261,9 @@ export class HintMode {
 
   private createOverlay(): void {
     this.overlay = document.createElement("div");
-    this.overlay.className = "vimium-hint-overlay vimium-hint-animate";
+    this.overlay.className = this.animate
+      ? "vimium-hint-overlay vimium-hint-animate"
+      : "vimium-hint-overlay";
     document.documentElement.appendChild(this.overlay);
     void this.overlay.offsetHeight;
     this.overlay.classList.add("visible");
