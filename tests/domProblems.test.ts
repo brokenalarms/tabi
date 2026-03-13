@@ -1080,7 +1080,9 @@ describe("DOM problems — native interactive elements prune subtrees", () => {
         assert.equal(x, 210, "Hint should center on heading (10 + 400/2)");
     });
 
-    it("link with SVG + heading uses the element itself, not the heading", () => {
+    // ISSUE: Nav links with an icon SVG + text (x.com sidebar, GitHub menus).
+    // FIX: Single SVG in first child subtree → hint targets the SVG icon.
+    it("link with SVG as first child targets the SVG", () => {
         const link = makeElement("A", { href: "/page", top: 0, left: 0, width: 250, height: 60 });
         const svg = makeElement("SVG", { top: 10, left: 10, width: 24, height: 24 });
         const heading = makeElement("H3", { top: 10, left: 50, width: 100, height: 24, textContent: "Page" });
@@ -1099,9 +1101,37 @@ describe("DOM problems — native interactive elements prune subtrees", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
-        // Should use the <a> rect, not the heading
+        // Should center on the SVG icon (10 + 24/2 = 22)
         const x = parseFloat(hints[0].style.left);
-        assert.equal(x, 125, "Hint should center on <a> (0 + 250/2)");
+        assert.equal(x, 22, "Hint should center on SVG icon (10 + 24/2)");
+    });
+
+    // ISSUE: Nav links wrap SVG inside a container div (x.com notifications).
+    // FIX: Single SVG found by querying first child subtree → hint targets the SVG.
+    it("link with SVG nested in first child subtree targets the SVG", () => {
+        const link = makeElement("A", { href: "/notifications", top: 0, left: 0, width: 250, height: 60 });
+        const iconWrap = makeElement("DIV", { top: 5, left: 5, width: 30, height: 30 });
+        const svg = makeElement("SVG", { top: 8, left: 8, width: 24, height: 24 });
+        iconWrap.appendChild(svg);
+        const textSpan = makeElement("SPAN", { top: 10, left: 40, width: 100, height: 20, textContent: "Notifications" });
+        link.appendChild(iconWrap);
+        link.appendChild(textSpan);
+
+        loadModules([link, iconWrap, svg, textSpan]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [link];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        // Should center on the SVG icon (8 + 24/2 = 20)
+        const x = parseFloat(hints[0].style.left);
+        assert.equal(x, 20, "Hint should center on nested SVG icon (8 + 24/2)");
     });
 
     it("anchor does not produce hints for interactive children inside it", () => {

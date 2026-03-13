@@ -147,11 +147,21 @@ export class HintMode {
       }
     }
 
-    // Native interactive elements are atomic. If the element contains a heading
-    // and no SVGs, use the heading as the hint target (e.g. article card links).
-    // Otherwise use the element itself.
+    // Native interactive elements are atomic — pick the best visual anchor:
+    // 1. Single SVG in the first child subtree → hint under the icon
+    // 2. Heading (no SVGs) → hint on the heading (article card links)
+    // 3. Otherwise → the element itself
     const tag = el.tagName.toLowerCase();
     if (NATIVE_INTERACTIVE_ELEMENTS.includes(tag)) {
+      const firstChild = el.firstElementChild;
+      if (firstChild) {
+        const isSvg = firstChild.tagName.toLowerCase() === "svg";
+        const svgs = isSvg ? [firstChild] : firstChild.querySelectorAll("svg");
+        if (svgs.length === 1) {
+          const sr = (svgs[0] as HTMLElement).getBoundingClientRect();
+          if (sr.width > 0 && sr.height > 0) return svgs[0] as HTMLElement;
+        }
+      }
       if (!el.querySelector("svg")) {
         const heading = el.querySelector("h1, h2, h3, h4, h5, h6") as HTMLElement | null;
         if (heading) {
