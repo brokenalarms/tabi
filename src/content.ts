@@ -230,9 +230,9 @@ browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme", "enable
     browser.runtime.sendMessage({ command: "extensionInactive" });
   } else {
     initialize({
-      keyBindingMode: result.keyBindingMode as KeyBindingMode | undefined,
-      theme: result.theme as Theme | undefined,
-      enablePointerTails: result.enablePointerTails as string | undefined,
+      ...(result.keyBindingMode !== undefined && { keyBindingMode: result.keyBindingMode as KeyBindingMode }),
+      ...(result.theme !== undefined && { theme: result.theme as Theme }),
+      ...(result.enablePointerTails !== undefined && { enablePointerTails: result.enablePointerTails as string }),
     });
   }
 }).catch(() => {

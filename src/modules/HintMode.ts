@@ -261,9 +261,7 @@ export class HintMode {
 
   private createOverlay(): void {
     this.overlay = document.createElement("div");
-    this.overlay.className = DEFAULTS.animate
-      ? "vimium-hint-overlay vimium-hint-animate"
-      : "vimium-hint-overlay";
+    this.overlay.className = `vimium-hint-overlay${DEFAULTS.animate ? " vimium-hint-animate" : ""}`;
     document.documentElement.appendChild(this.overlay);
     void this.overlay.offsetHeight;
     this.overlay.classList.add("visible");
