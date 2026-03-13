@@ -188,26 +188,41 @@ export class HintMode {
 
   private getHintRect(el: HTMLElement): DOMRect {
     const target = this.getHintTargetElement(el);
-    const rect = target.getBoundingClientRect();
+    let rect = target.getBoundingClientRect();
 
     if (el !== target && el.getBoundingClientRect().width > window.innerWidth * 0.25) {
       const paddingTop = parseFloat(getComputedStyle(target).paddingTop) || 0;
       if (paddingTop > 0) {
-        return new DOMRect(rect.left, rect.top + paddingTop, rect.width, rect.height - paddingTop);
+        rect = new DOMRect(rect.left, rect.top + paddingTop, rect.width, rect.height - paddingTop);
       }
     }
 
     if (el.tagName.toLowerCase() === "a") {
       const clientRects = (el === target ? el : target).getClientRects();
-      if (clientRects.length > 0) {
-        for (let i = 0; i < clientRects.length; i++) {
-          const cr = clientRects[i];
-          if (cr.width > 1 && cr.height > 1) return cr;
-        }
+      for (let i = 0; i < clientRects.length; i++) {
+        const cr = clientRects[i];
+        if (cr.width > 1 && cr.height > 1) { rect = cr; break; }
       }
     }
 
+    // For wide elements, use the actual text bounds instead of the full element rect
+    const textRect = HintMode.getTextRect(target);
+    if (textRect && textRect.width < rect.width * 0.8) return textRect;
+
     return rect;
+  }
+
+  private static getTextRect(el: HTMLElement): DOMRect | null {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let node: Text | null;
+    while ((node = walker.nextNode() as Text | null)) {
+      if (!(node.textContent || "").trim()) continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      const r = range.getBoundingClientRect();
+      if (r.width > 1 && r.height > 1) return r;
+    }
+    return null;
   }
 
   // --- Label generation ---

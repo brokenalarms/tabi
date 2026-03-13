@@ -21,7 +21,7 @@ When the user pastes a **DOM snippet, screenshot and URL** showing a hint mode b
 
 - **Simplify the DOM**: Distill the pasted snippet down to the minimal structure that reproduces the issue. Strip out irrelevant attributes, classes, and sibling elements. The test fixture should be the smallest DOM tree that triggers the bug — not a copy-paste of the full site markup.
 
-- **Verify** that your understanding of the issue is correct before proceeding. Echo back to the user
+- **Verify** that your understanding of the issue is correct before proceeding. Echo back to the user in the following format:
   - ISSUE: Your understanding of what the issue is, in a generalizable way
   - SITE: URL where seen
   - DOM: The simplified representation
@@ -30,15 +30,15 @@ When the user pastes a **DOM snippet, screenshot and URL** showing a hint mode b
 If the user agrees, you may proceed:
 
 - **Write a TDD test first that should be broken at first**: Before the fix, add a test in `tests/HintMode.test.js` that:
-   - Reconstruct that simplified DOM using `makeElement()` helpers, wiring up `parentElement`/`children` relationships to match.
-   - Do NOT  write DOM in the comments. Create a string for this simplified DOM, that you feed to makeElement, and this will be the basis of your test. 
+   - Reconstruct that simplified DOM using `happy-dom`.
+   - Do NOT  write DOM in the comments. Create a string for this simplified DOM, that you feed to `happy-dom`, and this will be the basis of your test. 
    - Includes a comment at the top of the test in the same format, stating the ISSUE, SITE, and FIX, or **what the test proves** (e.g. "GitHub: nested `<button>` inside `<button>` — only inner buttons get hints, not the wrapper").
    - Asserts the correct behavior: right number of hints, correct elements hinted, correct dedup outcome.
 
 - **Implement the fix** in `src/modules/HintMode.ts`.
 
 -  **Verify**: `npm run build && npm test` — all tests pass.
-
-- **Review** Is there a better way to integrate this edge test in a generic way so that it not specifically fixing the issue at hand, but a class of issues? 
+ 
+- **Review** Is there a better way to integrate this edge test in a generic way so that it not specifically fixing the issue at hand, but a class of issues? It should integrate seamlessly into the existing pipeline, not be a random 'if this unique situation then do something completely different' function call. If it doesn't fit, should we think about refactoring to better generically handle it for future flexibility, so the change is not brittle and liable to break again if the website changes?
 
 Each pasted scenario = one test. The test is the proof that the bug is fixed and won't regress.

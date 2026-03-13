@@ -469,3 +469,43 @@ describe("DOM problems — generic cursor:pointer wrapper dedup", () => {
     });
 });
 
+// Facebook sidebar: full-width <a> with flex layout makes text span full-width too.
+// Hint lands at element edge instead of near visible text content.
+// FIX: use Range on text node to get actual text bounds when element rect is much wider.
+describe("DOM problems — hint positioned at text, not full-width element", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("uses text range rect when element is wider than its text content", () => {
+        const span = makeElement("SPAN", { top: 10, left: 10, width: 400, height: 36 });
+        span.textContent = "Meta AI";
+
+        const link = makeElement("A", { href: "/meta-ai", top: 10, left: 10, width: 400, height: 36, children: [span] });
+
+        loadModules([link]);
+
+        (globalThis as any).document.elementsFromPoint = () => [link];
+
+        // Mock Range to return narrow text bounds
+        const textRect = { top: 10, left: 50, bottom: 30, right: 120, width: 70, height: 20, x: 50, y: 10, toJSON() { return this; } };
+        (globalThis as any).document.createRange = () => ({
+            selectNodeContents: () => {},
+            getBoundingClientRect: () => textRect,
+        });
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        // Access hint div position — it should be near the text rect (x=50), not the element edge (x=10)
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hintDiv = overlay?.querySelector(".vimium-hint");
+        assert.ok(hintDiv, "Hint div should exist");
+        const left = parseFloat(hintDiv.style.left);
+        assert.ok(left >= 40 && left <= 60, `Hint left (${left}) should be near text rect left (50), not element left (10)`);
+    });
+});
+
