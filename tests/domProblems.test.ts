@@ -1229,15 +1229,16 @@ describe("DOM problems — native interactive elements prune subtrees", () => {
 
     // ISSUE: Vertically stacked icon-above-text layouts (LinkedIn nav) falsely match the
     // leading icon pattern because DOM order is icon-then-text in both horizontal and vertical layouts.
-    // FIX: Check that icon and text sibling overlap vertically (same row), not stacked.
+    // FIX: Check that text top is above icon bottom — if text starts below icon, it's stacked.
     // SITE: linkedin.com
     it("vertically stacked icon-above-text does NOT target the SVG", () => {
+        // LinkedIn nav: <a> > <div icon-wrapper> > ... > <svg> + <span label below>
         const link = makeElement("A", { href: "/feed/", top: 0, left: 0, width: 80, height: 70 });
-        const iconWrap = makeElement("SPAN", { top: 5, left: 20, width: 30, height: 24 });
-        const svg = makeElement("SVG", { top: 5, left: 20, width: 24, height: 24 });
+        const iconWrap = makeElement("DIV", { top: 5, left: 20, width: 30, height: 30 });
+        const svg = makeElement("SVG", { top: 8, left: 22, width: 24, height: 24 });
         iconWrap.appendChild(svg);
-        // Text is BELOW the icon, not beside it
-        const label = makeElement("SPAN", { top: 35, left: 10, width: 60, height: 16, textContent: "Home" });
+        // Text label below the icon (top: 40, icon bottom: 32)
+        const label = makeElement("SPAN", { top: 40, left: 10, width: 60, height: 16, textContent: "Home" });
         link.appendChild(iconWrap);
         link.appendChild(label);
 
