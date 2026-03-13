@@ -278,7 +278,11 @@ describe("DOM problems — hash-link/label dedup", () => {
         loadModules([label, anchor]);
 
         (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
-            return [anchor, label];
+            const all = [label, anchor];
+            return all.filter((el: any) => {
+                const r = el.getBoundingClientRect();
+                return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+            });
         };
 
         const { hintMode } = getState();
@@ -874,6 +878,49 @@ describe("DOM problems — clip/clip-path visually-hidden elements", () => {
         const { hintMode } = getState();
         hintMode.activate(false);
         assert.ok(hintMode.isActive(), "clip-path: none should not filter the element");
+    });
+});
+
+// ISSUE: Links behind fixed overlay banners get hints because elementsFromPoint
+// returns all elements at a point (including occluded ones), and the occlusion
+// check verifies the candidate appears anywhere in the list, not that it's topmost.
+// SITE: theguardian.com — support banner overlay covers article links
+// FIX: Only check if the candidate is the topmost element at the point
+describe("DOM problems — overlay occlusion", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("filters links occluded by a fixed overlay", () => {
+        const articleLink = makeElement("A", { href: "/article", top: 400, left: 50, width: 200, height: 20 });
+        const overlayDiv = makeElement("DIV", { top: 0, left: 0, width: 1024, height: 768 });
+
+        loadModules([articleLink]);
+
+        // Simulate fixed overlay being topmost at every point (real browser z-order)
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [overlayDiv, articleLink];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(!hintMode.isActive(), "Link behind fixed overlay should not get a hint");
+    });
+
+    it("keeps links that are topmost (not occluded)", () => {
+        const link = makeElement("A", { href: "/visible", top: 10, left: 10, width: 200, height: 20 });
+
+        loadModules([link]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [link];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(), "Topmost link should get a hint");
     });
 });
 
