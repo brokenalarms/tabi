@@ -1,84 +1,55 @@
-// KeyHandler unit tests — using Node.js built-in test runner
+// KeyHandler unit tests — using Node.js built-in test runner + happy-dom.
 // Tests the mode state machine, key sequence parser with timeout,
 // input field detection, and command dispatch.
 
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
+import { createDOM, type DOMEnvironment } from "./helpers/dom";
 import { KeyHandler } from "../src/modules/KeyHandler";
 import { Mode } from "../src/commands";
 
-// --- Minimal DOM shim for Node.js ---
-
-class FakeElement {
-    tagName: string;
-    type: string;
-    isContentEditable: boolean;
-    constructor(tag: string, attrs: { type?: string; contentEditable?: boolean } = {}) {
-        this.tagName = tag;
-        this.type = attrs.type || "";
-        this.isContentEditable = attrs.contentEditable || false;
-    }
-}
+let env: DOMEnvironment;
+let keyHandler: KeyHandler;
 
 function makeKeyEvent(code: string, opts: { key?: string; shift?: boolean; ctrl?: boolean; alt?: boolean; meta?: boolean } = {}) {
-    return {
+    return new KeyboardEvent("keydown", {
         code,
         key: opts.key || "",
         shiftKey: opts.shift || false,
         ctrlKey: opts.ctrl || false,
         altKey: opts.alt || false,
         metaKey: opts.meta || false,
-        preventDefault: mock.fn(),
-        stopPropagation: mock.fn(),
-    };
+        bubbles: true,
+        cancelable: true,
+    });
 }
 
-// Shim globals before loading KeyHandler
-let capturedListeners: Record<string, Function[]> = {};
-let keyHandler: KeyHandler;
-
-function setupDOM() {
-    capturedListeners = {};
-    (globalThis as any).document = {
-        addEventListener(type: string, fn: Function, capture?: boolean) {
-            if (!capturedListeners[type]) capturedListeners[type] = [];
-            capturedListeners[type].push(fn);
-        },
-        removeEventListener(type: string, fn: Function, capture?: boolean) {
-            if (capturedListeners[type]) {
-                capturedListeners[type] = capturedListeners[type].filter((f) => f !== fn);
-            }
-        },
-        activeElement: new FakeElement("BODY"),
-        body: new FakeElement("BODY"),
-    };
-    (globalThis as any).clearTimeout = clearTimeout;
-    (globalThis as any).setTimeout = setTimeout;
+function fireKeyDown(event: KeyboardEvent) {
+    document.dispatchEvent(event);
 }
 
-function fireKeyDown(event: ReturnType<typeof makeKeyEvent>) {
-    const listeners = capturedListeners["keydown"] || [];
-    for (const fn of listeners) fn(event);
+function fireFocusIn(el: Element) {
+    el.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
 }
 
-function fireFocusIn(target: FakeElement) {
-    const listeners = capturedListeners["focusin"] || [];
-    for (const fn of listeners) fn({ target });
-}
-
-function fireFocusOut(target: FakeElement) {
-    const listeners = capturedListeners["focusout"] || [];
-    for (const fn of listeners) fn({ target });
+function fireFocusOut(el: Element) {
+    el.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
 }
 
 describe("KeyHandler", () => {
     beforeEach(() => {
-        setupDOM();
+        env = createDOM();
+        // happy-dom needs FocusEvent and KeyboardEvent on globalThis
+        (globalThis as any).FocusEvent = (env.window as any).FocusEvent;
+        (globalThis as any).KeyboardEvent = (env.window as any).KeyboardEvent;
         keyHandler = new KeyHandler();
     });
 
     afterEach(() => {
         if (keyHandler) keyHandler.destroy();
+        delete (globalThis as any).FocusEvent;
+        delete (globalThis as any).KeyboardEvent;
+        env.cleanup();
     });
 
     describe("Mode state machine", () => {
@@ -149,7 +120,7 @@ describe("KeyHandler", () => {
             const ev = makeKeyEvent("KeyJ");
             fireKeyDown(ev);
             assert.ok(called, "scrollDown should be called");
-            assert.equal(ev.preventDefault.mock.callCount(), 1);
+            assert.ok(ev.defaultPrevented);
         });
 
         // Tests that shift+key dispatches a different command (G → scrollToBottom)
@@ -164,7 +135,7 @@ describe("KeyHandler", () => {
         it("ignores unbound keys", () => {
             const ev = makeKeyEvent("KeyZ");
             fireKeyDown(ev);
-            assert.equal(ev.preventDefault.mock.callCount(), 0);
+            assert.ok(!ev.defaultPrevented);
         });
     });
 
@@ -247,21 +218,25 @@ describe("KeyHandler", () => {
         it("suppresses prefix key", () => {
             const ev = makeKeyEvent("KeyG");
             fireKeyDown(ev);
-            assert.equal(ev.preventDefault.mock.callCount(), 1);
+            assert.ok(ev.defaultPrevented);
         });
     });
 
     describe("Input field detection and auto-INSERT mode", () => {
         // Verifies that focusing a text input switches to INSERT mode
         it("enters INSERT mode on text input focus", () => {
-            const input = new FakeElement("INPUT", { type: "text" });
+            const input = document.createElement("input");
+            input.type = "text";
+            document.body.appendChild(input);
             fireFocusIn(input);
             assert.equal(keyHandler.getMode(), "INSERT");
         });
 
         // Verifies that leaving input switches back to NORMAL
         it("exits INSERT mode on input blur", () => {
-            const input = new FakeElement("INPUT", { type: "text" });
+            const input = document.createElement("input");
+            input.type = "text";
+            document.body.appendChild(input);
             fireFocusIn(input);
             assert.equal(keyHandler.getMode(), "INSERT");
             fireFocusOut(input);
@@ -270,21 +245,26 @@ describe("KeyHandler", () => {
 
         // Verifies that textarea also triggers INSERT mode
         it("enters INSERT mode on textarea focus", () => {
-            const textarea = new FakeElement("TEXTAREA");
+            const textarea = document.createElement("textarea");
+            document.body.appendChild(textarea);
             fireFocusIn(textarea);
             assert.equal(keyHandler.getMode(), "INSERT");
         });
 
         // Verifies that contentEditable elements trigger INSERT mode
         it("enters INSERT mode on contentEditable focus", () => {
-            const div = new FakeElement("DIV", { contentEditable: true });
+            const div = document.createElement("div");
+            div.contentEditable = "true";
+            document.body.appendChild(div);
             fireFocusIn(div);
             assert.equal(keyHandler.getMode(), "INSERT");
         });
 
         // Verifies that non-text inputs (checkbox, radio) don't trigger INSERT
         it("does NOT enter INSERT for checkbox input", () => {
-            const checkbox = new FakeElement("INPUT", { type: "checkbox" });
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            document.body.appendChild(checkbox);
             fireFocusIn(checkbox);
             assert.equal(keyHandler.getMode(), "NORMAL");
         });
@@ -307,7 +287,7 @@ describe("KeyHandler", () => {
             keyHandler.setMode(Mode.INSERT);
             const ev = makeKeyEvent("KeyJ");
             fireKeyDown(ev);
-            assert.equal(ev.preventDefault.mock.callCount(), 0);
+            assert.ok(!ev.defaultPrevented);
         });
     });
 
@@ -326,7 +306,7 @@ describe("KeyHandler", () => {
                 keyHandler.setMode(mode);
                 const ev = makeKeyEvent("KeyJ");
                 fireKeyDown(ev);
-                assert.equal(ev.preventDefault.mock.callCount(), 0);
+                assert.ok(!ev.defaultPrevented);
             });
         }
     });
@@ -349,7 +329,7 @@ describe("KeyHandler", () => {
         it("ignores modifier-only keys", () => {
             const ev = makeKeyEvent("ShiftLeft", { shift: true });
             fireKeyDown(ev);
-            assert.equal(ev.preventDefault.mock.callCount(), 0);
+            assert.ok(!ev.defaultPrevented);
         });
     });
 
@@ -359,7 +339,7 @@ describe("KeyHandler", () => {
             keyHandler.destroy();
             const ev = makeKeyEvent("KeyJ");
             fireKeyDown(ev);
-            assert.equal(ev.preventDefault.mock.callCount(), 0);
+            assert.ok(!ev.defaultPrevented);
         });
     });
 
