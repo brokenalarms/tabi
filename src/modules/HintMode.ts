@@ -420,10 +420,24 @@ export class HintMode {
         });
       } else {
         element.focus();
-        element.click();
+        this.activateViaKeyboard(element);
       }
     };
 
     hint.div.addEventListener("animationend", afterCollapse, { once: true });
+  }
+
+  private activateViaKeyboard(element: HTMLElement): void {
+    // Checkboxes and radios toggle on Space, not Enter
+    const tag = element.tagName.toLowerCase();
+    const inputType = tag === "input" ? ((element as HTMLInputElement).type || "").toLowerCase() : "";
+    const useSpace = inputType === "checkbox" || inputType === "radio";
+    const key = useSpace ? " " : "Enter";
+    const code = useSpace ? "Space" : "Enter";
+
+    const opts = { key, code, bubbles: true, cancelable: true };
+    element.dispatchEvent(new KeyboardEvent("keydown", opts));
+    element.dispatchEvent(new KeyboardEvent("keypress", opts));
+    element.dispatchEvent(new KeyboardEvent("keyup", opts));
   }
 }
