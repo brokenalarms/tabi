@@ -48,4 +48,4 @@ export type CommandMessage =
   | { command: "extensionActive" }
   | { command: "extensionInactive" };
 
-export type ModeValue = "NORMAL" | "INSERT" | "HINTS" | "FIND" | "TAB_SEARCH";
+export type ModeValue = "NORMAL" | "INSERT" | "HINTS" | "TAB_SEARCH";

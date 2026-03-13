@@ -7,7 +7,6 @@ import { Mode } from "./commands";
 import { KeyHandler } from "./modules/KeyHandler";
 import { ScrollController } from "./modules/ScrollController";
 import { HintMode } from "./modules/HintMode";
-import { FindMode } from "./modules/FindMode";
 import { TabSearch } from "./modules/TabSearch";
 import { HelpOverlay } from "./modules/HelpOverlay";
 
@@ -94,9 +93,6 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   // Link hint navigation
   const hintMode = new HintMode(keyHandler);
   hintMode.wireCommands();
-
-  // In-page find
-  const findMode = new FindMode(keyHandler);
 
   // Tab search overlay
   const tabSearch = new TabSearch(keyHandler);
@@ -210,7 +206,7 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   // Notify background that extension is active on this tab
   browser.runtime.sendMessage({ command: "extensionActive" });
 
-  // Expose for other modules (FindMode, TabSearch)
+  // Expose for other modules (TabSearch)
   window.__vimiumKeyHandler = keyHandler;
 
   // Suppress unused-variable warnings — these are used via their constructors

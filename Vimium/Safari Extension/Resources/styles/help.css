@@ -6,60 +6,74 @@
     bottom: 0;
     z-index: 2147483647;
     background: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
 }
 
 .vimium-help-modal {
     position: fixed;
     bottom: 16px;
     right: 16px;
-    background: var(--vimium-help-bg);
-    border-radius: 8px;
-    padding: 16px 20px;
     width: fit-content;
     max-width: 90vw;
-    max-height: 60vh;
-    overflow-y: auto;
+    background: var(--vimium-help-bg);
+    border-radius: 10px;
     box-shadow: var(--vimium-help-shadow);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
     color: var(--vimium-help-color);
-    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
 }
 
 .vimium-help-title {
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 600;
-    margin: 0 0 12px;
+    padding: 10px 14px;
+    margin: 0;
+    border-bottom: 1px solid var(--vimium-help-border);
     color: var(--vimium-help-color);
 }
 
 .vimium-help-grid {
     display: grid;
     grid-template-columns: auto 1fr;
-    gap: 4px 12px;
+    gap: 0;
+    padding: 4px 0;
 }
 
 .vimium-help-row {
     display: contents;
 }
 
+.vimium-help-row > * {
+    transition: background 0.1s;
+}
+
+.vimium-help-row:hover > * {
+    background: var(--vimium-help-row-hover);
+}
+
 .vimium-help-key {
     font-family: "SF Mono", Menlo, monospace;
     font-size: 11px;
-    background: var(--vimium-help-key-bg);
-    border-radius: 3px;
-    padding: 1px 5px;
-    text-align: center;
+    padding: 4px 14px;
+    text-align: right;
     white-space: nowrap;
+    color: var(--vimium-help-key-color);
 }
 
 .vimium-help-desc {
     font-size: 12px;
     color: var(--vimium-help-desc-color);
-    line-height: 1.8;
+    padding: 4px 14px 4px 8px;
 }
 
 .vimium-help-hint {
     text-align: center;
     font-size: 10px;
     color: var(--vimium-help-muted-color);
-    margin-top: 12px;
+    padding: 6px 14px;
+    border-top: 1px solid var(--vimium-help-border);
+    margin: 0;
 }

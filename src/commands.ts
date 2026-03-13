@@ -4,7 +4,6 @@ export const Mode = {
   NORMAL: "NORMAL",
   INSERT: "INSERT",
   HINTS: "HINTS",
-  FIND: "FIND",
   TAB_SEARCH: "TAB_SEARCH",
 } as const;
 
@@ -22,7 +21,6 @@ export const COMMANDS: Record<string, string> = {
   pageRefresh: "Refresh page",
   activateHints: "Open link (current tab)",
   activateHintsNewTab: "Open link (new tab)",
-  enterFindMode: "Find on page (Cmd+F)",
   createTab: "New tab",
   closeTab: "Close tab",
   restoreTab: "Restore tab",

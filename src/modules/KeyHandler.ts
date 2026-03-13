@@ -198,9 +198,6 @@ export class KeyHandler {
     _bind(n, "KeyF", "activateHints");
     _bind(n, "Shift-KeyF", "activateHintsNewTab");
 
-    // Find (delegates to native Cmd+F)
-    _bind(n, "Slash", "enterFindMode");
-
     // Tabs
     _bind(n, "KeyT", "createTab");
     _bind(n, "KeyX", "closeTab");

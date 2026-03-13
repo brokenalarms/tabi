@@ -6,7 +6,7 @@
     bottom: 0;
     z-index: 2147483647;
     background: transparent;
-    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
 }
 
 .vimium-tab-search-modal {
@@ -14,20 +14,21 @@
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 400px;
+    width: 420px;
     max-width: 90vw;
-    max-height: fit-content;
     background: var(--vimium-tab-modal-bg);
-    border-radius: 8px;
+    border-radius: 10px;
     box-shadow: var(--vimium-tab-modal-shadow);
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
 }
 
 .vimium-tab-search-modal input {
     width: 100%;
-    padding: 10px 12px;
+    padding: 10px 14px;
     border: none;
     border-bottom: 1px solid var(--vimium-tab-input-border);
     background: var(--vimium-tab-input-bg);
@@ -48,9 +49,10 @@
 }
 
 .vimium-tab-search-item {
-    padding: 8px 12px;
+    padding: 8px 14px;
     cursor: pointer;
     border-bottom: 1px solid var(--vimium-tab-item-border);
+    transition: background 0.1s;
 }
 
 .vimium-tab-search-item:last-child {
@@ -79,7 +81,7 @@
 }
 
 .vimium-tab-search-empty {
-    padding: 12px;
+    padding: 14px;
     color: var(--vimium-tab-empty-color);
     text-align: center;
     font-size: 13px;
