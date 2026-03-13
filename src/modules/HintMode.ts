@@ -159,13 +159,15 @@ export class HintMode {
         const ir = icon.getBoundingClientRect();
         if (ir.width > 0 && ir.height > 0) {
           // Walk up from icon, checking sibling pattern at each ancestor level.
-          // Leading icon = no text siblings before, text siblings after.
+          // Leading icon = no text siblings before, text siblings after,
+          // AND icon and text are on the same row (not stacked vertically).
           let ancestor: Element = icon;
           while (ancestor.parentElement && ancestor !== el) {
             const parent = ancestor.parentElement;
             let textBefore = false;
             let textAfter = false;
             let seenIcon = false;
+            let firstTextAfter: Element | null = null;
             for (const child of parent.children) {
               if (child === ancestor) {
                 seenIcon = true;
@@ -173,9 +175,16 @@ export class HintMode {
               }
               const hasText = (child.textContent || "").trim().length > 0;
               if (!seenIcon && hasText) textBefore = true;
-              if (seenIcon && hasText) textAfter = true;
+              if (seenIcon && hasText) {
+                textAfter = true;
+                if (!firstTextAfter) firstTextAfter = child;
+              }
             }
-            if (!textBefore && textAfter) return icon;
+            if (!textBefore && textAfter && firstTextAfter) {
+              // Ensure horizontal layout: icon and text share a vertical band.
+              const tr = (firstTextAfter as HTMLElement).getBoundingClientRect();
+              if (ir.bottom > tr.top && tr.bottom > ir.top) return icon;
+            }
             ancestor = parent;
           }
         }

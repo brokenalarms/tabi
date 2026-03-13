@@ -1227,6 +1227,37 @@ describe("DOM problems — native interactive elements prune subtrees", () => {
         assert.equal(x, 20, "Hint should center on SVG inside single wrapper (8 + 24/2)");
     });
 
+    // ISSUE: Vertically stacked icon-above-text layouts (LinkedIn nav) falsely match the
+    // leading icon pattern because DOM order is icon-then-text in both horizontal and vertical layouts.
+    // FIX: Check that icon and text sibling overlap vertically (same row), not stacked.
+    // SITE: linkedin.com
+    it("vertically stacked icon-above-text does NOT target the SVG", () => {
+        const link = makeElement("A", { href: "/feed/", top: 0, left: 0, width: 80, height: 70 });
+        const iconWrap = makeElement("SPAN", { top: 5, left: 20, width: 30, height: 24 });
+        const svg = makeElement("SVG", { top: 5, left: 20, width: 24, height: 24 });
+        iconWrap.appendChild(svg);
+        // Text is BELOW the icon, not beside it
+        const label = makeElement("SPAN", { top: 35, left: 10, width: 60, height: 16, textContent: "Home" });
+        link.appendChild(iconWrap);
+        link.appendChild(label);
+
+        loadModules([link, iconWrap, svg, label]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [link];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        // Should center on the link itself (0 + 80/2 = 40), NOT on the SVG
+        const x = parseFloat(hints[0].style.left);
+        assert.equal(x, 40, "Hint should center on the link, not the stacked icon");
+    });
+
     it("anchor does not produce hints for interactive children inside it", () => {
         const anchor = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 40 });
         const innerBtn = makeElement("BUTTON", { top: 12, left: 12, width: 80, height: 20 });
