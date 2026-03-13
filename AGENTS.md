@@ -10,7 +10,7 @@ The internet is full of quirks. For every new bug, we want to make sure that we 
 
 we also want to fix these in the most streamlined way possible without a lot of feedback. Therefore, with the below prompt, you will enter 'DOM problem mode'.
 
-When the user pastes a **DOM snippet and/or screenshot** showing a hint mode bug (or similar UI bug):
+When the user pastes a **DOM snippet, screenshot and URL** showing a hint mode bug (or similar UI bug):
 
 - **Understand the scenario**: Read the DOM structure and screenshot to identify what's wrong (e.g. duplicate hints, missing hints, hint on wrong element).
 
@@ -18,6 +18,7 @@ When the user pastes a **DOM snippet and/or screenshot** showing a hint mode bug
 
 - **Verify** that your understanding of the issue is correct before proceeding. Echo back to the user
   - ISSUE: Your understanding of what the issue is
+  - SITE: URL where seen
   - DOM: The simplified representation
   - FIX: Your proposed fix, using the same language of the issue
 
