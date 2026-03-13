@@ -242,10 +242,10 @@ export class HintMode {
 
   private getHintInfo(el: HTMLElement): { rect: DOMRect; container: boolean } {
     const target = this.getHintTargetElement(el);
-    // Bar style for containers where no specific anchor was found,
-    // but not when the element has many clickable children (too busy).
+    // Bar style: only for clickable containers with children but no
+    // clickable elements inside (no buttons, links, inputs, etc.).
     const container = target === el && el.children.length > 0 &&
-      el.querySelectorAll(CLICKABLE_SELECTOR).length <= 1;
+      el.querySelector(CLICKABLE_SELECTOR) === null;
     let rect = target.getBoundingClientRect();
 
     if (el !== target && el.getBoundingClientRect().width > window.innerWidth * 0.25) {
