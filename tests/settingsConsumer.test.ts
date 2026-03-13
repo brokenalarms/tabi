@@ -7,7 +7,8 @@ import { createDOM, type DOMEnvironment } from "./helpers/dom.js";
 
 // Inline applyTheme logic matching content.ts for unit testing
 function applyTheme(theme: string, element: Element) {
-    element.setAttribute("data-vimium-theme", theme);
+    const resolved = theme === "auto" ? "dark" : theme;
+    element.setAttribute("data-vimium-theme", resolved);
 }
 
 let env: DOMEnvironment;
@@ -28,14 +29,14 @@ describe("applyTheme", () => {
         }
     });
 
-    // Verifies that switching to "auto" replaces any previously set theme.
-    it("sets data-vimium-theme to auto for auto theme", () => {
+    // Verifies that "auto" resolves to "dark" (default fallback from detectPageBackground).
+    it("resolves auto theme to dark", () => {
         env = createDOM();
         const el = env.document.createElement("div");
         applyTheme("dark", el);
         assert.equal(el.getAttribute("data-vimium-theme"), "dark");
         applyTheme("auto", el);
-        assert.equal(el.getAttribute("data-vimium-theme"), "auto");
+        assert.equal(el.getAttribute("data-vimium-theme"), "dark");
     });
 
     // Verifies that setAttribute overwrites the previous value (no stale themes).
@@ -95,6 +96,6 @@ describe("storage.onChanged listener", () => {
         assert.equal(el.getAttribute("data-vimium-theme"), "dark");
 
         handleChange({ theme: { newValue: "auto" } }, "local");
-        assert.equal(el.getAttribute("data-vimium-theme"), "auto");
+        assert.equal(el.getAttribute("data-vimium-theme"), "dark");
     });
 });
