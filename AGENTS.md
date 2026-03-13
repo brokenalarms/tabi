@@ -15,6 +15,8 @@ We also want to fix these in the most streamlined way possible without a lot of 
 
 When the user pastes a **DOM snippet, screenshot and URL** showing a hint mode bug (or similar UI bug):
 
+- echo "DOM PROBLEM MODE" to convey you're entering this flow
+
 - **Understand the scenario**: Read the DOM structure and screenshot to identify what's wrong (e.g. duplicate hints, missing hints, hint on wrong element). There may be multiple issues.
 
 - **Simplify the DOM**: Distill the pasted snippet down to the minimal structure that reproduces the issue. Strip out irrelevant attributes, classes, and sibling elements. The test fixture should be the smallest DOM tree that triggers the bug — not a copy-paste of the full site markup.
