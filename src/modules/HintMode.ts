@@ -436,7 +436,8 @@ export class HintMode {
 
     hint.div.classList.add("vimium-hint-active");
 
-    // Focus ring around target element
+    // Focus ring around target element (appended to documentElement so it
+    // survives overlay removal and can fade out after the click)
     const ring = document.createElement("div");
     ring.className = "vimium-hint-ring";
     const pos = this.viewportToDocument(targetRect.left, targetRect.top);
@@ -444,10 +445,9 @@ export class HintMode {
     ring.style.top = pos.y - 2 + "px";
     ring.style.width = targetRect.width + 4 + "px";
     ring.style.height = targetRect.height + 4 + "px";
-    if (this.overlay) this.overlay.appendChild(ring);
+    document.documentElement.appendChild(ring);
 
     const afterCollapse = (): void => {
-      ring.remove();
       this.deactivate();
 
       const isLink = element.tagName.toLowerCase() === "a" && (element as HTMLAnchorElement).href;
@@ -460,11 +460,17 @@ export class HintMode {
         });
       } else {
         element.focus();
+        element.style.outline = "none";
+        element.addEventListener("blur", () => { element.style.outline = ""; }, { once: true });
         const opts = { bubbles: true, cancelable: true, view: window };
         element.dispatchEvent(new MouseEvent("mousedown", opts));
         element.dispatchEvent(new MouseEvent("mouseup", opts));
         element.click();
       }
+
+      // Fade out the ring
+      ring.classList.add("vimium-hint-ring-out");
+      ring.addEventListener("animationend", () => ring.remove(), { once: true });
     };
 
     hint.div.addEventListener("animationend", afterCollapse, { once: true });
