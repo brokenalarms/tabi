@@ -26,7 +26,8 @@ If the user agrees, you may proceed:
 
 - **Write a TDD test first that should be broken at first**: Before the fix, add a test in `tests/HintMode.test.js` that:
    - Reconstruct that simplified DOM using `makeElement()` helpers, wiring up `parentElement`/`children` relationships to match.
-   - Includes a descriptive comment at the top of the test stating the **site**, **DOM pattern**, and **what the test proves** (e.g. "GitHub: nested `<button>` inside `<button>` — only inner buttons get hints, not the wrapper").
+   - Do NOT  write DOM in the comments. Create a string for this simplified DOM, that you feed to makeElement, and this will be the basis of your test. 
+   - Includes a comment at the top of the test in the same format, stating the ISSUE, SITE, and FIX, or **what the test proves** (e.g. "GitHub: nested `<button>` inside `<button>` — only inner buttons get hints, not the wrapper").
    - Asserts the correct behavior: right number of hints, correct elements hinted, correct dedup outcome.
 
 - **Implement the fix** in `src/modules/HintMode.ts`.
