@@ -27,7 +27,6 @@ interface Hint {
 }
 
 const HINT_CHARS = "sadgjklewcmpoh";
-const HINT_ANIMATE = true;
 
 export class HintMode {
   private keyHandler: KeyHandlerLike;
@@ -94,15 +93,12 @@ export class HintMode {
     document.removeEventListener("mousedown", this.onMouseDown, true);
     window.removeEventListener("scroll", this.onScroll, true);
 
-    if (HINT_ANIMATE && this.overlay) {
+    if (this.overlay) {
       this.overlay.classList.remove("visible");
       const overlay = this.overlay;
       overlay.addEventListener("transitionend", () => {
         if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
       }, { once: true });
-      this.overlay = null;
-    } else if (this.overlay && this.overlay.parentNode) {
-      this.overlay.parentNode.removeChild(this.overlay);
       this.overlay = null;
     }
 
@@ -256,19 +252,16 @@ export class HintMode {
   }
 
   private createOverlay(): void {
-    this.overlay = document.createElement("div") as HTMLDivElement;
-    this.overlay.className = "vimium-hint-overlay";
-    if (HINT_ANIMATE) this.overlay.classList.add("vimium-hint-animate");
+    this.overlay = document.createElement("div");
+    this.overlay.className = "vimium-hint-overlay vimium-hint-animate";
     document.documentElement.appendChild(this.overlay);
-    if (HINT_ANIMATE) {
-      void this.overlay.offsetHeight;
-      this.overlay.classList.add("visible");
-    }
+    void this.overlay.offsetHeight;
+    this.overlay.classList.add("visible");
   }
 
   private createHintDiv(element: HTMLElement, label: string): HTMLDivElement {
     const rect = this.getHintRect(element);
-    const div = document.createElement("div") as HTMLDivElement;
+    const div = document.createElement("div");
     div.className = "vimium-hint";
     div.textContent = label;
     if (this.pointerTails) {
@@ -369,15 +362,15 @@ export class HintMode {
     }
 
     const targetRect = this.getHintRect(element);
-    const tagRect = hint.div.getBoundingClientRect ? hint.div.getBoundingClientRect() : null;
-    if (tagRect && tagRect.width > 0) {
+    const tagRect = hint.div.getBoundingClientRect();
+    if (tagRect.width > 0) {
       const dx = (targetRect.left + targetRect.width / 2) - (tagRect.left + tagRect.width / 2);
       const dy = (targetRect.top + targetRect.height / 2) - (tagRect.top + tagRect.height / 2);
       hint.div.style.setProperty("--poof-x", dx + "px");
       hint.div.style.setProperty("--poof-y", dy + "px");
     }
 
-    if (hint.div.classList) hint.div.classList.add("vimium-hint-active");
+    hint.div.classList.add("vimium-hint-active");
 
     const afterCollapse = (): void => {
       this.deactivate();
@@ -393,10 +386,6 @@ export class HintMode {
       }
     };
 
-    if (HINT_ANIMATE && hint.div.addEventListener) {
-      hint.div.addEventListener("animationend", afterCollapse, { once: true });
-    } else {
-      afterCollapse();
-    }
+    hint.div.addEventListener("animationend", afterCollapse, { once: true });
   }
 }

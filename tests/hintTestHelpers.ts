@@ -208,6 +208,7 @@ export function setupDOM(elements: any[] = []) {
                     contains(c: string) { return classes.has(c); },
                 },
                 offsetHeight: 0,
+                getBoundingClientRect() { return { left: 0, top: 0, right: 0, bottom: 0, width: 0, height: 0 }; },
                 // Fire animation/transition listeners synchronously (no real animations in tests)
                 addEventListener(type: string, fn: any) {
                     if (type === "animationend" || type === "transitionend") fn();
