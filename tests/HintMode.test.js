@@ -32,6 +32,7 @@ function makeElement(tag, opts = {}) {
         tagName: tag,
         href: opts.href || "",
         type: opts.type || "",
+        hidden: opts.hidden || false,
         isContentEditable: false,
         shadowRoot: opts.shadowRoot || null,
         parentNode: opts.parentNode || null,
@@ -126,10 +127,21 @@ function setupDOM(elements = []) {
             return elements.filter((e) => {
                 const clickableTags = ["A", "BUTTON", "INPUT", "TEXTAREA", "SELECT", "SUMMARY", "DETAILS"];
                 if (clickableTags.includes(e.tagName)) return true;
+                // Match label[for]
+                if (e.tagName === "LABEL" && e.htmlFor) return true;
+                // Match ARIA roles from CLICKABLE_SELECTOR
+                const role = e._attrs && e._attrs["role"];
+                const clickableRoles = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch"];
+                if (role && clickableRoles.includes(role)) return true;
+                // Match [onclick] / [onmousedown]
+                if (e._attrs && (e._attrs["onclick"] != null || e._attrs["onmousedown"] != null)) return true;
                 // Match elements with tabindex (mimics [tabindex]:not([tabindex='-1']))
                 if (e._tabindex !== undefined && e._tabindex !== "-1") return true;
                 return false;
             });
+        },
+        getElementById(id) {
+            return elements.find((e) => e.id === id) || null;
         },
         createElement(tag) {
             const classes = new Set();
@@ -210,6 +222,8 @@ function setupDOM(elements = []) {
     htmlEl.removeChild = function (child) {
         child.parentNode = null;
     };
+
+    global.CSS = { escape: (s) => s };
 
     global.window = {
         innerWidth: 1024,
@@ -364,6 +378,70 @@ describe("HintMode", () => {
             assert.ok(hintMode.isActive());
         });
 
+        // CSS checkbox hack menus: the visible "button" is a <label for="X">,
+        // not an <a> or <button>. label[for] must be discovered as interactive.
+        it("discovers label[for] as a clickable element", () => {
+            const label = makeElement("LABEL", { top: 10, left: 10, width: 80, height: 20 });
+            label.htmlFor = "menu-toggle";
+            loadModules([label]);
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive(), "label[for] should be discovered as clickable");
+            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
+            assert.ok(!hintMode.isActive());
+            assert.equal(label.click.mock.callCount(), 1);
+        });
+
+        // Apple nav: collapsed menu content wrapped in <div inert="true"> —
+        // buttons inside an inert subtree should not get hints.
+        it("filters out elements inside an inert subtree", () => {
+            const inertContainer = makeElement("DIV", {
+                top: 0, left: 0,
+                attrs: { "inert": "" },
+            });
+            const btn = makeElement("BUTTON", { top: 10, left: 10 });
+            btn.parentElement = inertContainer;
+            btn.parentNode = inertContainer;
+
+            loadModules([btn]);
+            hintMode.activate(false);
+            assert.ok(!hintMode.isActive(), "Button inside inert subtree should be filtered");
+        });
+
+        // aria-hidden="true" on the element itself prevents hint generation,
+        // but aria-hidden on an ancestor does NOT — it hides from a11y tree
+        // but doesn't prevent visual interaction.
+        it("filters element with aria-hidden=true", () => {
+            const btn = makeElement("BUTTON", {
+                top: 10, left: 10,
+                attrs: { "aria-hidden": "true" },
+            });
+            loadModules([btn]);
+            hintMode.activate(false);
+            assert.ok(!hintMode.isActive(), "Element with aria-hidden=true should be filtered");
+        });
+
+        it("keeps element inside aria-hidden ancestor", () => {
+            const wrapper = makeElement("DIV", {
+                top: 0, left: 0,
+                attrs: { "aria-hidden": "true" },
+            });
+            const btn = makeElement("BUTTON", { top: 10, left: 10 });
+            btn.parentElement = wrapper;
+            btn.parentNode = wrapper;
+
+            loadModules([btn]);
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive(), "Element inside aria-hidden ancestor should still get a hint");
+        });
+
+        // el.hidden (HTML hidden attribute) should prevent hint generation.
+        it("filters out elements with hidden attribute", () => {
+            const btn = makeElement("BUTTON", { top: 10, left: 10, hidden: true });
+            loadModules([btn]);
+            hintMode.activate(false);
+            assert.ok(!hintMode.isActive(), "Hidden element should be filtered");
+        });
+
         // Wrapper div with tabindex containing a textarea — only textarea gets a hint
         it("filters out ancestor wrapper when descendant is also a candidate", () => {
             const textarea = makeElement("TEXTAREA", { top: 10, left: 10 });
@@ -397,6 +475,196 @@ describe("HintMode", () => {
             fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
             // If only 1 hint, typing "s" activates it and deactivates hint mode
             assert.ok(!hintMode.isActive(), "Expected 1 hint (textarea only), but got more — wrapper was not filtered");
+        });
+    });
+
+    describe("Visibility edge cases", () => {
+        // CSS checkbox hack: transparent anchor overlay sits on top of a visible
+        // label/button. elementFromPoint returns only the overlay, but
+        // elementsFromPoint returns the full stack — the label underneath is reachable.
+        it("detects element behind transparent overlay via elementsFromPoint", () => {
+            const overlay = makeElement("A", { href: "#", top: 10, left: 10, width: 200, height: 40 });
+            const btn = makeElement("BUTTON", { top: 10, left: 10, width: 200, height: 40 });
+
+            loadModules([overlay, btn]);
+
+            // overlay is topmost; btn is underneath
+            global.document.elementsFromPoint = (x, y) => {
+                return [overlay, btn];
+            };
+
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive());
+            // Both should be visible — 2 hints → single-char labels s, a
+            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
+            assert.equal(overlay.click.mock.callCount(), 1, "Overlay element should be hintable");
+            hintMode.activate(false);
+            fireKeyDown(makeKeyEvent("KeyA", { key: "a" }));
+            assert.equal(btn.click.mock.callCount(), 1, "Element behind overlay should be hintable via elementsFromPoint");
+        });
+
+        // Element fully clipped by overflow:hidden ancestor — should not get a hint.
+        // Simplified: parent has overflow:hidden and a rect that doesn't overlap the child.
+        it("filters element clipped by overflow:hidden ancestor", () => {
+            const container = makeElement("DIV", {
+                top: 0, left: 0, width: 200, height: 50,
+                overflow: "hidden",
+            });
+            // Button is positioned below the container's bottom edge
+            const btn = makeElement("BUTTON", { top: 60, bottom: 80, left: 10, width: 80, height: 20 });
+            btn.parentElement = container;
+            btn.parentNode = container;
+
+            loadModules([btn]);
+            hintMode.activate(false);
+            assert.ok(!hintMode.isActive(), "Element clipped by overflow:hidden ancestor should be filtered");
+        });
+
+        // Custom-styled radio input with opacity:0 — visibility should redirect
+        // to the associated <label>, so the radio still gets a hint.
+        it("redirects visibility of opacity:0 radio to associated label", () => {
+            const label = makeElement("LABEL", { top: 10, left: 30, width: 100, height: 20 });
+            label.htmlFor = "custom-radio";
+            const radio = makeElement("INPUT", {
+                type: "radio", top: 10, left: 10,
+                width: 16, height: 16, opacity: "0",
+            });
+            radio.id = "custom-radio";
+            radio.type = "radio";
+
+            loadModules([radio, label]);
+
+            global.document.querySelector = (sel) => {
+                if (sel.includes("custom-radio")) return label;
+                return null;
+            };
+            global.document.elementsFromPoint = (x, y) => {
+                // Label is visible at its position
+                if (x >= 30 && x < 130) return [label];
+                return [radio];
+            };
+
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive(), "Opacity:0 radio with visible label should get a hint");
+        });
+
+        // Zero-size radio input redirects visibility to associated label.
+        it("redirects visibility of zero-size radio to associated label", () => {
+            const label = makeElement("LABEL", { top: 10, left: 30, width: 100, height: 20 });
+            label.htmlFor = "hidden-radio";
+            const radio = makeElement("INPUT", {
+                type: "radio", top: 10, left: 10,
+                width: 0, height: 0,
+            });
+            radio.id = "hidden-radio";
+            radio.type = "radio";
+
+            loadModules([radio, label]);
+
+            global.document.querySelector = (sel) => {
+                if (sel.includes("hidden-radio")) return label;
+                return null;
+            };
+            global.document.elementsFromPoint = (x, y) => {
+                if (x >= 30 && x < 130) return [label];
+                return [];
+            };
+
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive(), "Zero-size radio with visible label should get a hint");
+        });
+    });
+
+    describe("Label-for dedup", () => {
+        // Wikipedia theme picker: each radio has a sibling label[for] pointing
+        // at it. Without dedup, each radio gets two hints (input + label).
+        // Simplified from: <div class="cdx-radio"><input type="radio" id="X">
+        //   <label for="X">Text</label></div> × 3
+        it("filters label[for] when associated radio input is a candidate", () => {
+            const wrapper = makeElement("DIV", { top: 0, left: 0, width: 300, height: 120 });
+
+            const radio1 = makeElement("INPUT", { type: "radio", top: 10, left: 10, width: 16, height: 16 });
+            radio1.id = "theme-os";
+            radio1.type = "radio";
+            const label1 = makeElement("LABEL", { top: 10, left: 30, width: 100, height: 20 });
+            label1.htmlFor = "theme-os";
+            radio1.parentElement = wrapper;
+            label1.parentElement = wrapper;
+
+            const radio2 = makeElement("INPUT", { type: "radio", top: 40, left: 10, width: 16, height: 16 });
+            radio2.id = "theme-day";
+            radio2.type = "radio";
+            const label2 = makeElement("LABEL", { top: 40, left: 30, width: 100, height: 20 });
+            label2.htmlFor = "theme-day";
+            radio2.parentElement = wrapper;
+            label2.parentElement = wrapper;
+
+            const radio3 = makeElement("INPUT", { type: "radio", top: 70, left: 10, width: 16, height: 16 });
+            radio3.id = "theme-night";
+            radio3.type = "radio";
+            const label3 = makeElement("LABEL", { top: 70, left: 30, width: 100, height: 20 });
+            label3.htmlFor = "theme-night";
+            radio3.parentElement = wrapper;
+            label3.parentElement = wrapper;
+
+            loadModules([radio1, label1, radio2, label2, radio3, label3]);
+
+            global.document.elementsFromPoint = (x, y) => {
+                const all = [radio1, label1, radio2, label2, radio3, label3];
+                return all.filter((el) => {
+                    const r = el.getBoundingClientRect();
+                    return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+                });
+            };
+
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive());
+            // 3 hints (radios only) → single-char labels s, a, d
+            // If labels weren't deduped we'd have 6 → two-char labels
+            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
+            assert.ok(!hintMode.isActive(), "Expected 3 hints (radios only), got more — label[for] was not filtered");
+        });
+    });
+
+    describe("Hash-link/label dedup", () => {
+        // CSS checkbox hack: both <a href="#X"> and <label for="X"> control
+        // the same toggle. The anchor is typically a wide overlay with
+        // screen-reader-only text; the label has the correct visual position.
+        // When the label is a candidate, the hash-link anchor should be removed.
+        it("removes hash-link anchor when label[for] with same ID exists", () => {
+            const label = makeElement("LABEL", { top: 10, left: 10, width: 80, height: 20 });
+            label.htmlFor = "toggle-1";
+            const anchor = makeElement("A", {
+                href: "#toggle-1", top: 10, left: 0, width: 200, height: 20,
+                attrs: { href: "#toggle-1" },
+            });
+
+            loadModules([label, anchor]);
+
+            global.document.elementsFromPoint = (x, y) => {
+                return [anchor, label];
+            };
+
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive());
+            // 1 hint (label only) → single-char label "s"
+            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
+            assert.ok(!hintMode.isActive(), "Expected 1 hint (label only) — hash-link anchor should be removed");
+        });
+
+        // Hash-link anchor kept when there's no corresponding label[for]
+        it("keeps hash-link anchor when no matching label exists", () => {
+            const anchor = makeElement("A", {
+                href: "#section-2", top: 10, left: 0, width: 200, height: 20,
+                attrs: { href: "#section-2" },
+            });
+
+            loadModules([anchor]);
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive());
+            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
+            assert.ok(!hintMode.isActive(), "Hash-link without matching label should be kept");
+            assert.equal(anchor.click.mock.callCount(), 1);
         });
     });
 

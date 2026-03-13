@@ -126,6 +126,7 @@ class HintMode {
   // --- Element discovery ---
 
   private _discoverElements(): HTMLElement[] {
+    // Step 1: Find all clickable elements
     const seen = new Set<Element>();
     const result: HTMLElement[] = [];
 
@@ -148,6 +149,33 @@ class HintMode {
 
     collect(document);
 
+    // Cursor:pointer walk-up: find highest cursor:pointer ancestor for each
+    // candidate. This catches container elements (e.g. Facebook reel cards)
+    // that are clickable via cursor:pointer but don't match CLICKABLE_SELECTOR.
+    const candidateSet = new Set<Element>(result);
+    const pointerExtras: HTMLElement[] = [];
+    for (const el of result) {
+      let ancestor = el.parentElement;
+      let highest: HTMLElement | null = null;
+      while (ancestor && ancestor !== document.body && ancestor !== document.documentElement) {
+        if (candidateSet.has(ancestor)) break; // stop at existing candidate
+        const style = getComputedStyle(ancestor);
+        if (style.cursor === "pointer") {
+          highest = ancestor;
+        } else {
+          break; // stop as soon as cursor is not pointer
+        }
+        ancestor = ancestor.parentElement;
+      }
+      if (highest && !candidateSet.has(highest)) {
+        candidateSet.add(highest);
+        pointerExtras.push(highest);
+      }
+    }
+    for (const el of pointerExtras) {
+      if (this._isVisible(el)) result.push(el);
+    }
+
     // Sort by viewport position: top-left elements get shortest labels
     result.sort((a, b) => {
       const ra = this._getHintRect(a);
@@ -155,34 +183,53 @@ class HintMode {
       return (ra.top - rb.top) || (ra.left - rb.left);
     });
 
-    // Remove ancestor elements when a descendant is also a candidate —
-    // the inner element is the actual interaction target.
-    // Exception: keep both when they are different interactive types
-    // (e.g. a link card containing a menu button — these are independent targets).
+    // Step 2: Resolve candidates — containment-based dedup
     const resultSet = new Set(result);
     const toRemove = new Set<HTMLElement>();
+
+    // Build parentMap: each candidate → its nearest candidate ancestor
+    const parentMap = new Map<HTMLElement, HTMLElement>();
     for (const el of result) {
-      const elType = HintMode._interactiveType(el);
       let ancestor = el.parentElement;
       while (ancestor) {
-        if (resultSet.has(ancestor as HTMLElement)) {
-          const ancType = HintMode._interactiveType(ancestor as HTMLElement);
-          // Only remove ancestor if it's the same type as the descendant —
-          // they represent the same click target (e.g. <a> wrapping <a>).
-          // Different types means independent controls: keep both.
-          if (ancType === elType) {
-            toRemove.add(ancestor as HTMLElement);
-          }
+        if (ancestor !== el && resultSet.has(ancestor as HTMLElement)) {
+          parentMap.set(el, ancestor as HTMLElement);
+          break;
         }
         ancestor = ancestor.parentElement;
       }
     }
 
-    // Deduplicate labels and their associated controls:
-    // - Remove label[for] when its associated input is already a candidate
-    //   (the input's hint already targets the label's position via _findAssociatedLabel)
-    // - Remove hash-link anchors (href="#X") when a label[for="X"] is a candidate
-    //   (CSS checkbox hack pattern — both control the same toggle)
+    // Group children by their parent candidate
+    const childrenOf = new Map<HTMLElement, HTMLElement[]>();
+    for (const [child, parent] of parentMap) {
+      let list = childrenOf.get(parent);
+      if (!list) {
+        list = [];
+        childrenOf.set(parent, list);
+      }
+      list.push(child);
+    }
+
+    // Resolve each group
+    for (const [root, descendants] of childrenOf) {
+      const rootType = HintMode._interactiveType(root);
+      const allSameType = descendants.every(d => HintMode._interactiveType(d) === rootType);
+      const allGeneric = descendants.every(d => HintMode._interactiveType(d) === "generic");
+
+      if (allGeneric) {
+        // All descendants are generic (divs, spans) — keep root only
+        for (const d of descendants) toRemove.add(d);
+      } else if (allSameType) {
+        // All descendants same type as root — drop root, keep descendants
+        toRemove.add(root);
+      } else {
+        // Mixed specific types — keep both root and descendants
+      }
+    }
+
+    // Label-for dedup: remove label[for] when its associated input is already
+    // a candidate (the input's hint targets the label's position via _findAssociatedLabel)
     const labelForIds = new Set<string>();
     for (const el of result) {
       if (el.tagName === "LABEL" && (el as HTMLLabelElement).htmlFor) {
@@ -206,9 +253,8 @@ class HintMode {
       }
     }
 
-    // Dedup 4: Remove disclosure triggers (aria-expanded + aria-controls)
-    // when a sibling candidate exists. These are hover-activated submenu
-    // buttons that are visually hidden but have DOM dimensions.
+    // Disclosure trigger dedup: remove aria-expanded + aria-controls elements
+    // when a sibling candidate exists (hover-activated submenu buttons)
     for (const el of result) {
       if (toRemove.has(el)) continue;
       if (el.getAttribute("aria-expanded") == null) continue;
@@ -281,6 +327,7 @@ class HintMode {
   }
 
   private _isVisible(el: HTMLElement): boolean {
+    if (el.hidden) return false;
     const rect = el.getBoundingClientRect();
     if (rect.width === 0 && rect.height === 0) {
       // Anchor elements with display:contents (e.g. Google search links)
@@ -370,6 +417,7 @@ class HintMode {
   private _getHintTargetElement(el: HTMLElement): HTMLElement {
     const rect = el.getBoundingClientRect();
 
+    // Radio/checkbox inputs → associated label
     if (el.tagName === "INPUT") {
       const type = ((el as HTMLInputElement).type || "").toLowerCase();
       if (type === "radio" || type === "checkbox") {
@@ -380,32 +428,39 @@ class HintMode {
       }
     }
 
-    if (rect.width > window.innerWidth * 0.25) {
-      // First try specific widget children
-      const children = el.querySelectorAll(
-        "h1, h2, h3, h4, h5, h6, button, svg, [role='button'], [class*='icon'], [class*='chevron'], [class*='arrow']"
-      );
-      for (let i = 0; i < children.length; i++) {
-        const cr = children[i].getBoundingClientRect();
-        if (cr.width > 0 && cr.height > 0 && cr.width < rect.width * 0.5) {
-          return children[i] as HTMLElement;
-        }
-      }
-      // Fall back to any narrower child with text (e.g. <span>Show more</span>)
-      const textChildren = el.querySelectorAll("span, p, em, strong, b, i, u, small");
-      for (let i = 0; i < textChildren.length; i++) {
-        const child = textChildren[i] as HTMLElement;
-        const cr = child.getBoundingClientRect();
-        if (cr.width > 0 && cr.height > 0 && cr.width < rect.width * 0.5 && (child.textContent || "").trim().length > 0) {
-          return child;
-        }
-      }
-    }
-
+    // Zero-size anchor → first visible child
     if (el.tagName === "A" && rect.width === 0 && rect.height === 0) {
       for (const child of el.children) {
         const cr = (child as HTMLElement).getBoundingClientRect();
         if (cr.width > 0 && cr.height > 0) return child as HTMLElement;
+      }
+    }
+
+    // First descendant matching CLICKABLE_SELECTOR (visual affordance)
+    const clickableChildren = el.querySelectorAll(CLICKABLE_SELECTOR);
+    for (let i = 0; i < clickableChildren.length; i++) {
+      const child = clickableChildren[i] as HTMLElement;
+      if (child === el) continue;
+      const cr = child.getBoundingClientRect();
+      if (cr.width > 0 && cr.height > 0) return child;
+    }
+
+    // First descendant with direct text content (what the user reads)
+    if (typeof document.createTreeWalker === "function") {
+      const walker = document.createTreeWalker(el, 0x1 /* NodeFilter.SHOW_ELEMENT */);
+      let node = walker.nextNode() as HTMLElement | null;
+      while (node) {
+        if (node !== el) {
+          // Check for direct text content (not just inherited from children)
+          for (let i = 0; i < node.childNodes.length; i++) {
+            const child = node.childNodes[i];
+            if (child.nodeType === 3 && (child.textContent || "").trim().length > 0) {
+              const cr = node.getBoundingClientRect();
+              if (cr.width > 0 && cr.height > 0) return node;
+            }
+          }
+        }
+        node = walker.nextNode() as HTMLElement | null;
       }
     }
 
