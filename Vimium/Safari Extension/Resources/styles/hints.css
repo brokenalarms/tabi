@@ -37,6 +37,17 @@
     text-transform: uppercase;
 }
 
+.vimium-hint-row::after {
+    content: "";
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    width: 28px;
+    height: 1px;
+    background: linear-gradient(to right, var(--vimium-hint-border), transparent);
+    pointer-events: none;
+}
+
 .vimium-hint .vimium-hint-matched {
     opacity: var(--vimium-hint-matched-opacity);
 }
