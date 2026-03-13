@@ -59,6 +59,7 @@
 
 .vimium-hint-ring {
     position: absolute;
+    z-index: 2147483647;
     border-radius: 6px;
     border: 2px solid rgba(69, 137, 255, 0.85);
     box-shadow: 0 0 8px rgba(69, 137, 255, 0.4);
@@ -66,9 +67,18 @@
     animation: vimium-hint-ring-in 150ms ease-out forwards;
 }
 
+.vimium-hint-ring-out {
+    animation: vimium-hint-ring-fade 300ms ease-out forwards;
+}
+
 @keyframes vimium-hint-ring-in {
     0% { opacity: 0; }
     100% { opacity: 1; }
+}
+
+@keyframes vimium-hint-ring-fade {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
 }
 
 .vimium-hint-tail {
