@@ -212,6 +212,13 @@ export class HintMode {
       }
     }
 
+    // Inline elements have tight text rects — center on nearest block ancestor instead
+    // so hints in vertical lists align rather than scattering with text width.
+    if (getComputedStyle(target).display.startsWith("inline") && target.parentElement) {
+      const parentRect = target.parentElement.getBoundingClientRect();
+      rect = new DOMRect(parentRect.left, rect.top, parentRect.width, rect.height);
+    }
+
     return rect;
   }
 
