@@ -94,7 +94,6 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   // Link hint navigation
   const hintMode = new HintMode(keyHandler);
   hintMode.wireCommands();
-  hintMode.setPointerTails(resolved.enablePointerTails === "true");
 
   // In-page find
   const findMode = new FindMode(keyHandler);
@@ -114,9 +113,6 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
     }
     if (changes.theme?.newValue) {
       applyTheme(changes.theme.newValue as Theme);
-    }
-    if (changes.enablePointerTails) {
-      hintMode.setPointerTails(changes.enablePointerTails.newValue === "true");
     }
   });
 
@@ -223,7 +219,7 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
 }
 
 // Read all settings and initialize
-browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme", "enablePointerTails"]).then((result) => {
+browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme"]).then((result) => {
   const excluded = (result.excludedDomains as string[]) || [];
   if (isDomainExcluded(excluded)) {
     browser.runtime.sendMessage({ command: "extensionInactive" });

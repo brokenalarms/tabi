@@ -36,7 +36,6 @@ export class HintMode {
   private hints: Hint[];
   private typed: string;
   private overlay: HTMLDivElement | null;
-  private pointerTails: boolean;
   private activating: boolean;
   private readonly onMouseDown: () => void;
   private readonly onScroll: () => void;
@@ -48,7 +47,6 @@ export class HintMode {
     this.hints = [];
     this.typed = "";
     this.overlay = null;
-    this.pointerTails = false;
     this.activating = false;
     this.onMouseDown = this.deactivate.bind(this);
     this.onScroll = this.deactivate.bind(this);
@@ -80,8 +78,6 @@ export class HintMode {
       return { element: el, label, div };
     });
 
-    if (!this.pointerTails) this.markRowHints();
-
     this.keyHandler.setModeKeyDelegate(this.handleKey.bind(this));
     document.addEventListener("mousedown", this.onMouseDown, true);
     window.addEventListener("scroll", this.onScroll, true);
@@ -112,10 +108,6 @@ export class HintMode {
 
   isActive(): boolean {
     return this.active;
-  }
-
-  setPointerTails(enabled: boolean): void {
-    this.pointerTails = enabled;
   }
 
   wireCommands(): void {
@@ -292,30 +284,16 @@ export class HintMode {
     const div = document.createElement("div");
     div.className = "vimium-hint";
     div.textContent = label;
-    if (this.pointerTails) {
-      const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
-      div.style.left = Math.max(0, pos.x) + "px";
-      div.style.top = Math.max(0, pos.y) + "px";
-      div.style.transform = "translateX(-50%)";
-      const tail = document.createElement("div");
-      tail.className = "vimium-hint-tail";
-      div.appendChild(tail);
-    } else {
-      const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
-      div.style.left = Math.max(0, pos.x) + "px";
-      div.style.top = Math.max(0, pos.y) + "px";
-      div.style.transform = "translateX(-50%)";
-    }
+    const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
+    div.style.left = Math.max(0, pos.x) + "px";
+    div.style.top = Math.max(0, pos.y) + "px";
+    div.style.transform = "translateX(-50%)";
+    const tail = document.createElement("div");
+    tail.className = "vimium-hint-tail";
+    div.appendChild(tail);
 
     if (this.overlay) this.overlay.appendChild(div);
     return div;
-  }
-
-  private markRowHints(): void {
-    if (this.hints.length < 2) return;
-    for (const hint of this.hints) {
-      hint.div.classList.add("vimium-hint-row");
-    }
   }
 
   // --- Key handling ---
