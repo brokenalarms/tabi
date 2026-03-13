@@ -428,16 +428,22 @@ export class HintMode {
   }
 
   private activateViaKeyboard(element: HTMLElement): void {
-    // Checkboxes and radios toggle on Space, not Enter
     const tag = element.tagName.toLowerCase();
     const inputType = tag === "input" ? ((element as HTMLInputElement).type || "").toLowerCase() : "";
-    const useSpace = inputType === "checkbox" || inputType === "radio";
-    const key = useSpace ? " " : "Enter";
-    const code = useSpace ? "Space" : "Enter";
+    const interactive = tag === "a" || tag === "button" || tag === "select" || tag === "textarea"
+      || tag === "input" || element.getAttribute("role") === "button"
+      || element.getAttribute("role") === "link" || element.getAttribute("role") === "menuitem";
 
-    const opts = { key, code, bubbles: true, cancelable: true };
-    element.dispatchEvent(new KeyboardEvent("keydown", opts));
-    element.dispatchEvent(new KeyboardEvent("keypress", opts));
-    element.dispatchEvent(new KeyboardEvent("keyup", opts));
+    if (interactive) {
+      const useSpace = inputType === "checkbox" || inputType === "radio";
+      const key = useSpace ? " " : "Enter";
+      const code = useSpace ? "Space" : "Enter";
+      const opts = { key, code, bubbles: true, cancelable: true };
+      element.dispatchEvent(new KeyboardEvent("keydown", opts));
+      element.dispatchEvent(new KeyboardEvent("keypress", opts));
+      element.dispatchEvent(new KeyboardEvent("keyup", opts));
+    } else {
+      element.click();
+    }
   }
 }
