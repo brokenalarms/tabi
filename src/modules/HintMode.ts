@@ -1,16 +1,10 @@
 // HintMode — link-hint overlay for Vimium
-// Discovers clickable elements, renders labeled hints, and dispatches
+// Renders labeled hints over discovered elements and dispatches
 // clicks when the user types the matching label characters.
 
 import type { ModeValue } from "../types";
-
-declare const Mode: {
-  readonly NORMAL: "NORMAL";
-  readonly INSERT: "INSERT";
-  readonly HINTS: "HINTS";
-  readonly FIND: "FIND";
-  readonly TAB_SEARCH: "TAB_SEARCH";
-};
+import { discoverElements, findAssociatedLabel, CLICKABLE_SELECTOR } from "./ElementGatherer";
+import { Mode } from "../commands";
 
 declare const browser: {
   runtime: {
@@ -35,38 +29,7 @@ interface Hint {
 const HINT_CHARS = "sadgjklewcmpoh";
 const HINT_ANIMATE = true;
 
-const CLICKABLE_SELECTOR = [
-  "a", "button", "input", "textarea", "select",
-  "summary", "details", "label[for]",
-  "[role='button']", "[role='link']", "[role='tab']",
-  "[role='menuitem']", "[role='option']", "[role='checkbox']",
-  "[role='radio']", "[role='switch']",
-  "[tabindex]:not([tabindex='-1'])",
-  "[onclick]", "[onmousedown]",
-].join(", ");
-
-// --- Exclusion pipeline ---
-// Declarative predicates that discard elements from hint discovery.
-// Each returns true → element is excluded.
-
-// Subtree exclude selector: if element or any ancestor matches, discard.
-// Single closest() call handles all subtree-level exclusions.
-const SUBTREE_EXCLUDE_SELECTOR = '[aria-hidden="true"], [inert]';
-
-// Element excludes: checked on the element itself only.
-const ELEMENT_EXCLUDES: Array<(el: HTMLElement) => boolean> = [
-  (el) => !!(el as HTMLButtonElement).disabled,
-  (el) => el.hidden,
-];
-
-// Style excludes: checked via getComputedStyle. Opacity:0 is handled
-// separately in isVisible due to radio/checkbox → label redirect.
-const STYLE_EXCLUDES: Array<(style: CSSStyleDeclaration) => boolean> = [
-  (s) => s.display === "none",
-  (s) => s.visibility === "hidden",
-];
-
-class HintMode {
+export class HintMode {
   private keyHandler: KeyHandlerLike;
   private active: boolean;
   private newTab: boolean;
@@ -103,7 +66,7 @@ class HintMode {
     this.typed = "";
     this.keyHandler.setMode(Mode.HINTS);
 
-    const elements = this.discoverElements();
+    const elements = discoverElements(this.getHintRect.bind(this));
     if (elements.length === 0) {
       this.deactivate();
       return;
@@ -170,296 +133,22 @@ class HintMode {
     this.unwireCommands();
   }
 
-  // --- Element discovery ---
-
-  private discoverElements(): HTMLElement[] {
-    // Step 1: Find all clickable elements
-    const seen = new Set<Element>();
-    const result: HTMLElement[] = [];
-
-    const collect = (root: Document | ShadowRoot): void => {
-      const nodes = root.querySelectorAll(CLICKABLE_SELECTOR);
-      for (const el of nodes) {
-        if (seen.has(el)) continue;
-        seen.add(el);
-        if (this.isVisible(el as HTMLElement) && this.isInteractive(el as HTMLElement)) result.push(el as HTMLElement);
-      }
-
-      // Check for shadow roots
-      const allEls = root.querySelectorAll("*");
-      for (const el of allEls) {
-        if (el.shadowRoot) {
-          collect(el.shadowRoot);
-        }
-      }
-    };
-
-    collect(document);
-
-    // Cursor:pointer walk-up: find highest cursor:pointer ancestor for each
-    // candidate. This catches container elements (e.g. Facebook reel cards)
-    // that are clickable via cursor:pointer but don't match CLICKABLE_SELECTOR.
-    const candidateSet = new Set<Element>(result);
-    const pointerExtras: HTMLElement[] = [];
-    for (const el of result) {
-      let ancestor = el.parentElement;
-      let highest: HTMLElement | null = null;
-      while (ancestor && ancestor !== document.body && ancestor !== document.documentElement) {
-        if (candidateSet.has(ancestor)) break; // stop at existing candidate
-        const style = getComputedStyle(ancestor);
-        if (style.cursor === "pointer") {
-          highest = ancestor;
-        } else {
-          break; // stop as soon as cursor is not pointer
-        }
-        ancestor = ancestor.parentElement;
-      }
-      if (highest && !candidateSet.has(highest)) {
-        candidateSet.add(highest);
-        pointerExtras.push(highest);
-      }
-    }
-    for (const el of pointerExtras) {
-      if (!this.isExcluded(el) && this.isVisible(el)) result.push(el);
-    }
-
-    // Sort by viewport position: top-left elements get shortest labels
-    result.sort((a, b) => {
-      const ra = this.getHintRect(a);
-      const rb = this.getHintRect(b);
-      return (ra.top - rb.top) || (ra.left - rb.left);
-    });
-
-    // Step 2: Resolve candidates — containment-based dedup
-    const resultSet = new Set(result);
-    const toRemove = new Set<HTMLElement>();
-
-    // Build parentMap: each candidate → its nearest candidate ancestor
-    const parentMap = new Map<HTMLElement, HTMLElement>();
-    for (const el of result) {
-      let ancestor = el.parentElement;
-      while (ancestor) {
-        if (ancestor !== el && resultSet.has(ancestor as HTMLElement)) {
-          parentMap.set(el, ancestor as HTMLElement);
-          break;
-        }
-        ancestor = ancestor.parentElement;
-      }
-    }
-
-    // Group children by their parent candidate
-    const childrenOf = new Map<HTMLElement, HTMLElement[]>();
-    for (const [child, parent] of parentMap) {
-      let list = childrenOf.get(parent);
-      if (!list) {
-        list = [];
-        childrenOf.set(parent, list);
-      }
-      list.push(child);
-    }
-
-    // Resolve each group
-    for (const [root, descendants] of childrenOf) {
-      const rootType = HintMode.interactiveType(root);
-      const allSameType = descendants.every(d => HintMode.interactiveType(d) === rootType);
-      const allGeneric = descendants.every(d => HintMode.interactiveType(d) === "generic");
-
-      if (allGeneric) {
-        // All descendants are generic (divs, spans) — keep root only
-        for (const d of descendants) toRemove.add(d);
-      } else if (allSameType) {
-        // All descendants same type as root — drop root, keep descendants
-        toRemove.add(root);
-      } else {
-        // Mixed specific types — keep both root and descendants
-      }
-    }
-
-    // Label-for dedup: remove label[for] when its associated input is already
-    // a candidate (the input's hint targets the label's position via findAssociatedLabel)
-    const labelForIds = new Set<string>();
-    for (const el of result) {
-      if (el.tagName === "LABEL" && (el as HTMLLabelElement).htmlFor) {
-        const forId = (el as HTMLLabelElement).htmlFor;
-        const input = document.getElementById(forId);
-        if (input && resultSet.has(input as HTMLElement)) {
-          toRemove.add(el);
-        } else {
-          labelForIds.add(forId);
-        }
-      }
-    }
-    if (labelForIds.size > 0) {
-      for (const el of result) {
-        if (el.tagName === "A") {
-          const href = el.getAttribute("href");
-          if (href && href.charAt(0) === "#" && labelForIds.has(href.slice(1))) {
-            toRemove.add(el);
-          }
-        }
-      }
-    }
-
-    // Disclosure trigger dedup: remove aria-expanded + aria-controls elements
-    // when a sibling candidate exists (hover-activated submenu buttons)
-    for (const el of result) {
-      if (toRemove.has(el)) continue;
-      if (el.getAttribute("aria-expanded") == null) continue;
-      if (!el.getAttribute("aria-controls")) continue;
-
-      const parent = el.parentElement;
-      if (!parent) continue;
-
-      for (const sibling of result) {
-        if (sibling !== el && !toRemove.has(sibling) && sibling.parentElement === parent) {
-          toRemove.add(el);
-          break;
-        }
-      }
-    }
-
-    return result.filter(el => !toRemove.has(el));
-  }
-
-  // Returns the interactive "type" of an element — used to determine whether
-  // an ancestor and descendant are the same target or independent controls.
-  private static interactiveType(el: HTMLElement): string {
-    const tag = el.tagName.toLowerCase();
-    const role = el.getAttribute("role")?.toLowerCase();
-    if (tag === "a" || role === "link") return "link";
-    if (tag === "button" || role === "button" || role === "menuitem") return "action";
-    if (tag === "input" || tag === "textarea" || tag === "select" ||
-        role === "checkbox" || role === "radio" || role === "switch" || role === "option") return "form";
-    if (tag === "summary" || tag === "details" || role === "tab") return "disclosure";
-    if (tag === "label") return "label";
-    return "generic";
-  }
-
-  private isExcluded(el: HTMLElement): boolean {
-    return !!el.closest(SUBTREE_EXCLUDE_SELECTOR) || ELEMENT_EXCLUDES.some(fn => fn(el));
-  }
-
-  private isInteractive(el: HTMLElement): boolean {
-    if (this.isExcluded(el)) return false;
-
-    const tag = el.tagName.toLowerCase();
-    if (tag === "a" || tag === "button" || tag === "input" ||
-        tag === "textarea" || tag === "select" ||
-        tag === "summary" || tag === "details" || tag === "label") {
-      return true;
-    }
-    const role = el.getAttribute("role")?.toLowerCase();
-    if (role === "button" || role === "link" || role === "tab" ||
-        role === "menuitem" || role === "option" ||
-        role === "checkbox" || role === "radio" || role === "switch") {
-      return true;
-    }
-    const style = getComputedStyle(el);
-    return style.cursor === "pointer";
-  }
-
-  private findAssociatedLabel(el: HTMLElement): HTMLElement | null {
-    if (el.id) {
-      const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
-      if (label) return label as HTMLElement;
-    }
-    const parent = el.closest("label");
-    if (parent) return parent as HTMLElement;
-    return null;
-  }
-
-  private isVisible(el: HTMLElement): boolean {
-    const rect = el.getBoundingClientRect();
-    if (rect.width === 0 && rect.height === 0) {
-      if (el.tagName === "A") {
-        for (const child of el.children) {
-          const cr = (child as HTMLElement).getBoundingClientRect();
-          if (cr.width > 0 && cr.height > 0) {
-            return this.isVisible(child as HTMLElement);
-          }
-        }
-      }
-      if (el.tagName === "INPUT") {
-        const type = ((el as HTMLInputElement).type || "").toLowerCase();
-        if (type === "radio" || type === "checkbox") {
-          const label = this.findAssociatedLabel(el);
-          if (label) return this.isVisible(label);
-        }
-      }
-      return false;
-    }
-    if (rect.bottom < 0 || rect.top > window.innerHeight) return false;
-    if (rect.right < 0 || rect.left > window.innerWidth) return false;
-
-    const style = getComputedStyle(el);
-    if (STYLE_EXCLUDES.some(fn => fn(style))) return false;
-    // Opacity:0 — excluded, with radio/checkbox → label redirect
-    if (parseFloat(style.opacity) === 0) {
-      if (el.tagName === "INPUT") {
-        const type = ((el as HTMLInputElement).type || "").toLowerCase();
-        if (type === "radio" || type === "checkbox") {
-          const label = this.findAssociatedLabel(el);
-          if (label) return this.isVisible(label);
-        }
-      }
-      return false;
-    }
-
-    // Check if element is clipped by an ancestor with overflow:hidden/clip
-    let ancestor = el.parentElement;
-    while (ancestor && ancestor !== document.body) {
-      const overflow = getComputedStyle(ancestor).overflow;
-      if (overflow === "hidden" || overflow === "clip") {
-        const ar = ancestor.getBoundingClientRect();
-        if (rect.bottom <= ar.top || rect.top >= ar.bottom ||
-            rect.right <= ar.left || rect.left >= ar.right) {
-          return false;
-        }
-      }
-      ancestor = ancestor.parentElement;
-    }
-
-    // Check if element is actually reachable (not fully covered by another element).
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    const px = Math.min(Math.max(centerX, 0), window.innerWidth - 1);
-    const py = Math.min(Math.max(centerY, 0), window.innerHeight - 1);
-
-    const elMatchesPoint = (point: Element[]): boolean => {
-      for (const hit of point) {
-        if (el.contains(hit) || hit.contains(el)) return true;
-      }
-      return false;
-    };
-
-    const centerHits = document.elementsFromPoint(px, py);
-    if (centerHits.length > 0 && !elMatchesPoint(centerHits)) {
-      const tlHits = document.elementsFromPoint(
-        Math.min(Math.max(rect.left + 2, 0), window.innerWidth - 1),
-        Math.min(Math.max(rect.top + 2, 0), window.innerHeight - 1)
-      );
-      if (tlHits.length === 0 || !elMatchesPoint(tlHits)) {
-        return false;
-      }
-    }
-
-    return true;
-  }
+  // --- Hint target element ---
 
   private getHintTargetElement(el: HTMLElement): HTMLElement {
     const rect = el.getBoundingClientRect();
 
-    if (el.tagName === "INPUT") {
+    if (el.tagName.toLowerCase() === "input") {
       const type = ((el as HTMLInputElement).type || "").toLowerCase();
       if (type === "radio" || type === "checkbox") {
         if ((rect.width === 0 && rect.height === 0) || parseFloat(getComputedStyle(el).opacity) === 0) {
-          const label = this.findAssociatedLabel(el);
+          const label = findAssociatedLabel(el);
           if (label) return label;
         }
       }
     }
 
-    if (el.tagName === "A" && rect.width === 0 && rect.height === 0) {
+    if (el.tagName.toLowerCase() === "a" && rect.width === 0 && rect.height === 0) {
       for (const child of el.children) {
         const cr = (child as HTMLElement).getBoundingClientRect();
         if (cr.width > 0 && cr.height > 0) return child as HTMLElement;
@@ -475,7 +164,7 @@ class HintMode {
     }
 
     if (typeof document.createTreeWalker === "function") {
-      const walker = document.createTreeWalker(el, 0x1 /* NodeFilter.SHOW_ELEMENT */);
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT);
       let node = walker.nextNode() as HTMLElement | null;
       while (node) {
         if (node !== el) {
@@ -509,7 +198,7 @@ class HintMode {
       }
     }
 
-    if (el.tagName === "A") {
+    if (el.tagName.toLowerCase() === "a") {
       const clientRects = (el === target ? el : target).getClientRects();
       if (clientRects.length > 0) {
         for (let i = 0; i < clientRects.length; i++) {
@@ -695,7 +384,7 @@ class HintMode {
     const afterCollapse = (): void => {
       this.deactivate();
 
-      if (this.newTab && element.tagName === "A" && (element as HTMLAnchorElement).href) {
+      if (this.newTab && element.tagName.toLowerCase() === "a" && (element as HTMLAnchorElement).href) {
         browser.runtime.sendMessage({
           command: "createTab",
           url: (element as HTMLAnchorElement).href,
@@ -712,11 +401,4 @@ class HintMode {
       afterCollapse();
     }
   }
-}
-
-// Export for Node.js tests; no-op in browser content script context
-if (typeof globalThis !== "undefined") {
-  (globalThis as Record<string, unknown>).HintMode = HintMode;
-  (globalThis as Record<string, unknown>).HINT_CHARS = HINT_CHARS;
-  (globalThis as Record<string, unknown>).CLICKABLE_SELECTOR = CLICKABLE_SELECTOR;
 }

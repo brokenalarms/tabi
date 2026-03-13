@@ -1,22 +1,22 @@
 // Settings consumer tests — verifies that content.ts applies theme and
 // keyBindingMode settings, and that live updates via storage.onChanged work.
 
-const { describe, it } = require("node:test");
-const assert = require("node:assert/strict");
+import { describe, it } from "node:test";
+import assert from "node:assert/strict";
 
 // Inline applyTheme logic matching content.ts for unit testing
-function applyTheme(theme, element) {
+function applyTheme(theme: string, element: any) {
     element.setAttribute("data-vimium-theme", theme);
 }
 
 describe("applyTheme", () => {
     function makeElement() {
         // Minimal stub that tracks attributes
-        const attrs = {};
+        const attrs: Record<string, string> = {};
         return {
-            setAttribute(name, value) { attrs[name] = value; },
-            removeAttribute(name) { delete attrs[name]; },
-            getAttribute(name) { return attrs[name] ?? null; },
+            setAttribute(name: string, value: string) { attrs[name] = value; },
+            removeAttribute(name: string) { delete attrs[name]; },
+            getAttribute(name: string) { return attrs[name] ?? null; },
         };
     }
 
@@ -48,7 +48,7 @@ describe("storage.onChanged listener", () => {
     it("applies keyBindingMode changes from storage events", () => {
         // Simulate the logic in content.ts onChanged handler
         let currentMode = "location";
-        function handleChange(changes, areaName) {
+        function handleChange(changes: any, areaName: string) {
             if (areaName !== "local") return;
             if (changes.keyBindingMode?.newValue) {
                 currentMode = changes.keyBindingMode.newValue;
@@ -64,7 +64,7 @@ describe("storage.onChanged listener", () => {
 
     it("ignores changes from non-local storage areas", () => {
         let currentMode = "location";
-        function handleChange(changes, areaName) {
+        function handleChange(changes: any, areaName: string) {
             if (areaName !== "local") return;
             if (changes.keyBindingMode?.newValue) {
                 currentMode = changes.keyBindingMode.newValue;
@@ -77,7 +77,7 @@ describe("storage.onChanged listener", () => {
 
     it("applies theme changes from storage events", () => {
         const el = makeElement();
-        function handleChange(changes, areaName) {
+        function handleChange(changes: any, areaName: string) {
             if (areaName !== "local") return;
             if (changes.theme?.newValue) {
                 applyTheme(changes.theme.newValue, el);
@@ -92,11 +92,11 @@ describe("storage.onChanged listener", () => {
     });
 
     function makeElement() {
-        const attrs = {};
+        const attrs: Record<string, string> = {};
         return {
-            setAttribute(name, value) { attrs[name] = value; },
-            removeAttribute(name) { delete attrs[name]; },
-            getAttribute(name) { return attrs[name] ?? null; },
+            setAttribute(name: string, value: string) { attrs[name] = value; },
+            removeAttribute(name: string) { delete attrs[name]; },
+            getAttribute(name: string) { return attrs[name] ?? null; },
         };
     }
 });

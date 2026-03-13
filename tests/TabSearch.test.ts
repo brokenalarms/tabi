@@ -2,16 +2,21 @@
 // Tests fuzzy matching/scoring, overlay lifecycle, keyboard navigation,
 // tab switching, and command wiring.
 
-const { describe, it, beforeEach, afterEach, mock } = require("node:test");
-const assert = require("node:assert/strict");
+import { describe, it, beforeEach, afterEach, mock } from "node:test";
+import assert from "node:assert/strict";
+import { KeyHandler } from "../src/modules/KeyHandler";
+import { TabSearch } from "../src/modules/TabSearch";
+import { Mode } from "../src/commands";
 
 // --- Minimal DOM shim ---
 
-let capturedListeners, keyHandler, tabSearch;
-let bodyEl, headEl;
-let sentMessages;
+let capturedListeners: Record<string, Function>,
+    keyHandler: InstanceType<typeof KeyHandler>,
+    tabSearch: InstanceType<typeof TabSearch>;
+let bodyEl: any, headEl: any;
+let sentMessages: any[];
 
-function makeElement(tag, opts = {}) {
+function makeElement(tag: string, opts: any = {}) {
     return {
         tagName: tag,
         type: opts.type || "",
@@ -22,28 +27,28 @@ function makeElement(tag, opts = {}) {
         textContent: "",
         parentNode: opts.parentNode || bodyEl,
         style: {},
-        firstChild: null,
-        _children: [],
-        _listeners: {},
+        firstChild: null as any,
+        _children: [] as any[],
+        _listeners: {} as Record<string, Function>,
         focus: mock.fn(),
         blur: mock.fn(),
         select: mock.fn(),
-        setAttribute(k, v) { this["_attr_" + k] = v; },
-        appendChild(child) {
+        setAttribute(k: string, v: string) { (this as any)["_attr_" + k] = v; },
+        appendChild(child: any) {
             child.parentNode = this;
             this._children.push(child);
             if (!this.firstChild) this.firstChild = child;
             return child;
         },
-        removeChild(child) {
+        removeChild(child: any) {
             const idx = this._children.indexOf(child);
             if (idx >= 0) this._children.splice(idx, 1);
             child.parentNode = null;
             this.firstChild = this._children[0] || null;
             return child;
         },
-        addEventListener(type, fn) { this._listeners[type] = fn; },
-        removeEventListener(type, fn) { delete this._listeners[type]; },
+        addEventListener(type: string, fn: Function) { this._listeners[type] = fn; },
+        removeEventListener(type: string, fn: Function) { delete this._listeners[type]; },
     };
 }
 
@@ -55,33 +60,33 @@ function setupDOM() {
     bodyEl.parentNode = null;
     headEl = makeElement("HEAD");
 
-    globalThis.document = {
+    (globalThis as any).document = {
         body: bodyEl,
         head: headEl,
         documentElement: makeElement("HTML"),
         activeElement: bodyEl,
-        createElement(tag) {
+        createElement(tag: string) {
             return makeElement(tag.toUpperCase());
         },
-        addEventListener(type, fn, opts) {
+        addEventListener(type: string, fn: Function, opts?: any) {
             capturedListeners[type] = fn;
         },
-        removeEventListener(type, fn, opts) {
+        removeEventListener(type: string, fn: Function, opts?: any) {
             if (capturedListeners[type] === fn) delete capturedListeners[type];
         },
         querySelectorAll() { return []; },
     };
 
-    globalThis.window = {
+    (globalThis as any).window = {
         innerWidth: 1024,
         innerHeight: 768,
         find() { return true; },
         getSelection() { return { removeAllRanges() {} }; },
     };
 
-    globalThis.browser = {
+    (globalThis as any).browser = {
         runtime: {
-            sendMessage(msg) {
+            sendMessage(msg: any) {
                 sentMessages.push(msg);
                 if (msg.command === "queryTabs") {
                     return Promise.resolve([
@@ -97,7 +102,7 @@ function setupDOM() {
         },
     };
 
-    globalThis.getComputedStyle = () => ({
+    (globalThis as any).getComputedStyle = () => ({
         visibility: "visible",
         display: "block",
         opacity: "1",
@@ -106,13 +111,13 @@ function setupDOM() {
 }
 
 function teardownDOM() {
-    delete globalThis.document;
-    delete globalThis.window;
-    delete globalThis.browser;
-    delete globalThis.getComputedStyle;
+    delete (globalThis as any).document;
+    delete (globalThis as any).window;
+    delete (globalThis as any).browser;
+    delete (globalThis as any).getComputedStyle;
 }
 
-function fireKeyDown(code, opts = {}) {
+function fireKeyDown(code: string, opts: any = {}) {
     const event = {
         code,
         key: opts.key || "",
@@ -130,12 +135,6 @@ function fireKeyDown(code, opts = {}) {
     }
     return event;
 }
-
-// --- Load modules ---
-
-require("../Vimium/Safari Extension/Resources/commands.js");
-require("../Vimium/Safari Extension/Resources/modules/KeyHandler.js");
-require("../Vimium/Safari Extension/Resources/modules/TabSearch.js");
 
 // --- Tests ---
 
@@ -206,14 +205,14 @@ describe("TabSearch", () => {
 
         // Verifies that empty query returns all tabs in original order
         it("returns all tabs for empty query", () => {
-            const result = TabSearch.scoreTabs("", tabs);
+            const result = TabSearch.scoreTabs("", tabs as any);
             assert.equal(result.length, 3);
             assert.equal(result[0].id, 1);
         });
 
         // Verifies that prefix matches rank higher than substring
         it("ranks prefix matches above substring matches", () => {
-            const result = TabSearch.scoreTabs("git", tabs);
+            const result = TabSearch.scoreTabs("git", tabs as any);
             // GitHub and GitLab both prefix-match; Google doesn't match
             assert.equal(result.length, 2);
             assert.equal(result[0].id, 1); // GitHub first (earlier index)
@@ -222,13 +221,13 @@ describe("TabSearch", () => {
 
         // Verifies that non-matching tabs are excluded
         it("excludes non-matching tabs", () => {
-            const result = TabSearch.scoreTabs("xyz", tabs);
+            const result = TabSearch.scoreTabs("xyz", tabs as any);
             assert.equal(result.length, 0);
         });
 
         // Verifies URL matching works
         it("matches against URL as well as title", () => {
-            const result = TabSearch.scoreTabs("gitlab.com", tabs);
+            const result = TabSearch.scoreTabs("gitlab.com", tabs as any);
             assert.equal(result.length, 1);
             assert.equal(result[0].id, 3);
         });
@@ -265,8 +264,8 @@ describe("TabSearch", () => {
         it("excludes the active tab from results", async () => {
             await tabSearch.activate();
             // 5 tabs total, 1 active → 4 shown
-            assert.equal(tabSearch._filtered.length, 4);
-            assert.ok(tabSearch._filtered.every(t => !t.active));
+            assert.equal((tabSearch as any)._filtered.length, 4);
+            assert.ok((tabSearch as any)._filtered.every((t: any) => !t.active));
         });
     });
 
@@ -274,40 +273,40 @@ describe("TabSearch", () => {
         // Verifies ArrowDown moves selection forward
         it("ArrowDown moves selection down", async () => {
             await tabSearch.activate();
-            assert.equal(tabSearch._selectedIndex, 0);
+            assert.equal((tabSearch as any)._selectedIndex, 0);
             fireKeyDown("ArrowDown");
-            assert.equal(tabSearch._selectedIndex, 1);
+            assert.equal((tabSearch as any)._selectedIndex, 1);
         });
 
         // Verifies ArrowUp wraps around to last item
         it("ArrowUp wraps around from first to last", async () => {
             await tabSearch.activate();
-            assert.equal(tabSearch._selectedIndex, 0);
+            assert.equal((tabSearch as any)._selectedIndex, 0);
             fireKeyDown("ArrowUp");
-            assert.equal(tabSearch._selectedIndex, tabSearch._filtered.length - 1);
+            assert.equal((tabSearch as any)._selectedIndex, (tabSearch as any)._filtered.length - 1);
         });
 
         // Verifies Ctrl-j works like ArrowDown
         it("Ctrl-j moves selection down", async () => {
             await tabSearch.activate();
             fireKeyDown("KeyJ", { ctrlKey: true });
-            assert.equal(tabSearch._selectedIndex, 1);
+            assert.equal((tabSearch as any)._selectedIndex, 1);
         });
 
         // Verifies Ctrl-k works like ArrowUp
         it("Ctrl-k moves selection up (wraps)", async () => {
             await tabSearch.activate();
             fireKeyDown("KeyK", { ctrlKey: true });
-            assert.equal(tabSearch._selectedIndex, tabSearch._filtered.length - 1);
+            assert.equal((tabSearch as any)._selectedIndex, (tabSearch as any)._filtered.length - 1);
         });
 
         // Verifies ArrowDown wraps around at end
         it("ArrowDown wraps from last to first", async () => {
             await tabSearch.activate();
-            const lastIdx = tabSearch._filtered.length - 1;
-            tabSearch._selectedIndex = lastIdx;
+            const lastIdx = (tabSearch as any)._filtered.length - 1;
+            (tabSearch as any)._selectedIndex = lastIdx;
             fireKeyDown("ArrowDown");
-            assert.equal(tabSearch._selectedIndex, 0);
+            assert.equal((tabSearch as any)._selectedIndex, 0);
         });
     });
 
@@ -325,7 +324,7 @@ describe("TabSearch", () => {
         // Verifies that Enter sends switchTab message for the selected tab
         it("sends switchTab for selected tab on Enter", async () => {
             await tabSearch.activate();
-            const selectedTab = tabSearch._filtered[0];
+            const selectedTab = (tabSearch as any)._filtered[0];
             const beforeCount = sentMessages.length;
             fireKeyDown("Enter");
             const switchMsg = sentMessages.find(m => m.command === "switchTab");
@@ -337,11 +336,11 @@ describe("TabSearch", () => {
         // Verifies that Enter with no results does nothing harmful
         it("does nothing when no results match", async () => {
             await tabSearch.activate();
-            tabSearch._filtered = [];
-            tabSearch._selectedIndex = 0;
+            (tabSearch as any)._filtered = [];
+            (tabSearch as any)._selectedIndex = 0;
             const beforeCount = sentMessages.length;
             fireKeyDown("Enter");
-            const switchMsg = sentMessages.slice(beforeCount).find(m => m.command === "switchTab");
+            const switchMsg = sentMessages.slice(beforeCount).find((m: any) => m.command === "switchTab");
             assert.equal(switchMsg, undefined);
         });
     });
@@ -350,29 +349,29 @@ describe("TabSearch", () => {
         // Verifies that typing filters the tab list
         it("filters tabs on input", async () => {
             await tabSearch.activate();
-            tabSearch._inputEl.value = "google";
-            tabSearch._onInput();
-            assert.equal(tabSearch._filtered.length, 1);
-            assert.equal(tabSearch._filtered[0].title, "Google Search");
+            (tabSearch as any)._inputEl.value = "google";
+            (tabSearch as any)._onInput();
+            assert.equal((tabSearch as any)._filtered.length, 1);
+            assert.equal((tabSearch as any)._filtered[0].title, "Google Search");
         });
 
         // Verifies that clearing input shows all non-active tabs
         it("shows all tabs when input cleared", async () => {
             await tabSearch.activate();
-            tabSearch._inputEl.value = "google";
-            tabSearch._onInput();
-            tabSearch._inputEl.value = "";
-            tabSearch._onInput();
-            assert.equal(tabSearch._filtered.length, 4);
+            (tabSearch as any)._inputEl.value = "google";
+            (tabSearch as any)._onInput();
+            (tabSearch as any)._inputEl.value = "";
+            (tabSearch as any)._onInput();
+            assert.equal((tabSearch as any)._filtered.length, 4);
         });
 
         // Verifies that selection resets to 0 after filtering
         it("resets selection on filter change", async () => {
             await tabSearch.activate();
-            tabSearch._selectedIndex = 2;
-            tabSearch._inputEl.value = "stack";
-            tabSearch._onInput();
-            assert.equal(tabSearch._selectedIndex, 0);
+            (tabSearch as any)._selectedIndex = 2;
+            (tabSearch as any)._inputEl.value = "stack";
+            (tabSearch as any)._onInput();
+            assert.equal((tabSearch as any)._selectedIndex, 0);
         });
     });
 
@@ -399,7 +398,7 @@ describe("TabSearch", () => {
             let activated = false;
             const origActivate = tabSearch.activate.bind(tabSearch);
             tabSearch.activate = async () => { activated = true; await origActivate(); };
-            keyHandler._dispatch("openTabSearch");
+            (keyHandler as any)._dispatch("openTabSearch");
             assert.equal(activated, true);
         });
 
@@ -407,7 +406,7 @@ describe("TabSearch", () => {
         it("destroy unwires commands", () => {
             tabSearch.destroy();
             // After destroy, openTabSearch should be a no-op
-            assert.equal(keyHandler._commands.has("openTabSearch"), false);
+            assert.equal((keyHandler as any)._commands.has("openTabSearch"), false);
         });
     });
 });

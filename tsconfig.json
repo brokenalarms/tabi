@@ -4,6 +4,7 @@
     "module": "ES2020",
     "moduleResolution": "bundler",
     "strict": true,
+    "erasableSyntaxOnly": true,
     "noEmit": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

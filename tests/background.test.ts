@@ -3,18 +3,22 @@
 // tab cycling (left/right/first/last), closed-tab stack with max limit,
 // and queryTabs response format.
 
-const { describe, it, beforeEach, mock } = require("node:test");
-const assert = require("node:assert/strict");
+import { describe, it, beforeEach } from "node:test";
+import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
 
 // --- browser API shim ---
 
-let mockTabs;
-let createdTabs;
-let removedTabIds;
-let activatedTabId;
-let actionState;
-let tabRemovedListeners;
-let tabUpdatedListeners;
+let mockTabs: Array<{ id: number; title: string; url: string; active: boolean }>;
+let createdTabs: Array<Record<string, unknown>>;
+let removedTabIds: number[];
+let activatedTabId: number | null;
+let actionState: Record<number, Record<string, unknown>>;
+let tabRemovedListeners: Array<(tabId: number) => void>;
+let tabUpdatedListeners: Array<(tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string }) => void>;
+
 function resetBrowserShim() {
     mockTabs = [
         { id: 1, title: "Tab 1", url: "https://example.com/1", active: false },
@@ -28,46 +32,47 @@ function resetBrowserShim() {
     tabRemovedListeners = [];
     tabUpdatedListeners = [];
 
-    global.browser = {
+    const g = globalThis as Record<string, unknown>;
+    g.browser = {
         tabs: {
-            async create(opts) {
+            async create(opts: Record<string, unknown>) {
                 const tab = { id: 100 + createdTabs.length, ...opts };
                 createdTabs.push(tab);
                 return tab;
             },
-            async remove(tabId) {
+            async remove(tabId: number) {
                 removedTabIds.push(tabId);
                 mockTabs = mockTabs.filter(t => t.id !== tabId);
             },
-            async update(tabId, props) {
+            async update(tabId: number, props: Record<string, unknown>) {
                 if (props.active) activatedTabId = tabId;
                 return { id: tabId, ...props };
             },
-            async query(_opts) {
+            async query(_opts: Record<string, unknown>) {
                 return [...mockTabs];
             },
             onRemoved: {
-                addListener(fn) { tabRemovedListeners.push(fn); },
+                addListener(fn: (tabId: number) => void) { tabRemovedListeners.push(fn); },
             },
             onUpdated: {
-                addListener(fn) { tabUpdatedListeners.push(fn); },
+                addListener(fn: (tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string }) => void) { tabUpdatedListeners.push(fn); },
             },
         },
         action: {
-            async enable(tabId) {
+            async enable(tabId: number) {
                 if (!actionState[tabId]) actionState[tabId] = {};
                 actionState[tabId].enabled = true;
             },
-            async disable(tabId) {
+            async disable(tabId: number) {
                 if (!actionState[tabId]) actionState[tabId] = {};
                 actionState[tabId].enabled = false;
             },
-            async setBadgeText(opts) {
+            async setBadgeText(opts: { tabId: number; text: string }) {
                 const id = opts.tabId;
                 if (!actionState[id]) actionState[id] = {};
                 actionState[id].badgeText = opts.text;
             },
-            async setTitle(opts) {
+            async setTitle(opts: { tabId: number; title: string }) {
                 const id = opts.tabId;
                 if (!actionState[id]) actionState[id] = {};
                 actionState[id].title = opts.title;
@@ -79,14 +84,25 @@ function resetBrowserShim() {
     };
 }
 
-function makeSender(tabId) {
+function makeSender(tabId: number) {
     const tab = mockTabs.find(t => t.id === tabId);
     return { tab: tab || { id: tabId, url: `https://example.com/${tabId}` } };
 }
 
 // --- Load module ---
 
-let bgModule;
+interface BgModule {
+    closedTabStack: string[];
+    pushClosedTab: (url: string | null) => void;
+    popClosedTab: () => string | null;
+    handleCommand: (command: string, sender: Record<string, unknown>, message?: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    MAX_CLOSED_TABS: number;
+    activeTabSet: Set<number>;
+    tabUrlCache: Map<number, string>;
+    updateIconState: (tabId: number) => Promise<void>;
+}
+
+let bgModule: BgModule;
 
 function loadBackground() {
     // Clear require cache so each test suite gets a fresh module
@@ -94,15 +110,16 @@ function loadBackground() {
     delete require.cache[modPath];
     resetBrowserShim();
     require(modPath);
+    const g = globalThis as Record<string, unknown>;
     bgModule = {
-        closedTabStack: global.closedTabStack,
-        pushClosedTab: global.pushClosedTab,
-        popClosedTab: global.popClosedTab,
-        handleCommand: global.handleCommand,
-        MAX_CLOSED_TABS: global.MAX_CLOSED_TABS,
-        activeTabSet: global.activeTabSet,
-        tabUrlCache: global.tabUrlCache,
-        updateIconState: global.updateIconState,
+        closedTabStack: g.closedTabStack as string[],
+        pushClosedTab: g.pushClosedTab as BgModule["pushClosedTab"],
+        popClosedTab: g.popClosedTab as BgModule["popClosedTab"],
+        handleCommand: g.handleCommand as BgModule["handleCommand"],
+        MAX_CLOSED_TABS: g.MAX_CLOSED_TABS as number,
+        activeTabSet: g.activeTabSet as Set<number>,
+        tabUrlCache: g.tabUrlCache as Map<number, string>,
+        updateIconState: g.updateIconState as BgModule["updateIconState"],
     };
 }
 
@@ -250,7 +267,7 @@ describe("background.js tab management", () => {
     describe("queryTabs command", () => {
         // Verifies that queryTabs returns tab metadata for all tabs.
         it("returns tab list with id, title, url, active fields", async () => {
-            const result = await bgModule.handleCommand("queryTabs", {});
+            const result = await bgModule.handleCommand("queryTabs", {}) as unknown as Array<Record<string, unknown>>;
             assert.equal(result.length, 3);
             assert.deepEqual(Object.keys(result[0]).sort(), ["active", "id", "title", "url"]);
             assert.equal(result[1].active, true);

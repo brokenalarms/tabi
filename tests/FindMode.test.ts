@@ -2,16 +2,20 @@
 // FindMode is a thin wrapper that dispatches Cmd+F to trigger Safari's
 // native find bar. Tests verify command wiring, lifecycle, and cleanup.
 
-const { describe, it, beforeEach, afterEach, mock } = require("node:test");
-const assert = require("node:assert/strict");
+import { describe, it, beforeEach, afterEach, mock } from "node:test";
+import assert from "node:assert/strict";
+import { KeyHandler } from "../src/modules/KeyHandler";
+import { FindMode } from "../src/modules/FindMode";
 
 // --- Minimal DOM shim ---
 
-let capturedListeners, keyHandler, findMode;
-let bodyEl;
-let dispatchedEvents;
+let capturedListeners: Record<string, Function>,
+    keyHandler: InstanceType<typeof KeyHandler>,
+    findMode: InstanceType<typeof FindMode>;
+let bodyEl: any;
+let dispatchedEvents: any[];
 
-function makeElement(tag, opts = {}) {
+function makeElement(tag: string, opts: any = {}) {
     return {
         tagName: tag,
         type: opts.type || "",
@@ -21,22 +25,22 @@ function makeElement(tag, opts = {}) {
         value: opts.value || "",
         parentNode: opts.parentNode || bodyEl,
         style: {},
-        _children: [],
-        _listeners: {},
+        _children: [] as any[],
+        _listeners: {} as Record<string, Function>,
         focus: mock.fn(),
         blur: mock.fn(),
         click: mock.fn(),
         select: mock.fn(),
-        setAttribute(k, v) { this["_attr_" + k] = v; },
-        appendChild(child) { child.parentNode = this; this._children.push(child); return child; },
-        removeChild(child) {
+        setAttribute(k: string, v: string) { (this as any)["_attr_" + k] = v; },
+        appendChild(child: any) { child.parentNode = this; this._children.push(child); return child; },
+        removeChild(child: any) {
             const idx = this._children.indexOf(child);
             if (idx >= 0) this._children.splice(idx, 1);
             child.parentNode = null;
             return child;
         },
-        addEventListener(type, fn) { this._listeners[type] = fn; },
-        removeEventListener(type, fn) { delete this._listeners[type]; },
+        addEventListener(type: string, fn: Function) { this._listeners[type] = fn; },
+        removeEventListener(type: string, fn: Function) { delete this._listeners[type]; },
     };
 }
 
@@ -47,35 +51,41 @@ function setupDOM() {
     bodyEl = makeElement("BODY");
     bodyEl.parentNode = null;
 
-    globalThis.document = {
+    (globalThis as any).document = {
         body: bodyEl,
         head: makeElement("HEAD"),
         documentElement: makeElement("HTML"),
         activeElement: bodyEl,
-        createElement(tag) {
+        createElement(tag: string) {
             return makeElement(tag.toUpperCase());
         },
-        addEventListener(type, fn, opts) {
+        addEventListener(type: string, fn: Function, opts?: any) {
             capturedListeners[type] = fn;
         },
-        removeEventListener(type, fn, opts) {
+        removeEventListener(type: string, fn: Function, opts?: any) {
             if (capturedListeners[type] === fn) delete capturedListeners[type];
         },
         querySelectorAll() { return []; },
-        dispatchEvent(event) {
+        dispatchEvent(event: any) {
             dispatchedEvents.push(event);
         },
     };
 
-    globalThis.window = {
+    (globalThis as any).window = {
         innerWidth: 1024,
         innerHeight: 768,
         find() { return true; },
         getSelection() { return { removeAllRanges() {} }; },
     };
 
-    globalThis.KeyboardEvent = class KeyboardEvent {
-        constructor(type, init = {}) {
+    (globalThis as any).KeyboardEvent = class KeyboardEvent {
+        type: string;
+        key: string;
+        code: string;
+        metaKey: boolean;
+        bubbles: boolean;
+        cancelable: boolean;
+        constructor(type: string, init: any = {}) {
             this.type = type;
             this.key = init.key || "";
             this.code = init.code || "";
@@ -85,7 +95,7 @@ function setupDOM() {
         }
     };
 
-    globalThis.getComputedStyle = () => ({
+    (globalThis as any).getComputedStyle = () => ({
         visibility: "visible",
         display: "block",
         opacity: "1",
@@ -94,13 +104,13 @@ function setupDOM() {
 }
 
 function teardownDOM() {
-    delete globalThis.document;
-    delete globalThis.window;
-    delete globalThis.KeyboardEvent;
-    delete globalThis.getComputedStyle;
+    delete (globalThis as any).document;
+    delete (globalThis as any).window;
+    delete (globalThis as any).KeyboardEvent;
+    delete (globalThis as any).getComputedStyle;
 }
 
-function fireKeyDown(code, opts = {}) {
+function fireKeyDown(code: string, opts: any = {}) {
     const event = {
         code,
         key: opts.key || "",
@@ -118,12 +128,6 @@ function fireKeyDown(code, opts = {}) {
     }
     return event;
 }
-
-// --- Load modules ---
-
-require("../Vimium/Safari Extension/Resources/commands.js");
-require("../Vimium/Safari Extension/Resources/modules/KeyHandler.js");
-require("../Vimium/Safari Extension/Resources/modules/FindMode.js");
 
 // --- Tests ---
 

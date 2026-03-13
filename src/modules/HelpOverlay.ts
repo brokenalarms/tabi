@@ -2,17 +2,7 @@
 // Shows all NORMAL-mode bindings in a centered overlay.
 // Dismissed on any keypress or mouse click.
 
-import type { ModeValue } from "../types";
-
-declare const COMMANDS: Record<string, string>;
-
-declare const Mode: {
-  readonly NORMAL: "NORMAL";
-  readonly INSERT: "INSERT";
-  readonly HINTS: "HINTS";
-  readonly FIND: "FIND";
-  readonly TAB_SEARCH: "TAB_SEARCH";
-};
+import { COMMANDS } from "../commands";
 
 interface KeyHandlerLike {
   on(command: string, callback: () => void): void;
@@ -20,7 +10,7 @@ interface KeyHandlerLike {
   getBindings(): Map<string, Map<string, string>>;
 }
 
-class HelpOverlay {
+export class HelpOverlay {
   private _keyHandler: KeyHandlerLike;
   private _active: boolean;
   private _overlay: HTMLDivElement | null;
@@ -151,9 +141,4 @@ class HelpOverlay {
     this._deactivate();
     this._keyHandler.off("showHelp");
   }
-}
-
-// Export for Node.js tests; no-op in browser content script context
-if (typeof globalThis !== "undefined") {
-  (globalThis as Record<string, unknown>).HelpOverlay = HelpOverlay;
 }

@@ -2,22 +2,12 @@
 // Vimium "/" binding dispatches a synthetic Cmd+F keydown so Safari's
 // built-in find handles everything (highlight, n/N, UI).
 
-import type { ModeValue } from "../types";
-
-declare const Mode: {
-  readonly NORMAL: "NORMAL";
-  readonly INSERT: "INSERT";
-  readonly HINTS: "HINTS";
-  readonly FIND: "FIND";
-  readonly TAB_SEARCH: "TAB_SEARCH";
-};
-
 interface KeyHandlerLike {
   on(command: string, callback: () => void): void;
   off(command: string): void;
 }
 
-class FindMode {
+export class FindMode {
   private _keyHandler: KeyHandlerLike;
 
   constructor(keyHandler: KeyHandlerLike) {
@@ -46,9 +36,4 @@ class FindMode {
   destroy(): void {
     this._keyHandler.off("enterFindMode");
   }
-}
-
-// Export for Node.js tests; no-op in browser content script context
-if (typeof globalThis !== "undefined") {
-  (globalThis as Record<string, unknown>).FindMode = FindMode;
 }

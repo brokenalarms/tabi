@@ -1,9 +1,9 @@
 // DOM problem mode tests — selector pipeline edge cases from real sites.
 // Each test reproduces a specific bug scenario with a minimal DOM fixture.
 
-const { describe, it, afterEach } = require("node:test");
-const assert = require("node:assert/strict");
-const { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } = require("./hintTestHelpers");
+import { describe, it, afterEach } from "node:test";
+import assert from "node:assert/strict";
+import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 
 describe("DOM problems — element discovery", () => {
     afterEach(() => {
@@ -46,9 +46,9 @@ describe("DOM problems — element discovery", () => {
     // ISSUE: zero-size anchor wrapping a visible child gets no hint
     // FIX: fall back to firstElementChild rect for zero-size anchors
     it("falls back to firstElementChild for zero-size anchors", () => {
-        const dom = '<a href="#" style="width:0;height:0"><h3>Title</h3></a>';
         const child = makeElement("H3", { top: 10, left: 20, width: 200, height: 24 });
         const anchor = makeElement("A", { href: "#", width: 0, height: 0, top: 0, left: 0, children: [child] });
+        child.parentElement = anchor;
         loadModules([anchor]);
         const { hintMode } = getState();
         hintMode.activate(false);
@@ -58,9 +58,8 @@ describe("DOM problems — element discovery", () => {
     // ISSUE: label[for] not discovered as clickable — CSS checkbox hack menus use label as the visible "button"
     // FIX: add label[for] to clickable selector
     it("discovers label[for] as a clickable element", () => {
-        const dom = '<label for="menu-toggle">Menu</label>';
         const label = makeElement("LABEL", { top: 10, left: 10, width: 80, height: 20 });
-        label.htmlFor = "menu-toggle";
+        (label as any).htmlFor = "menu-toggle";
         loadModules([label]);
         const { hintMode } = getState();
         hintMode.activate(false);
@@ -74,7 +73,6 @@ describe("DOM problems — element discovery", () => {
     // SITE: apple.com nav
     // FIX: filter elements inside inert subtrees
     it("filters out elements inside an inert subtree", () => {
-        const dom = '<div inert><button>Shop</button></div>';
         const inertContainer = makeElement("DIV", {
             top: 0, left: 0,
             attrs: { "inert": "" },
@@ -82,6 +80,7 @@ describe("DOM problems — element discovery", () => {
         const btn = makeElement("BUTTON", { top: 10, left: 10 });
         btn.parentElement = inertContainer;
         btn.parentNode = inertContainer;
+        (inertContainer as any).children = [btn];
 
         loadModules([btn]);
         const { hintMode } = getState();
@@ -92,7 +91,6 @@ describe("DOM problems — element discovery", () => {
     // ISSUE: hints appear on elements with aria-hidden="true" (but NOT inherited from ancestors)
     // FIX: filter elements with aria-hidden="true" directly, keep descendants of aria-hidden ancestors
     it("filters element with aria-hidden=true", () => {
-        const dom = '<button aria-hidden="true">Hidden</button>';
         const btn = makeElement("BUTTON", {
             top: 10, left: 10,
             attrs: { "aria-hidden": "true" },
@@ -112,6 +110,7 @@ describe("DOM problems — element discovery", () => {
         const btn = makeElement("BUTTON", { top: 10, left: 10 });
         btn.parentElement = wrapper;
         btn.parentNode = wrapper;
+        (wrapper as any).children = [btn];
 
         loadModules([btn]);
         const { hintMode } = getState();
@@ -132,20 +131,20 @@ describe("DOM problems — element discovery", () => {
     it("filters out ancestor wrapper when descendant is also a candidate", () => {
         const textarea = makeElement("TEXTAREA", { top: 10, left: 10 });
         const wrapper = makeElement("DIV", { top: 10, left: 10 });
-        wrapper._tabindex = "0";
+        (wrapper as any)._tabindex = "0";
         textarea.parentElement = wrapper;
         textarea.parentNode = wrapper;
-        wrapper._children = [textarea];
         wrapper.children = [textarea];
+        (wrapper as any).children = [textarea];
 
         loadModules([wrapper, textarea]);
 
         // Need elementFromPoint/elementsFromPoint to return the element itself for visibility
-        global.document.elementFromPoint = (x, y) => {
+        (globalThis as any).document.elementFromPoint = (x: number, y: number) => {
             // Return the textarea for any point check (both are at same position)
             return textarea;
         };
-        global.document.elementsFromPoint = (x, y) => {
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
             return [textarea, wrapper];
         };
 
@@ -177,7 +176,7 @@ describe("DOM problems — visibility edge cases", () => {
         loadModules([overlay, btn]);
 
         // overlay is topmost; btn is underneath
-        global.document.elementsFromPoint = (x, y) => {
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
             return [overlay, btn];
         };
 
@@ -203,6 +202,7 @@ describe("DOM problems — visibility edge cases", () => {
         const btn = makeElement("BUTTON", { top: 60, bottom: 80, left: 10, width: 80, height: 20 });
         btn.parentElement = container;
         btn.parentNode = container;
+        (container as any).children = [btn];
 
         loadModules([btn]);
         const { hintMode } = getState();
@@ -213,23 +213,22 @@ describe("DOM problems — visibility edge cases", () => {
     // ISSUE: custom-styled radio with opacity:0 gets no hint because it fails visibility check
     // FIX: redirect visibility check to associated label when radio is invisible
     it("redirects visibility of opacity:0 radio to associated label", () => {
-        const dom = '<input type="radio" id="r" style="opacity:0"><label for="r">Option</label>';
         const label = makeElement("LABEL", { top: 10, left: 30, width: 100, height: 20 });
-        label.htmlFor = "custom-radio";
+        (label as any).htmlFor = "custom-radio";
         const radio = makeElement("INPUT", {
             type: "radio", top: 10, left: 10,
             width: 16, height: 16, opacity: "0",
         });
-        radio.id = "custom-radio";
+        (radio as any).id = "custom-radio";
         radio.type = "radio";
 
         loadModules([radio, label]);
 
-        global.document.querySelector = (sel) => {
+        (globalThis as any).document.querySelector = (sel: string) => {
             if (sel.includes("custom-radio")) return label;
             return null;
         };
-        global.document.elementsFromPoint = (x, y) => {
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
             // Label is visible at its position
             if (x >= 30 && x < 130) return [label];
             return [radio];
@@ -243,21 +242,21 @@ describe("DOM problems — visibility edge cases", () => {
     // Zero-size radio input redirects visibility to associated label.
     it("redirects visibility of zero-size radio to associated label", () => {
         const label = makeElement("LABEL", { top: 10, left: 30, width: 100, height: 20 });
-        label.htmlFor = "hidden-radio";
+        (label as any).htmlFor = "hidden-radio";
         const radio = makeElement("INPUT", {
             type: "radio", top: 10, left: 10,
             width: 0, height: 0,
         });
-        radio.id = "hidden-radio";
+        (radio as any).id = "hidden-radio";
         radio.type = "radio";
 
         loadModules([radio, label]);
 
-        global.document.querySelector = (sel) => {
+        (globalThis as any).document.querySelector = (sel: string) => {
             if (sel.includes("hidden-radio")) return label;
             return null;
         };
-        global.document.elementsFromPoint = (x, y) => {
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
             if (x >= 30 && x < 130) return [label];
             return [];
         };
@@ -279,38 +278,37 @@ describe("DOM problems — label-for dedup", () => {
     // SITE: wikipedia.org theme picker
     // FIX: filter label[for] when the associated radio input is already a candidate
     it("filters label[for] when associated radio input is a candidate", () => {
-        const dom = '<div><input type="radio" id="X"><label for="X">Text</label></div> × 3';
         const wrapper = makeElement("DIV", { top: 0, left: 0, width: 300, height: 120 });
 
         const radio1 = makeElement("INPUT", { type: "radio", top: 10, left: 10, width: 16, height: 16 });
-        radio1.id = "theme-os";
+        (radio1 as any).id = "theme-os";
         radio1.type = "radio";
         const label1 = makeElement("LABEL", { top: 10, left: 30, width: 100, height: 20 });
-        label1.htmlFor = "theme-os";
+        (label1 as any).htmlFor = "theme-os";
         radio1.parentElement = wrapper;
         label1.parentElement = wrapper;
 
         const radio2 = makeElement("INPUT", { type: "radio", top: 40, left: 10, width: 16, height: 16 });
-        radio2.id = "theme-day";
+        (radio2 as any).id = "theme-day";
         radio2.type = "radio";
         const label2 = makeElement("LABEL", { top: 40, left: 30, width: 100, height: 20 });
-        label2.htmlFor = "theme-day";
+        (label2 as any).htmlFor = "theme-day";
         radio2.parentElement = wrapper;
         label2.parentElement = wrapper;
 
         const radio3 = makeElement("INPUT", { type: "radio", top: 70, left: 10, width: 16, height: 16 });
-        radio3.id = "theme-night";
+        (radio3 as any).id = "theme-night";
         radio3.type = "radio";
         const label3 = makeElement("LABEL", { top: 70, left: 30, width: 100, height: 20 });
-        label3.htmlFor = "theme-night";
+        (label3 as any).htmlFor = "theme-night";
         radio3.parentElement = wrapper;
         label3.parentElement = wrapper;
 
         loadModules([radio1, label1, radio2, label2, radio3, label3]);
 
-        global.document.elementsFromPoint = (x, y) => {
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
             const all = [radio1, label1, radio2, label2, radio3, label3];
-            return all.filter((el) => {
+            return all.filter((el: any) => {
                 const r = el.getBoundingClientRect();
                 return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
             });
@@ -336,9 +334,8 @@ describe("DOM problems — hash-link/label dedup", () => {
     // ISSUE: duplicate hints — hash-link anchor and label[for] both target the same toggle
     // FIX: remove hash-link anchor when a label[for] with the same ID is a candidate
     it("removes hash-link anchor when label[for] with same ID exists", () => {
-        const dom = '<a href="#toggle-1">Toggle</a><label for="toggle-1">Toggle</label>';
         const label = makeElement("LABEL", { top: 10, left: 10, width: 80, height: 20 });
-        label.htmlFor = "toggle-1";
+        (label as any).htmlFor = "toggle-1";
         const anchor = makeElement("A", {
             href: "#toggle-1", top: 10, left: 0, width: 200, height: 20,
             attrs: { href: "#toggle-1" },
@@ -346,7 +343,7 @@ describe("DOM problems — hash-link/label dedup", () => {
 
         loadModules([label, anchor]);
 
-        global.document.elementsFromPoint = (x, y) => {
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
             return [anchor, label];
         };
 
@@ -476,7 +473,7 @@ describe("DOM problems — hint target text walker", () => {
         assert.ok(hintMode.isActive());
 
         // Hint position should target navText (top:30), not badge (top:5)
-        const docEl = global.document.documentElement;
+        const docEl = (globalThis as any).document.documentElement;
         const overlay = docEl._appendedChildren[0];
         const hintDiv = overlay.children[0];
         assert.equal(hintDiv.style.top, "30px",
@@ -503,7 +500,7 @@ describe("DOM problems — hint target text walker", () => {
         assert.ok(hintMode.isActive());
 
         // Hint should target the button itself (top:0), not the 1×1 span (top:5)
-        const docEl = global.document.documentElement;
+        const docEl = (globalThis as any).document.documentElement;
         const overlay = docEl._appendedChildren[0];
         const hintDiv = overlay.children[0];
         assert.equal(hintDiv.style.top, "0px",

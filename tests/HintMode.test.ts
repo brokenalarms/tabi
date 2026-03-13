@@ -1,10 +1,11 @@
 // HintMode unit tests — behavioral tests for label generation, progressive
 // filtering, click dispatch, layout independence, and command wiring.
-// Selector pipeline / DOM problem tests live in domProblems.test.js.
+// Selector pipeline / DOM problem tests live in domProblems.test.ts.
 
-const { describe, it, beforeEach, afterEach } = require("node:test");
-const assert = require("node:assert/strict");
-const { makeElement, makeKeyEvent, loadModules, fireKeyDown, fireMouseDown, getState } = require("./hintTestHelpers");
+import { describe, it, beforeEach, afterEach } from "node:test";
+import assert from "node:assert/strict";
+import { makeElement, makeKeyEvent, loadModules, fireKeyDown, fireMouseDown, getState } from "./hintTestHelpers";
+import { HintMode } from "../src/modules/HintMode";
 
 describe("HintMode", () => {
     afterEach(() => {
@@ -83,7 +84,7 @@ describe("HintMode", () => {
     describe("Progressive filtering", () => {
         // Typing a label character narrows visible hints
         it("hides non-matching hints as user types", () => {
-            const links = [];
+            const links: any[] = [];
             // Create enough links to need multi-char labels (>14)
             for (let i = 0; i < 15; i++) {
                 links.push(makeElement("A", { href: "#" + i, top: i * 20, left: 0 }));
@@ -112,7 +113,7 @@ describe("HintMode", () => {
 
         // Backspace removes last typed character
         it("backspace removes last typed character", () => {
-            const links = [];
+            const links: any[] = [];
             for (let i = 0; i < 15; i++) {
                 links.push(makeElement("A", { href: "#" + i, top: i * 20, left: 0 }));
             }
@@ -245,7 +246,7 @@ describe("HintMode", () => {
         // Hint typing uses event.key (layout character), not event.code (physical position)
         it("matches hints by event.key, not event.code", () => {
             // Create 15 links so labels are 2-char (ss, sa, sd, ...)
-            const links = [];
+            const links: any[] = [];
             for (let i = 0; i < 15; i++) {
                 links.push(makeElement("A", { href: "#" + i, top: i * 20, left: 0 }));
             }
@@ -332,8 +333,8 @@ describe("HintMode", () => {
             hintMode.activate(true);
 
             fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
-            assert.equal(global.browser.runtime.sendMessage.mock.callCount(), 1);
-            const msg = global.browser.runtime.sendMessage.mock.calls[0].arguments[0];
+            assert.equal((globalThis as any).browser.runtime.sendMessage.mock.callCount(), 1);
+            const msg = (globalThis as any).browser.runtime.sendMessage.mock.calls[0].arguments[0];
             assert.equal(msg.command, "createTab");
             assert.equal(msg.url, "https://example.com");
             assert.ok(!hintMode.isActive());

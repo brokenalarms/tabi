@@ -4,20 +4,13 @@
 // Up/Down or Ctrl-j/k, Enter to switch, Escape to dismiss.
 
 import type { ModeValue, TabInfo } from "../types";
+import { Mode } from "../commands";
 
 // Browser API (Safari Web Extension)
 declare const browser: {
   runtime: {
     sendMessage(message: { command: string; tabId?: number }): Promise<unknown>;
   };
-};
-
-declare const Mode: {
-  readonly NORMAL: "NORMAL";
-  readonly INSERT: "INSERT";
-  readonly HINTS: "HINTS";
-  readonly FIND: "FIND";
-  readonly TAB_SEARCH: "TAB_SEARCH";
 };
 
 interface KeyHandlerLike {
@@ -34,7 +27,7 @@ interface ScoredEntry {
   index: number;
 }
 
-class TabSearch {
+export class TabSearch {
   private _keyHandler: KeyHandlerLike;
   private _active: boolean;
   private _overlayEl: HTMLDivElement | null;
@@ -287,9 +280,4 @@ class TabSearch {
     this.deactivate();
     this._keyHandler.off("openTabSearch");
   }
-}
-
-// Export for Node.js tests; no-op in browser content script context
-if (typeof globalThis !== "undefined") {
-  (globalThis as Record<string, unknown>).TabSearch = TabSearch;
 }

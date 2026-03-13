@@ -2,11 +2,18 @@
 // Runs on every page to handle keyboard navigation
 
 import type { KeyBindingMode, ModeValue, Theme, VimiumSettings } from "./types";
+import { Mode } from "./commands";
+import { KeyHandler } from "./modules/KeyHandler";
+import { ScrollController } from "./modules/ScrollController";
+import { HintMode } from "./modules/HintMode";
+import { FindMode } from "./modules/FindMode";
+import { TabSearch } from "./modules/TabSearch";
+import { HelpOverlay } from "./modules/HelpOverlay";
 
 // Browser API (Safari Web Extension)
 declare const browser: {
   runtime: {
-    sendMessage(message: { command: string }): Promise<unknown>;
+    sendMessage(message: { command: string; url?: string; index?: number }): Promise<unknown>;
   };
   storage: {
     local: {
@@ -22,53 +29,6 @@ declare const browser: {
     };
   };
 };
-
-// Globals injected by content_scripts loaded before this file
-declare const Mode: {
-  readonly NORMAL: "NORMAL";
-  readonly INSERT: "INSERT";
-  readonly HINTS: "HINTS";
-  readonly FIND: "FIND";
-  readonly TAB_SEARCH: "TAB_SEARCH";
-};
-
-declare class KeyHandler {
-  mode: ModeValue;
-  getMode(): ModeValue;
-  setMode(mode: ModeValue): void;
-  setKeyBindingMode(mode: KeyBindingMode): void;
-  resetBuffer(): void;
-  on(command: string, callback: () => void): void;
-}
-
-declare class ScrollController {
-  constructor(keyHandler: KeyHandler);
-}
-
-declare class HintMode {
-  constructor(keyHandler: KeyHandler);
-  isActive(): boolean;
-  deactivate(): void;
-  wireCommands(): void;
-  unwireCommands(): void;
-  setPointerTails(enabled: boolean): void;
-}
-
-declare class FindMode {
-  constructor(keyHandler: KeyHandler);
-  destroy(): void;
-}
-
-declare class TabSearch {
-  constructor(keyHandler: KeyHandler);
-  isActive(): boolean;
-  deactivate(): void;
-}
-
-declare class HelpOverlay {
-  constructor(keyHandler: KeyHandler);
-  destroy(): void;
-}
 
 declare global {
   interface Window {
@@ -281,9 +241,3 @@ browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme", "enable
   // If storage read fails, initialize with defaults
   initialize({});
 });
-
-// Export for testing via globalThis
-if (typeof globalThis !== "undefined") {
-  (globalThis as Record<string, unknown>).isDomainExcluded = isDomainExcluded;
-  (globalThis as Record<string, unknown>).applyTheme = applyTheme;
-}

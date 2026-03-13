@@ -1,11 +1,18 @@
 // Shared test helpers for HintMode tests — DOM shim, element factory, module loader.
 
-const { mock } = require("node:test");
+import { mock } from "node:test";
+import { KeyHandler } from "../src/modules/KeyHandler";
+import { HintMode } from "../src/modules/HintMode";
+import { Mode } from "../src/commands";
+import { CLICKABLE_TAGS, CLICKABLE_ROLES } from "../src/modules/ElementGatherer";
 
-let capturedListeners, keyHandler, hintMode;
-let bodyEl, htmlEl;
+let capturedListeners: Record<string, Function[]>;
+let keyHandler: KeyHandler;
+let hintMode: HintMode;
+let bodyEl: any;
+let htmlEl: any;
 
-function makeElement(tag, opts = {}) {
+export function makeElement(tag: string, opts: any = {}) {
     const rect = {
         top: opts.top ?? 0,
         left: opts.left ?? 0,
@@ -14,7 +21,7 @@ function makeElement(tag, opts = {}) {
         width: opts.width ?? 100,
         height: opts.height ?? 20,
     };
-    const style = {
+    const style: any = {
         visibility: opts.visibility || "visible",
         display: opts.display || "block",
         opacity: opts.opacity ?? "1",
@@ -29,6 +36,7 @@ function makeElement(tag, opts = {}) {
         href: opts.href || "",
         type: opts.type || "",
         hidden: opts.hidden || false,
+        disabled: opts.disabled || false,
         isContentEditable: false,
         shadowRoot: opts.shadowRoot || null,
         parentNode: opts.parentNode || null,
@@ -42,10 +50,32 @@ function makeElement(tag, opts = {}) {
             return [];
         },
         _style: style,
-        _children: children,
         _attrs: opts.attrs || {},
-        getAttribute(name) { return this._attrs[name] ?? null; },
-        contains(other) {
+        getAttribute(name: string) { return this._attrs[name] ?? null; },
+        hasAttribute(name: string) { return this._attrs[name] != null; },
+        matches(sel: string) {
+            const tag = this.tagName.toLowerCase();
+            // Check tag names
+            if (CLICKABLE_TAGS.includes(tag)) {
+                // For label, only match label[for]
+                if (tag === "label") {
+                    if (sel.includes("label[for]") && (this as any).htmlFor) return true;
+                    // Fall through to check other selectors
+                } else {
+                    return true;
+                }
+            }
+            // Check roles
+            const role = this._attrs["role"];
+            if (role && CLICKABLE_ROLES.includes(role)) return true;
+            // Check attrs
+            if (this._attrs["onclick"] != null && sel.includes("[onclick]")) return true;
+            if (this._attrs["onmousedown"] != null && sel.includes("[onmousedown]")) return true;
+            if ((this as any)._tabindex !== undefined && (this as any)._tabindex !== "-1") return true;
+            if ((this as any).htmlFor && sel.includes("label[for]")) return true;
+            return false;
+        },
+        contains(other: any) {
             let node = other;
             while (node) {
                 if (node === this) return true;
@@ -53,10 +83,10 @@ function makeElement(tag, opts = {}) {
             }
             return false;
         },
-        closest(sel) {
+        closest(sel: string) {
             // Minimal closest shim — matches comma-separated selectors
-            const parts = sel.split(",").map((s) => s.trim());
-            let node = this;
+            const parts = sel.split(",").map((s: string) => s.trim());
+            let node: any = this;
             while (node) {
                 for (const part of parts) {
                     if (part === "[inert]" && node._attrs && node._attrs["inert"] != null) return node;
@@ -69,18 +99,18 @@ function makeElement(tag, opts = {}) {
         },
         focus: mock.fn(),
         click: mock.fn(),
-        addEventListener(type, fn) {
+        addEventListener(type: string, fn: any) {
             if (type === "animationend" || type === "transitionend") fn();
         },
-        querySelector(sel) {
+        querySelector(sel: string) {
             const matches = this.querySelectorAll(sel);
             return matches.length > 0 ? matches[0] : null;
         },
-        querySelectorAll(sel) {
+        querySelectorAll(sel: string) {
             // Return children that match (simplified: return all children)
-            if (sel === "*") return this._children;
+            if (sel === "*") return this.children;
             // For CLICKABLE_SELECTOR, return children that are "clickable"
-            return this._children.filter((c) => {
+            return this.children.filter((c: any) => {
                 const clickableTags = ["A", "BUTTON", "INPUT", "TEXTAREA", "SELECT", "SUMMARY", "DETAILS"];
                 return clickableTags.includes(c.tagName);
             });
@@ -88,7 +118,7 @@ function makeElement(tag, opts = {}) {
     };
 }
 
-function makeKeyEvent(code, opts = {}) {
+export function makeKeyEvent(code: string, opts: any = {}) {
     return {
         code,
         key: opts.key || "",
@@ -101,19 +131,44 @@ function makeKeyEvent(code, opts = {}) {
     };
 }
 
-function setupDOM(elements = []) {
+export function setupDOM(elements: any[] = []) {
     capturedListeners = {};
     bodyEl = makeElement("BODY");
     htmlEl = makeElement("HTML");
 
-    const createdEls = [];
+    const createdEls: any[] = [];
 
-    global.document = {
-        addEventListener(type, fn, capture) {
+    // Wire children from parentElement relationships so BFS can
+    // traverse from body down through parents to reach all elements.
+    bodyEl.children = [];
+    const allParents = new Set<any>();
+    for (const el of elements) {
+        if (el.parentElement && el.parentElement !== bodyEl) {
+            allParents.add(el.parentElement);
+            if (!el.parentElement.children) el.parentElement.children = [];
+            if (!el.parentElement.children.includes(el)) {
+                el.parentElement.children.push(el);
+            }
+        }
+    }
+    // Add root-level elements and orphan parents to body.children
+    for (const el of elements) {
+        if (!el.parentElement) {
+            bodyEl.children.push(el);
+        }
+    }
+    for (const parent of allParents) {
+        if (!parent.parentElement && !bodyEl.children.includes(parent)) {
+            bodyEl.children.push(parent);
+        }
+    }
+
+    (globalThis as any).document = {
+        addEventListener(type: string, fn: any, capture?: any) {
             if (!capturedListeners[type]) capturedListeners[type] = [];
             capturedListeners[type].push(fn);
         },
-        removeEventListener(type, fn, capture) {
+        removeEventListener(type: string, fn: any, capture?: any) {
             if (capturedListeners[type]) {
                 capturedListeners[type] = capturedListeners[type].filter((f) => f !== fn);
             }
@@ -123,9 +178,9 @@ function setupDOM(elements = []) {
         documentElement: htmlEl,
         head: htmlEl,
         visibilityState: "visible",
-        querySelectorAll(sel) {
+        querySelectorAll(sel: string) {
             if (sel === "*") return elements;
-            return elements.filter((e) => {
+            return elements.filter((e: any) => {
                 const clickableTags = ["A", "BUTTON", "INPUT", "TEXTAREA", "SELECT", "SUMMARY", "DETAILS"];
                 if (clickableTags.includes(e.tagName)) return true;
                 // Match label[for]
@@ -141,12 +196,12 @@ function setupDOM(elements = []) {
                 return false;
             });
         },
-        getElementById(id) {
-            return elements.find((e) => e.id === id) || null;
+        getElementById(id: string) {
+            return elements.find((e: any) => e.id === id) || null;
         },
-        createElement(tag) {
-            const classes = new Set();
-            const el = {
+        createElement(tag: string) {
+            const classes = new Set<string>();
+            const el: any = {
                 tagName: tag.toUpperCase(),
                 className: "",
                 textContent: "",
@@ -155,53 +210,33 @@ function setupDOM(elements = []) {
                 children: [],
                 parentNode: null,
                 classList: {
-                    add(c) { classes.add(c); },
-                    remove(c) { classes.delete(c); },
-                    contains(c) { return classes.has(c); },
+                    add(c: string) { classes.add(c); },
+                    remove(c: string) { classes.delete(c); },
+                    contains(c: string) { return classes.has(c); },
                 },
                 offsetHeight: 0,
                 // Fire animation/transition listeners synchronously (no real animations in tests)
-                addEventListener(type, fn) {
+                addEventListener(type: string, fn: any) {
                     if (type === "animationend" || type === "transitionend") fn();
                 },
-                appendChild(child) {
+                appendChild(child: any) {
                     this.children.push(child);
                     child.parentNode = this;
                 },
-                removeChild(child) {
-                    this.children = this.children.filter((c) => c !== child);
+                removeChild(child: any) {
+                    this.children = this.children.filter((c: any) => c !== child);
                     child.parentNode = null;
                 },
             };
             createdEls.push(el);
             return el;
         },
-        createTextNode(text) {
+        createTextNode(text: string) {
             return { nodeType: 3, textContent: text };
         },
-        createTreeWalker(root, whatToShow) {
-            const nodes = [];
-            const walk = (el) => {
-                const ch = el._children || el.children || [];
-                for (const child of ch) {
-                    if (child && child.tagName) {
-                        nodes.push(child);
-                        walk(child);
-                    }
-                }
-            };
-            walk(root);
-            let idx = -1;
-            return {
-                nextNode() {
-                    idx++;
-                    return idx < nodes.length ? nodes[idx] : null;
-                },
-            };
-        },
-        elementFromPoint(x, y) {
+        elementFromPoint(x: number, y: number) {
             // Return smallest element whose rect contains the point
-            let best = null;
+            let best: any = null;
             let bestArea = Infinity;
             for (const el of elements) {
                 const rect = el.getBoundingClientRect();
@@ -212,16 +247,16 @@ function setupDOM(elements = []) {
             }
             return best;
         },
-        elementsFromPoint(x, y) {
+        elementsFromPoint(x: number, y: number) {
             // Return all elements whose rect contains the point, smallest first
-            const hits = [];
+            const hits: any[] = [];
             for (const el of elements) {
                 const rect = el.getBoundingClientRect();
                 if (x >= rect.left && x < rect.right && y >= rect.top && y < rect.bottom) {
                     hits.push(el);
                 }
             }
-            hits.sort((a, b) => {
+            hits.sort((a: any, b: any) => {
                 const ra = a.getBoundingClientRect();
                 const rb = b.getBoundingClientRect();
                 return (ra.width * ra.height) - (rb.width * rb.height);
@@ -231,10 +266,10 @@ function setupDOM(elements = []) {
     };
 
     // Make body appendable
-    bodyEl.appendChild = function (child) {
+    bodyEl.appendChild = function (child: any) {
         child.parentNode = bodyEl;
     };
-    bodyEl.removeChild = function (child) {
+    bodyEl.removeChild = function (child: any) {
         child.parentNode = null;
     };
     // Make _viewportToDocument an identity transform
@@ -242,63 +277,51 @@ function setupDOM(elements = []) {
     htmlEl._style.marginTop = "0";
     htmlEl._style.marginLeft = "0";
     htmlEl._appendedChildren = [];
-    htmlEl.appendChild = function (child) {
+    htmlEl.appendChild = function (child: any) {
         child.parentNode = htmlEl;
         htmlEl._appendedChildren.push(child);
     };
-    htmlEl.removeChild = function (child) {
+    htmlEl.removeChild = function (child: any) {
         child.parentNode = null;
     };
 
-    global.CSS = { escape: (s) => s };
+    (globalThis as any).CSS = { escape: (s: string) => s };
 
-    global.window = {
+    (globalThis as any).window = {
         innerWidth: 1024,
         innerHeight: 768,
         focus: mock.fn(),
         addEventListener: mock.fn(),
         removeEventListener: mock.fn(),
     };
-    global.getComputedStyle = (el) => el._style || { visibility: "visible", display: "block", opacity: "1", cursor: "default" };
-    global.clearTimeout = clearTimeout;
-    global.browser = {
+    (globalThis as any).getComputedStyle = (el: any) => el._style || { visibility: "visible", display: "block", opacity: "1", cursor: "default" };
+    (globalThis as any).clearTimeout = clearTimeout;
+    (globalThis as any).browser = {
         runtime: { sendMessage: mock.fn() },
     };
 }
 
-function loadModules(elements = []) {
+export function loadModules(elements: any[] = []) {
     setupDOM(elements);
-    const path = require("node:path");
-    const cmdPath = path.resolve(__dirname, "../Vimium/Safari Extension/Resources/commands.js");
-    const khPath = path.resolve(__dirname, "../Vimium/Safari Extension/Resources/modules/KeyHandler.js");
-    const hmPath = path.resolve(__dirname, "../Vimium/Safari Extension/Resources/modules/HintMode.js");
-    delete require.cache[cmdPath];
-    delete require.cache[khPath];
-    delete require.cache[hmPath];
-    require(cmdPath);
-    require(khPath);
-    require(hmPath);
-    keyHandler = new global.KeyHandler();
-    hintMode = new global.HintMode(keyHandler);
+    keyHandler = new KeyHandler();
+    hintMode = new HintMode(keyHandler);
     hintMode.wireCommands();
     keyHandler.on("exitToNormal", () => {
         if (hintMode.isActive()) hintMode.deactivate();
-        keyHandler.setMode(global.Mode.NORMAL);
+        keyHandler.setMode(Mode.NORMAL);
     });
 }
 
-function fireKeyDown(event) {
+export function fireKeyDown(event: any) {
     const fns = capturedListeners["keydown"] || [];
     for (const fn of [...fns]) fn(event);
 }
 
-function fireMouseDown() {
+export function fireMouseDown() {
     const fns = capturedListeners["mousedown"] || [];
     for (const fn of [...fns]) fn({});
 }
 
-function getState() {
+export function getState() {
     return { keyHandler, hintMode };
 }
-
-module.exports = { makeElement, makeKeyEvent, loadModules, fireKeyDown, fireMouseDown, getState };

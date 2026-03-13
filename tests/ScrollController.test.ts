@@ -4,12 +4,14 @@
 // The smooth-scroll implementation uses requestAnimationFrame; these tests
 // simulate the animation by flushing rAF callbacks to their final frame.
 
-const { describe, it, beforeEach, afterEach, mock } = require("node:test");
-const assert = require("node:assert/strict");
+import { describe, it, beforeEach, afterEach, mock } from "node:test";
+import assert from "node:assert/strict";
+import { KeyHandler } from "../src/modules/KeyHandler";
+import { ScrollController, ScrollConfig } from "../src/modules/ScrollController";
 
 // --- Minimal DOM shim ---
 
-function makeElement(opts = {}) {
+function makeElement(opts: Record<string, any> = {}) {
     const style = {
         overflowX: opts.overflowX || "visible",
         overflowY: opts.overflowY || "visible",
@@ -29,12 +31,15 @@ function makeElement(opts = {}) {
     };
 }
 
-let capturedListeners, keyHandler, scrollController;
-let documentBody, documentScrollingElement;
+let capturedListeners: Record<string, Function[]>,
+    keyHandler: KeyHandler,
+    scrollController: ScrollController;
+let documentBody: ReturnType<typeof makeElement>,
+    documentScrollingElement: ReturnType<typeof makeElement>;
 
 // rAF simulation: collect callbacks and flush them with a given timestamp.
-let rafQueue;
-let rafIdCounter;
+let rafQueue: Map<number, FrameRequestCallback>;
+let rafIdCounter: number;
 
 function setupDOM() {
     capturedListeners = {};
@@ -48,12 +53,12 @@ function setupDOM() {
         clientHeight: 800,
     });
 
-    global.document = {
-        addEventListener(type, fn, capture) {
+    (globalThis as any).document = {
+        addEventListener(type: string, fn: Function, capture?: boolean) {
             if (!capturedListeners[type]) capturedListeners[type] = [];
             capturedListeners[type].push(fn);
         },
-        removeEventListener(type, fn, capture) {
+        removeEventListener(type: string, fn: Function, capture?: boolean) {
             if (capturedListeners[type]) {
                 capturedListeners[type] = capturedListeners[type].filter((f) => f !== fn);
             }
@@ -64,29 +69,29 @@ function setupDOM() {
         scrollingElement: documentScrollingElement,
     };
 
-    global.getComputedStyle = (el) => el._style;
-    global.history = { back: mock.fn(), forward: mock.fn() };
-    global.location = { reload: mock.fn() };
-    global.clearTimeout = clearTimeout;
-    global.setTimeout = setTimeout;
+    (globalThis as any).getComputedStyle = (el: any) => el._style;
+    (globalThis as any).history = { back: mock.fn(), forward: mock.fn() };
+    (globalThis as any).location = { reload: mock.fn() };
+    (globalThis as any).clearTimeout = clearTimeout;
+    (globalThis as any).setTimeout = setTimeout;
 
     // performance.now shim
-    global.performance = { now: () => 0 };
+    (globalThis as any).performance = { now: () => 0 };
 
     // requestAnimationFrame / cancelAnimationFrame shim
-    global.requestAnimationFrame = (cb) => {
+    (globalThis as any).requestAnimationFrame = (cb: FrameRequestCallback) => {
         const id = ++rafIdCounter;
         rafQueue.set(id, cb);
         return id;
     };
-    global.cancelAnimationFrame = (id) => {
+    (globalThis as any).cancelAnimationFrame = (id: number) => {
         rafQueue.delete(id);
     };
 }
 
 // Flush all pending rAF callbacks, simulating time jumping to `timestamp`.
 // Repeats until no new callbacks are queued (handles chained rAFs).
-function flushRAF(timestamp) {
+function flushRAF(timestamp: number) {
     let safety = 100;
     while (rafQueue.size > 0 && safety-- > 0) {
         const batch = new Map(rafQueue);
@@ -99,21 +104,11 @@ function flushRAF(timestamp) {
 
 function loadModules() {
     setupDOM();
-    const path = require("node:path");
-    const cmdPath = path.resolve(__dirname, "../Vimium/Safari Extension/Resources/commands.js");
-    const khPath = path.resolve(__dirname, "../Vimium/Safari Extension/Resources/modules/KeyHandler.js");
-    const scPath = path.resolve(__dirname, "../Vimium/Safari Extension/Resources/modules/ScrollController.js");
-    delete require.cache[cmdPath];
-    delete require.cache[khPath];
-    delete require.cache[scPath];
-    require(cmdPath);
-    require(khPath);
-    require(scPath);
-    keyHandler = new global.KeyHandler();
-    scrollController = new global.ScrollController(keyHandler);
+    keyHandler = new KeyHandler();
+    scrollController = new ScrollController(keyHandler);
 }
 
-function makeKeyEvent(code, opts = {}) {
+function makeKeyEvent(code: string, opts: Record<string, boolean> = {}) {
     return {
         code,
         shiftKey: opts.shift || false,
@@ -125,7 +120,7 @@ function makeKeyEvent(code, opts = {}) {
     };
 }
 
-function fireKeyDown(event) {
+function fireKeyDown(event: ReturnType<typeof makeKeyEvent>) {
     const listeners = capturedListeners["keydown"] || [];
     for (const fn of listeners) fn(event);
 }
@@ -152,7 +147,7 @@ describe("ScrollController", () => {
                 clientHeight: 400,
             });
             const child = makeElement({ parent: scrollableDiv });
-            global.document.activeElement = child;
+            (globalThis as any).document.activeElement = child;
 
             const target = ScrollController.findScrollTarget("y");
             assert.strictEqual(target, scrollableDiv);
@@ -163,7 +158,7 @@ describe("ScrollController", () => {
             const nonScrollable = makeElement({ overflowY: "visible" });
             const child = makeElement({ parent: nonScrollable });
             nonScrollable.parentElement = documentBody;
-            global.document.activeElement = child;
+            (globalThis as any).document.activeElement = child;
 
             const target = ScrollController.findScrollTarget("y");
             assert.strictEqual(target, documentScrollingElement);
@@ -177,7 +172,7 @@ describe("ScrollController", () => {
                 clientWidth: 400,
             });
             const child = makeElement({ parent: hScroll });
-            global.document.activeElement = child;
+            (globalThis as any).document.activeElement = child;
 
             const target = ScrollController.findScrollTarget("x");
             assert.strictEqual(target, hScroll);
@@ -292,13 +287,13 @@ describe("ScrollController", () => {
         // Shift+H navigates backward in browser history
         it("H goes back", () => {
             fireKeyDown(makeKeyEvent("KeyH", { shift: true }));
-            assert.equal(global.history.back.mock.callCount(), 1);
+            assert.equal((globalThis as any).history.back.mock.callCount(), 1);
         });
 
         // Shift+L navigates forward in browser history
         it("L goes forward", () => {
             fireKeyDown(makeKeyEvent("KeyL", { shift: true }));
-            assert.equal(global.history.forward.mock.callCount(), 1);
+            assert.equal((globalThis as any).history.forward.mock.callCount(), 1);
         });
     });
 
@@ -306,7 +301,7 @@ describe("ScrollController", () => {
         // Pressing r reloads the current page
         it("r refreshes the page", () => {
             fireKeyDown(makeKeyEvent("KeyR"));
-            assert.equal(global.location.reload.mock.callCount(), 1);
+            assert.equal((globalThis as any).location.reload.mock.callCount(), 1);
         });
     });
 

@@ -2,16 +2,7 @@
 // Uses event.code for positional key bindings (layout-independent).
 
 import type { KeyBindingMode, ModeValue } from "../types";
-
-declare const COMMANDS: Record<string, string>;
-
-declare const Mode: {
-  readonly NORMAL: "NORMAL";
-  readonly INSERT: "INSERT";
-  readonly HINTS: "HINTS";
-  readonly FIND: "FIND";
-  readonly TAB_SEARCH: "TAB_SEARCH";
-};
+import { Mode, COMMANDS } from "../commands";
 
 const INPUT_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
 const NON_TEXT_INPUT_TYPES = new Set([
@@ -40,7 +31,7 @@ const KEY_CHAR_TO_CODE: Record<string, string> = {
 
 type ModeListener = (newMode: ModeValue, prevMode: ModeValue) => void;
 
-class KeyHandler {
+export class KeyHandler {
   mode: ModeValue;
   private _keyBindingMode: KeyBindingMode;
   private _keyBuffer: string;
@@ -367,9 +358,4 @@ class KeyHandler {
       handler();
     }
   }
-}
-
-// Export for Node.js tests; no-op in browser content script context
-if (typeof globalThis !== "undefined") {
-  (globalThis as Record<string, unknown>).KeyHandler = KeyHandler;
 }

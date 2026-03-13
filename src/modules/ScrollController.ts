@@ -10,7 +10,7 @@ interface KeyHandlerLike {
   off(command: string): void;
 }
 
-const ScrollConfig = {
+export const ScrollConfig = {
   /** Pixels per j/k keystroke */
   scrollStep: 60,
   /** Animation duration (ms) for j/k step scrolls */
@@ -21,7 +21,7 @@ const ScrollConfig = {
   jumpLogScale: 20,
 };
 
-class ScrollController {
+export class ScrollController {
   private _keyHandler: KeyHandlerLike;
   private static _activeAnimations = new Map<Element, number>();
 
@@ -31,9 +31,6 @@ class ScrollController {
   }
 
   // --- Scroll target detection ---
-  // Walk from the active element up through ancestors, looking for an
-  // element that can actually scroll in the requested axis. Falls back to
-  // the document's scrolling element.
 
   static findScrollTarget(axis: Axis): Element {
     const el = document.activeElement;
@@ -61,15 +58,12 @@ class ScrollController {
   }
 
   // --- Easing ---
-  // Quadratic ease-out for a natural deceleration feel.
 
   private static _easeOut(t: number): number {
     return t * (2 - t);
   }
 
   // --- Smooth scroll via requestAnimationFrame ---
-  // Cancels any in-flight animation on the same element before starting a new
-  // one, so rapid key-repeat feels responsive rather than queuing up animations.
 
   private static _smoothScroll(
     target: Element,
@@ -113,7 +107,6 @@ class ScrollController {
 
   private static _jumpDuration(distance: number): number {
     if (distance === 0) return 0;
-    // Scale duration with distance: short jumps stay snappy, long jumps ease in smoothly
     return Math.min(ScrollConfig.scrollDurationMs + Math.log2(1 + Math.abs(distance)) * ScrollConfig.jumpLogScale, ScrollConfig.jumpMaxMs);
   }
 
@@ -167,10 +160,4 @@ class ScrollController {
       this._keyHandler.off(cmd);
     }
   }
-}
-
-// Export for Node.js tests; no-op in browser content script context
-if (typeof globalThis !== "undefined") {
-  (globalThis as Record<string, unknown>).ScrollController = ScrollController;
-  (globalThis as Record<string, unknown>).ScrollConfig = ScrollConfig;
 }

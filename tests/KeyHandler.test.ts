@@ -2,20 +2,25 @@
 // Tests the mode state machine, key sequence parser with timeout,
 // input field detection, and command dispatch.
 
-const { describe, it, beforeEach, afterEach, mock } = require("node:test");
-const assert = require("node:assert/strict");
+import { describe, it, beforeEach, afterEach, mock } from "node:test";
+import assert from "node:assert/strict";
+import { KeyHandler } from "../src/modules/KeyHandler";
+import { Mode } from "../src/commands";
 
 // --- Minimal DOM shim for Node.js ---
 
 class FakeElement {
-    constructor(tag, attrs = {}) {
+    tagName: string;
+    type: string;
+    isContentEditable: boolean;
+    constructor(tag: string, attrs: { type?: string; contentEditable?: boolean } = {}) {
         this.tagName = tag;
         this.type = attrs.type || "";
         this.isContentEditable = attrs.contentEditable || false;
     }
 }
 
-function makeKeyEvent(code, opts = {}) {
+function makeKeyEvent(code: string, opts: { key?: string; shift?: boolean; ctrl?: boolean; alt?: boolean; meta?: boolean } = {}) {
     return {
         code,
         key: opts.key || "",
@@ -29,17 +34,17 @@ function makeKeyEvent(code, opts = {}) {
 }
 
 // Shim globals before loading KeyHandler
-let capturedListeners = {};
-let keyHandler;
+let capturedListeners: Record<string, Function[]> = {};
+let keyHandler: KeyHandler;
 
 function setupDOM() {
     capturedListeners = {};
-    global.document = {
-        addEventListener(type, fn, capture) {
+    (globalThis as any).document = {
+        addEventListener(type: string, fn: Function, capture?: boolean) {
             if (!capturedListeners[type]) capturedListeners[type] = [];
             capturedListeners[type].push(fn);
         },
-        removeEventListener(type, fn, capture) {
+        removeEventListener(type: string, fn: Function, capture?: boolean) {
             if (capturedListeners[type]) {
                 capturedListeners[type] = capturedListeners[type].filter((f) => f !== fn);
             }
@@ -47,48 +52,29 @@ function setupDOM() {
         activeElement: new FakeElement("BODY"),
         body: new FakeElement("BODY"),
     };
-    global.clearTimeout = clearTimeout;
-    global.setTimeout = setTimeout;
+    (globalThis as any).clearTimeout = clearTimeout;
+    (globalThis as any).setTimeout = setTimeout;
 }
 
-function fireKeyDown(event) {
+function fireKeyDown(event: ReturnType<typeof makeKeyEvent>) {
     const listeners = capturedListeners["keydown"] || [];
     for (const fn of listeners) fn(event);
 }
 
-function fireFocusIn(target) {
+function fireFocusIn(target: FakeElement) {
     const listeners = capturedListeners["focusin"] || [];
     for (const fn of listeners) fn({ target });
 }
 
-function fireFocusOut(target) {
+function fireFocusOut(target: FakeElement) {
     const listeners = capturedListeners["focusout"] || [];
     for (const fn of listeners) fn({ target });
 }
 
-// Load the module source (not an ES module — defines globals)
-function loadKeyHandler() {
-    setupDOM();
-    // Load commands first (defines global COMMANDS)
-    const commandsPath = require("node:path").resolve(
-        __dirname,
-        "../Vimium/Safari Extension/Resources/commands.js"
-    );
-    delete require.cache[commandsPath];
-    require(commandsPath);
-    // Clear require cache so each test gets a fresh module
-    const modulePath = require("node:path").resolve(
-        __dirname,
-        "../Vimium/Safari Extension/Resources/modules/KeyHandler.js"
-    );
-    delete require.cache[modulePath];
-    require(modulePath);
-    keyHandler = new global.KeyHandler();
-}
-
 describe("KeyHandler", () => {
     beforeEach(() => {
-        loadKeyHandler();
+        setupDOM();
+        keyHandler = new KeyHandler();
     });
 
     afterEach(() => {
@@ -102,7 +88,7 @@ describe("KeyHandler", () => {
         });
 
         it("transitions between modes and fires listeners", () => {
-            const transitions = [];
+            const transitions: { to: string; from: string }[] = [];
             keyHandler.onModeChange((to, from) => transitions.push({ to, from }));
 
             keyHandler.setMode(Mode.INSERT);
@@ -127,7 +113,7 @@ describe("KeyHandler", () => {
 
         // Setting the same mode is a no-op
         it("does not fire listener for same-mode transition", () => {
-            const transitions = [];
+            const transitions: string[] = [];
             keyHandler.onModeChange((to) => transitions.push(to));
             keyHandler.setMode(Mode.NORMAL);
             assert.equal(transitions.length, 0);
@@ -327,7 +313,7 @@ describe("KeyHandler", () => {
 
     describe("Overlay modes (HINTS, FIND, TAB_SEARCH)", () => {
         // Verifies that Escape dispatches exitToNormal in overlay modes
-        for (const mode of ["HINTS", "FIND", "TAB_SEARCH"]) {
+        for (const mode of ["HINTS", "FIND", "TAB_SEARCH"] as const) {
             it(`Escape dispatches exitToNormal in ${mode} mode`, () => {
                 let called = false;
                 keyHandler.on("exitToNormal", () => { called = true; });
