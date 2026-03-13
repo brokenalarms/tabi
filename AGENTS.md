@@ -8,7 +8,10 @@
 ## Bug Scenario Workflow (DOM PROBLEMS MODE)
 The internet is full of quirks. For every new bug, we want to make sure that we implement a fix in a way that slots in generically into our click selector pipeline and doesn't make the code increasingly complicated. We should be searching for a way to make a fix generic and applicable to new use cases rather than accounting specifically for one. 
 
-we also want to fix these in the most streamlined way possible without a lot of feedback. Therefore, with the below prompt, you will enter 'DOM problem mode'.
+- Bad: testing based on visual widths (brittle, subject to change), specific DOM nesting (x levels deep) consideration of non-interactive elements as relevant (p, div, span - these are not useful in determining whether something is interactive). Any element can be interacted with `role="button"` on it, even if it doesn't adhere to web standards)
+- Good: consideration of generic attributes (does this element have display: none, visibility: hidden, or some other occlusion applied to it?), and generic framing of the issue in a way that is generalizable to other sites and structures. For example, a label with a sibling input means that the label should be clickable, but the input shouldn't in order to avoid duplication. 
+
+We also want to fix these in the most streamlined way possible without a lot of feedback. Therefore, with the below prompt, you will enter 'DOM problem mode'.
 
 When the user pastes a **DOM snippet, screenshot and URL** showing a hint mode bug (or similar UI bug):
 
@@ -17,7 +20,7 @@ When the user pastes a **DOM snippet, screenshot and URL** showing a hint mode b
 - **Simplify the DOM**: Distill the pasted snippet down to the minimal structure that reproduces the issue. Strip out irrelevant attributes, classes, and sibling elements. The test fixture should be the smallest DOM tree that triggers the bug — not a copy-paste of the full site markup.
 
 - **Verify** that your understanding of the issue is correct before proceeding. Echo back to the user
-  - ISSUE: Your understanding of what the issue is
+  - ISSUE: Your understanding of what the issue is, in a generalizable way
   - SITE: URL where seen
   - DOM: The simplified representation
   - FIX: Your proposed fix, using the same language of the issue

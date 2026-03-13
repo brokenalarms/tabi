@@ -369,8 +369,10 @@ describe("HintMode", () => {
             assert.ok(!hintMode.isActive());
         });
 
-        // Zero-size <a> with visible child falls back to child rect
+        // ISSUE: zero-size anchor wrapping a visible child gets no hint
+        // FIX: fall back to firstElementChild rect for zero-size anchors
         it("falls back to firstElementChild for zero-size anchors", () => {
+            const dom = '<a href="#" style="width:0;height:0"><h3>Title</h3></a>';
             const child = makeElement("H3", { top: 10, left: 20, width: 200, height: 24 });
             const anchor = makeElement("A", { href: "#", width: 0, height: 0, top: 0, left: 0, children: [child] });
             loadModules([anchor]);
@@ -378,9 +380,10 @@ describe("HintMode", () => {
             assert.ok(hintMode.isActive());
         });
 
-        // CSS checkbox hack menus: the visible "button" is a <label for="X">,
-        // not an <a> or <button>. label[for] must be discovered as interactive.
+        // ISSUE: label[for] not discovered as clickable — CSS checkbox hack menus use label as the visible "button"
+        // FIX: add label[for] to clickable selector
         it("discovers label[for] as a clickable element", () => {
+            const dom = '<label for="menu-toggle">Menu</label>';
             const label = makeElement("LABEL", { top: 10, left: 10, width: 80, height: 20 });
             label.htmlFor = "menu-toggle";
             loadModules([label]);
@@ -391,9 +394,11 @@ describe("HintMode", () => {
             assert.equal(label.click.mock.callCount(), 1);
         });
 
-        // Apple nav: collapsed menu content wrapped in <div inert="true"> —
-        // buttons inside an inert subtree should not get hints.
+        // ISSUE: hints appear on buttons inside collapsed menus
+        // SITE: apple.com nav
+        // FIX: filter elements inside inert subtrees
         it("filters out elements inside an inert subtree", () => {
+            const dom = '<div inert><button>Shop</button></div>';
             const inertContainer = makeElement("DIV", {
                 top: 0, left: 0,
                 attrs: { "inert": "" },
@@ -407,10 +412,10 @@ describe("HintMode", () => {
             assert.ok(!hintMode.isActive(), "Button inside inert subtree should be filtered");
         });
 
-        // aria-hidden="true" on the element itself prevents hint generation,
-        // but aria-hidden on an ancestor does NOT — it hides from a11y tree
-        // but doesn't prevent visual interaction.
+        // ISSUE: hints appear on elements with aria-hidden="true" (but NOT inherited from ancestors)
+        // FIX: filter elements with aria-hidden="true" directly, keep descendants of aria-hidden ancestors
         it("filters element with aria-hidden=true", () => {
+            const dom = '<button aria-hidden="true">Hidden</button>';
             const btn = makeElement("BUTTON", {
                 top: 10, left: 10,
                 attrs: { "aria-hidden": "true" },
@@ -479,9 +484,8 @@ describe("HintMode", () => {
     });
 
     describe("Visibility edge cases", () => {
-        // CSS checkbox hack: transparent anchor overlay sits on top of a visible
-        // label/button. elementFromPoint returns only the overlay, but
-        // elementsFromPoint returns the full stack — the label underneath is reachable.
+        // ISSUE: element behind a transparent overlay gets no hint — elementFromPoint misses it
+        // FIX: use elementsFromPoint to detect elements in the full stacking context
         it("detects element behind transparent overlay via elementsFromPoint", () => {
             const overlay = makeElement("A", { href: "#", top: 10, left: 10, width: 200, height: 40 });
             const btn = makeElement("BUTTON", { top: 10, left: 10, width: 200, height: 40 });
@@ -503,8 +507,8 @@ describe("HintMode", () => {
             assert.equal(btn.click.mock.callCount(), 1, "Element behind overlay should be hintable via elementsFromPoint");
         });
 
-        // Element fully clipped by overflow:hidden ancestor — should not get a hint.
-        // Simplified: parent has overflow:hidden and a rect that doesn't overlap the child.
+        // ISSUE: hints appear on elements visually clipped by overflow:hidden ancestor
+        // FIX: check if element rect intersects ancestor's clip rect
         it("filters element clipped by overflow:hidden ancestor", () => {
             const container = makeElement("DIV", {
                 top: 0, left: 0, width: 200, height: 50,
@@ -520,9 +524,10 @@ describe("HintMode", () => {
             assert.ok(!hintMode.isActive(), "Element clipped by overflow:hidden ancestor should be filtered");
         });
 
-        // Custom-styled radio input with opacity:0 — visibility should redirect
-        // to the associated <label>, so the radio still gets a hint.
+        // ISSUE: custom-styled radio with opacity:0 gets no hint because it fails visibility check
+        // FIX: redirect visibility check to associated label when radio is invisible
         it("redirects visibility of opacity:0 radio to associated label", () => {
+            const dom = '<input type="radio" id="r" style="opacity:0"><label for="r">Option</label>';
             const label = makeElement("LABEL", { top: 10, left: 30, width: 100, height: 20 });
             label.htmlFor = "custom-radio";
             const radio = makeElement("INPUT", {
@@ -576,11 +581,11 @@ describe("HintMode", () => {
     });
 
     describe("Label-for dedup", () => {
-        // Wikipedia theme picker: each radio has a sibling label[for] pointing
-        // at it. Without dedup, each radio gets two hints (input + label).
-        // Simplified from: <div class="cdx-radio"><input type="radio" id="X">
-        //   <label for="X">Text</label></div> × 3
+        // ISSUE: each radio gets two hints (input + label) — duplicate hints on theme picker
+        // SITE: wikipedia.org theme picker
+        // FIX: filter label[for] when the associated radio input is already a candidate
         it("filters label[for] when associated radio input is a candidate", () => {
+            const dom = '<div><input type="radio" id="X"><label for="X">Text</label></div> × 3';
             const wrapper = makeElement("DIV", { top: 0, left: 0, width: 300, height: 120 });
 
             const radio1 = makeElement("INPUT", { type: "radio", top: 10, left: 10, width: 16, height: 16 });
@@ -627,11 +632,10 @@ describe("HintMode", () => {
     });
 
     describe("Hash-link/label dedup", () => {
-        // CSS checkbox hack: both <a href="#X"> and <label for="X"> control
-        // the same toggle. The anchor is typically a wide overlay with
-        // screen-reader-only text; the label has the correct visual position.
-        // When the label is a candidate, the hash-link anchor should be removed.
+        // ISSUE: duplicate hints — hash-link anchor and label[for] both target the same toggle
+        // FIX: remove hash-link anchor when a label[for] with the same ID is a candidate
         it("removes hash-link anchor when label[for] with same ID exists", () => {
+            const dom = '<a href="#toggle-1">Toggle</a><label for="toggle-1">Toggle</label>';
             const label = makeElement("LABEL", { top: 10, left: 10, width: 80, height: 20 });
             label.htmlFor = "toggle-1";
             const anchor = makeElement("A", {
