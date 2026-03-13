@@ -6,12 +6,12 @@
 // Native interactive elements — atomic controls at the lowest level of the DOM.
 // The walker accepts these and prunes their subtrees: children are content/labels,
 // not separate click targets. This prevents duplicate hints inside buttons, links, etc.
-export const NATIVE_INTERACTIVE = ["a", "button", "input", "textarea", "select", "summary"];
+export const NATIVE_INTERACTIVE_ELEMENTS = ["a", "button", "input", "textarea", "select", "summary"];
 export const CLICKABLE_ROLES = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch"];
 const CLICKABLE_ATTRS = ["label[for]", "[tabindex]:not([tabindex='-1'])", "[onclick]", "[onmousedown]"];
 
 export const CLICKABLE_SELECTOR = [
-  ...NATIVE_INTERACTIVE,
+  ...NATIVE_INTERACTIVE_ELEMENTS,
   ...CLICKABLE_ROLES.map(r => `[role='${r}']`),
   ...CLICKABLE_ATTRS,
 ].join(", ");
@@ -278,7 +278,7 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
     // Wrap walkerFilter to also collect shadow roots from non-rejected nodes
     // and prune subtrees of native interactive elements (they're atomic controls).
     const shadowRoots: ShadowRoot[] = [];
-    const nativeInteractiveSet = new Set(NATIVE_INTERACTIVE);
+    const nativeInteractiveSet = new Set(NATIVE_INTERACTIVE_ELEMENTS);
     const filter = (node: Node): number => {
       const verdict = walkerFilter(node);
       if (verdict !== NodeFilter.FILTER_REJECT) {
