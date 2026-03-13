@@ -1,8 +1,8 @@
 // Vimium content script
 // Runs on every page to handle keyboard navigation
 
-import type { KeyBindingMode, ModeValue, Theme, VimiumSettings } from "./types";
-import { DEFAULTS } from "./types";
+import type { KeyBindingMode, ModeValue, Theme } from "./types";
+import { resolveSettings } from "./types";
 import { Mode } from "./commands";
 import { KeyHandler } from "./modules/KeyHandler";
 import { ScrollController } from "./modules/ScrollController";
@@ -81,8 +81,7 @@ function applyTheme(theme: Theme): void {
   }
 }
 
-function initialize(settings: Partial<VimiumSettings>): void {
-  const resolved = { ...DEFAULTS, ...settings };
+function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   const keyHandler = new KeyHandler();
 
   // Apply initial settings
@@ -229,13 +228,9 @@ browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme", "enable
   if (isDomainExcluded(excluded)) {
     browser.runtime.sendMessage({ command: "extensionInactive" });
   } else {
-    initialize({
-      ...(result.keyBindingMode !== undefined && { keyBindingMode: result.keyBindingMode as KeyBindingMode }),
-      ...(result.theme !== undefined && { theme: result.theme as Theme }),
-      ...(result.enablePointerTails !== undefined && { enablePointerTails: result.enablePointerTails as string }),
-    });
+    initialize(resolveSettings(result));
   }
 }).catch(() => {
   // If storage read fails, initialize with defaults
-  initialize({});
+  initialize(resolveSettings({}));
 });

@@ -17,6 +17,16 @@ export const DEFAULTS: VimiumSettings = {
   animate: true,
 };
 
+export function resolveSettings(storage: Record<string, unknown>): VimiumSettings {
+  return {
+    ...DEFAULTS,
+    ...(storage.keyBindingMode !== undefined && { keyBindingMode: storage.keyBindingMode as KeyBindingMode }),
+    ...(storage.theme !== undefined && { theme: storage.theme as Theme }),
+    ...(storage.enablePointerTails !== undefined && { enablePointerTails: storage.enablePointerTails as string }),
+    ...(storage.animate !== undefined && { animate: storage.animate as boolean }),
+  };
+}
+
 export interface TabInfo {
   id: number;
   title: string;
