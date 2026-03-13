@@ -147,10 +147,20 @@ export class HintMode {
       }
     }
 
-    // Native interactive elements are atomic — use their own rect.
-    // Same NATIVE_INTERACTIVE_ELEMENTS set that governs subtree pruning in discovery.
+    // Native interactive elements are atomic. If the element contains a heading
+    // and no SVGs, use the heading as the hint target (e.g. article card links).
+    // Otherwise use the element itself.
     const tag = el.tagName.toLowerCase();
-    if (NATIVE_INTERACTIVE_ELEMENTS.includes(tag)) return el;
+    if (NATIVE_INTERACTIVE_ELEMENTS.includes(tag)) {
+      if (!el.querySelector("svg")) {
+        const heading = el.querySelector("h1, h2, h3, h4, h5, h6") as HTMLElement | null;
+        if (heading) {
+          const hr = heading.getBoundingClientRect();
+          if (hr.width > 0 && hr.height > 0) return heading;
+        }
+      }
+      return el;
+    }
 
     // If this element contains other clickable children, don't redirect — keep
     // the hint on the first-level element. Inner clickable elements get their own hints.
