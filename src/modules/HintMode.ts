@@ -451,12 +451,18 @@ class HintMode {
       let node = walker.nextNode() as HTMLElement | null;
       while (node) {
         if (node !== el) {
+          // Skip aria-hidden nodes — decorative content like badge counts
+          if (node.getAttribute && node.getAttribute("aria-hidden") === "true") {
+            node = walker.nextNode() as HTMLElement | null;
+            continue;
+          }
           // Check for direct text content (not just inherited from children)
           for (let i = 0; i < node.childNodes.length; i++) {
             const child = node.childNodes[i];
             if (child.nodeType === 3 && (child.textContent || "").trim().length > 0) {
               const cr = node.getBoundingClientRect();
-              if (cr.width > 0 && cr.height > 0) return node;
+              // Require minimum size — filters visually-hidden 1×1px elements
+              if (cr.width > 4 && cr.height > 4) return node;
             }
           }
         }
