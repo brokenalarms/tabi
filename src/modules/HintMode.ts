@@ -4,7 +4,7 @@
 
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
-import { discoverElements, findAssociatedLabel, CLICKABLE_SELECTOR, NATIVE_INTERACTIVE_ELEMENTS } from "./ElementGatherer";
+import { discoverElements, findAssociatedLabel, CLICKABLE_SELECTOR, NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_ROLES } from "./ElementGatherer";
 import { Mode } from "../commands";
 
 declare const browser: {
@@ -154,7 +154,7 @@ export class HintMode {
     const tag = el.tagName.toLowerCase();
     const role = el.getAttribute("role") || "";
     const isInteractive = NATIVE_INTERACTIVE_ELEMENTS.includes(tag) ||
-      ["link", "button", "tab", "menuitem"].includes(role);
+      CLICKABLE_ROLES.includes(role);
     if (isInteractive) {
       const icons = el.querySelectorAll("svg, img");
       if (icons.length === 1) {
