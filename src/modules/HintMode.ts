@@ -147,57 +147,18 @@ export class HintMode {
       }
     }
 
-    // Native interactive elements are atomic — pick the best visual anchor:
-    // 1. Single leading icon (SVG/img, no text before, text after) → hint under the icon
-    // 2. Heading (no icons) → hint on the heading (article card links)
-    // 3. Otherwise → the element itself
+    // Native interactive elements are atomic — drill down to heading or
+    // text anchor if available, otherwise keep the element itself (which
+    // may get bar/container style if block-level with content).
     const tag = el.tagName.toLowerCase();
     const role = el.getAttribute("role") || "";
     const isInteractive = NATIVE_INTERACTIVE_ELEMENTS.includes(tag) ||
       CLICKABLE_ROLES.includes(role);
     if (isInteractive) {
-      const icons = el.querySelectorAll("svg, img");
-      if (icons.length === 1) {
-        const icon = icons[0] as HTMLElement;
-        const ir = icon.getBoundingClientRect();
-        if (ir.width > 0 && ir.height > 0) {
-          // Walk up from icon, checking sibling pattern at each ancestor level.
-          // Leading icon = no text siblings before, text siblings after,
-          // AND icon and text are on the same row (not stacked vertically).
-          let ancestor: Element = icon;
-          while (ancestor.parentElement && ancestor !== el) {
-            const parent = ancestor.parentElement;
-            let textBefore = false;
-            let textAfter = false;
-            let seenIcon = false;
-            let firstTextAfter: Element | null = null;
-            for (const child of parent.children) {
-              if (child === ancestor) {
-                seenIcon = true;
-                continue;
-              }
-              const hasText = (child.textContent || "").trim().length > 0;
-              if (!seenIcon && hasText) textBefore = true;
-              if (seenIcon && hasText) {
-                textAfter = true;
-                if (!firstTextAfter) firstTextAfter = child;
-              }
-            }
-            if (!textBefore && textAfter && firstTextAfter) {
-              // Only target the icon if text is beside it, not below it.
-              const tr = (firstTextAfter as HTMLElement).getBoundingClientRect();
-              if (tr.top < ir.bottom) return icon;
-            }
-            ancestor = parent;
-          }
-        }
-      }
-      if (icons.length === 0) {
-        const heading = el.querySelector("h1, h2, h3, h4, h5, h6") as HTMLElement | null;
-        if (heading) {
-          const hr = heading.getBoundingClientRect();
-          if (hr.width > 0 && hr.height > 0) return heading;
-        }
+      const heading = el.querySelector("h1, h2, h3, h4, h5, h6") as HTMLElement | null;
+      if (heading) {
+        const hr = heading.getBoundingClientRect();
+        if (hr.width > 0 && hr.height > 0) return heading;
       }
       return el;
     }
