@@ -249,12 +249,24 @@ export class HintMode {
     let container = false;
     if (target === el && el.children.length > 0 &&
         !getComputedStyle(el).display.startsWith("inline")) {
-      // Walk the single-child chain — if it reaches a leaf, it's not a container.
+      // Walk the single-child chain — if it reaches a leaf with no sibling
+      // text, it's just wrapper nesting (e.g. <a><span>text</span></a>).
+      // But if any level has text nodes alongside the single element child
+      // (e.g. <summary><svg/>Assignees</summary>), it's a real container.
       let node: HTMLElement = el;
+      let hasTextAlongside = false;
       while (node.children.length === 1) {
+        for (let i = 0; i < node.childNodes.length; i++) {
+          const child = node.childNodes[i];
+          if (child.nodeType === 3 && (child.textContent || "").trim().length > 0) {
+            hasTextAlongside = true;
+            break;
+          }
+        }
+        if (hasTextAlongside) break;
         node = node.children[0] as HTMLElement;
       }
-      container = node.children.length > 0;
+      container = node.children.length > 0 || hasTextAlongside;
     }
 
     if (el !== target && el.getBoundingClientRect().width > window.innerWidth * 0.25) {
