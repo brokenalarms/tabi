@@ -242,11 +242,20 @@ export class HintMode {
 
   private getHintInfo(el: HTMLElement): { rect: DOMRect; container: boolean } {
     const target = this.getHintTargetElement(el);
-    // Bar style: for block-level clickable containers with children.
-    // Inline elements (links in text, inline buttons) get pill+pointer.
+    // Bar style: for block-level containers with branching content.
+    // Single descendant chains (e.g. <a><span>text</span></a>) are just
+    // wrapper nesting — not containers. Inline elements get pill+pointer.
     let rect = target.getBoundingClientRect();
-    const isBlock = target === el && !getComputedStyle(el).display.startsWith("inline");
-    const container = target === el && el.children.length > 0 && isBlock;
+    let container = false;
+    if (target === el && el.children.length > 0 &&
+        !getComputedStyle(el).display.startsWith("inline")) {
+      // Walk the single-child chain — if it reaches a leaf, it's not a container.
+      let node: HTMLElement = el;
+      while (node.children.length === 1) {
+        node = node.children[0] as HTMLElement;
+      }
+      container = node.children.length > 0;
+    }
 
     if (el !== target && el.getBoundingClientRect().width > window.innerWidth * 0.25) {
       const paddingTop = parseFloat(getComputedStyle(target).paddingTop) || 0;
@@ -268,6 +277,10 @@ export class HintMode {
     // Exclude form controls — they are discrete positioned elements that should keep their own rect.
     // Exclude mixed content — when the parent has sibling text (e.g. <p>text <a>link</a></p>),
     // the link's natural position is correct.
+    // Only expand when parent is the sole wrapper — a lone link in a wide
+    // heading should stay near its text, not drift to the parent's center.
+    // Skip when the parent is a single-child wrapper (e.g. <h2><a>text</a></h2>)
+    // since there are no siblings to align with.
     const tag = target.tagName.toLowerCase();
     const isFormControl = tag === "input" || tag === "textarea" || tag === "select";
     if (!isFormControl && getComputedStyle(target).display.startsWith("inline") && target.parentElement) {
@@ -275,7 +288,13 @@ export class HintMode {
       const hasMixedContent = Array.from(parent.childNodes).some(
         n => n !== target && n.nodeType === 3 && (n.textContent || "").trim().length > 0
       );
-      if (!hasMixedContent) {
+      // Skip when the element is the sole child of a standalone parent
+      // (e.g. <h2><a>text</a></h2>) — hint should center on the text.
+      // But keep centering when the parent is part of a repeating list
+      // (parent has siblings), so adjacent items align their hints.
+      const isSoleInStandalone = parent.children.length === 1 &&
+        (!parent.parentElement || parent.parentElement.children.length <= 1);
+      if (!hasMixedContent && !isSoleInStandalone) {
         const parentRect = parent.getBoundingClientRect();
         rect = new DOMRect(parentRect.left, rect.top, parentRect.width, rect.height);
       }
