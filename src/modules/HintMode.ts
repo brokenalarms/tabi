@@ -242,9 +242,12 @@ export class HintMode {
 
   private getHintInfo(el: HTMLElement): { rect: DOMRect; container: boolean } {
     const target = this.getHintTargetElement(el);
-    // Bar style: only for clickable containers with children but no
-    // clickable elements inside (no buttons, links, inputs, etc.).
+    // Bar style: only for non-interactive clickable containers (e.g. div[role="button"]
+    // wrapping content). Native interactive elements (links, buttons, inputs) are
+    // atomic units and should always get normal pill+pointer hints.
+    const isNativeInteractive = NATIVE_INTERACTIVE_ELEMENTS.includes(el.tagName.toLowerCase());
     const container = target === el && el.children.length > 0 &&
+      !isNativeInteractive &&
       el.querySelector(CLICKABLE_SELECTOR) === null;
     let rect = target.getBoundingClientRect();
 
@@ -348,8 +351,7 @@ export class HintMode {
       // Bar style: centered at bottom edge of container, 25% width
       const elRect = element.getBoundingClientRect();
       const barWidth = elRect.width * 0.25;
-      // Position at bottom border of container (intrudes slightly)
-      const pos = this.viewportToDocument(elRect.left + elRect.width / 2, elRect.bottom - 1);
+      const pos = this.viewportToDocument(elRect.left + elRect.width / 2, elRect.bottom);
       div.style.left = Math.max(0, pos.x) + "px";
       div.style.top = Math.max(0, pos.y) + "px";
       div.style.transform = "translateX(-50%)";
