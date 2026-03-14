@@ -14,6 +14,8 @@
     --vimium-hint-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
     --vimium-hint-color: #302505;
     --vimium-hint-matched-opacity: 0.4;
+    --vimium-hint-bar-line: rgba(195, 138, 34, 0.4);
+    --vimium-hint-bar-glow: rgba(195, 138, 34, 0.15);
 }
 
 [data-vimium-theme="dark"] .vimium-hint-overlay,
@@ -23,6 +25,8 @@
     --vimium-hint-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
     --vimium-hint-color: #eee;
     --vimium-hint-matched-opacity: 0.35;
+    --vimium-hint-bar-line: rgba(102, 102, 102, 0.4);
+    --vimium-hint-bar-glow: rgba(102, 102, 102, 0.15);
 }
 
 [data-vimium-theme="light"] .vimium-hint-overlay,
@@ -32,6 +36,8 @@
     --vimium-hint-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
     --vimium-hint-color: #111;
     --vimium-hint-matched-opacity: 0.35;
+    --vimium-hint-bar-line: rgba(187, 187, 187, 0.4);
+    --vimium-hint-bar-glow: rgba(187, 187, 187, 0.15);
 }
 
 /* ── Help overlay theme (follows system dark mode) ────────────────────── */
