@@ -1308,6 +1308,31 @@ describe("DOM problems — native interactive elements prune subtrees", () => {
         assert.ok(!hints[0].classList.contains("vimium-hint-bar"), "Link with heading should use normal hint");
     });
 
+    // ISSUE: Block-level link with single descendant chain (<a display:block><span>text</span></a>)
+    // gets bar-style hint, but it's just wrapper nesting — not a real container.
+    // SITE: femmetal.rocks — "Show 24 footnotes" link
+    // FIX: Walk the single-child chain; if it reaches a leaf, it's not a container.
+    it("single descendant chain gets normal hint, not bar", () => {
+        const link = makeElement("A", { href: "#", top: 10, left: 10, width: 400, height: 30,
+            attrs: { onclick: "return toggle()" }, display: "block" });
+        const span = makeElement("SPAN", { top: 12, left: 12, width: 180, height: 20, textContent: "Show 24 footnotes" });
+        link.appendChild(span);
+
+        loadModules([link, span]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [link];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        assert.ok(!hints[0].classList.contains("vimium-hint-bar"), "Single descendant chain should use normal hint, not bar");
+    });
+
     it("anchor does not produce hints for interactive children inside it", () => {
         const anchor = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 40 });
         const innerBtn = makeElement("BUTTON", { top: 12, left: 12, width: 80, height: 20 });
