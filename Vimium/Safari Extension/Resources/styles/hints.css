@@ -115,9 +115,9 @@
 .vimium-hint-bar::after {
     content: attr(data-label);
     position: absolute;
-    bottom: 0;
+    top: 50%;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translate(-50%, -50%);
     font: bold 12px/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif;
     text-transform: uppercase;
     color: var(--vimium-hint-color);
