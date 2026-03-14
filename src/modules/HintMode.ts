@@ -242,13 +242,11 @@ export class HintMode {
 
   private getHintInfo(el: HTMLElement): { rect: DOMRect; container: boolean } {
     const target = this.getHintTargetElement(el);
-    // Bar style: only for non-interactive clickable containers (e.g. div[role="button"]
-    // wrapping content). Native interactive elements (links, buttons, inputs) are
-    // atomic units and should always get normal pill+pointer hints.
+    // Bar style: for non-interactive clickable containers (e.g. div with onclick,
+    // div[role="button"] wrapping content). Native interactive elements (links,
+    // buttons, inputs) are atomic units — always pill+pointer hints.
     const isNativeInteractive = NATIVE_INTERACTIVE_ELEMENTS.includes(el.tagName.toLowerCase());
-    const container = target === el && el.children.length > 0 &&
-      !isNativeInteractive &&
-      el.querySelector(CLICKABLE_SELECTOR) === null;
+    const container = target === el && el.children.length > 0 && !isNativeInteractive;
     let rect = target.getBoundingClientRect();
 
     if (el !== target && el.getBoundingClientRect().width > window.innerWidth * 0.25) {
