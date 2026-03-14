@@ -242,12 +242,11 @@ export class HintMode {
 
   private getHintInfo(el: HTMLElement): { rect: DOMRect; container: boolean } {
     const target = this.getHintTargetElement(el);
-    // Bar style: for non-interactive clickable containers (e.g. div with onclick,
-    // div[role="button"] wrapping content). Native interactive elements (links,
-    // buttons, inputs) are atomic units — always pill+pointer hints.
-    const isNativeInteractive = NATIVE_INTERACTIVE_ELEMENTS.includes(el.tagName.toLowerCase());
-    const container = target === el && el.children.length > 0 && !isNativeInteractive;
+    // Bar style: for block-level clickable containers with children.
+    // Inline elements (links in text, inline buttons) get pill+pointer.
     let rect = target.getBoundingClientRect();
+    const isBlock = target === el && !getComputedStyle(el).display.startsWith("inline");
+    const container = target === el && el.children.length > 0 && isBlock;
 
     if (el !== target && el.getBoundingClientRect().width > window.innerWidth * 0.25) {
       const paddingTop = parseFloat(getComputedStyle(target).paddingTop) || 0;
