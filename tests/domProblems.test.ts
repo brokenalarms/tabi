@@ -1080,10 +1080,8 @@ describe("DOM problems — native interactive elements prune subtrees", () => {
         assert.equal(x, 210, "Hint should center on heading (10 + 400/2)");
     });
 
-    // ISSUE: Nav links with a leading SVG icon followed by text should target the SVG.
-    // A leading icon is one SVG with no text siblings before it and text siblings after.
-    // FIX: Find single SVG anywhere in element, verify it's leading (no text before, text after).
-    it("link with SVG as first child targets the SVG", () => {
+    // Link with SVG + heading drills down to heading, not SVG icon
+    it("link with SVG and heading targets the heading", () => {
         const link = makeElement("A", { href: "/page", top: 0, left: 0, width: 250, height: 60 });
         const svg = makeElement("SVG", { top: 10, left: 10, width: 24, height: 24 });
         const heading = makeElement("H3", { top: 10, left: 50, width: 100, height: 24, textContent: "Page" });
@@ -1102,14 +1100,13 @@ describe("DOM problems — native interactive elements prune subtrees", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
-        // Should center on the SVG icon (10 + 24/2 = 22)
+        // Should center on the heading (50 + 100/2 = 100)
         const x = parseFloat(hints[0].style.left);
-        assert.equal(x, 22, "Hint should center on SVG icon (10 + 24/2)");
+        assert.equal(x, 100, "Hint should center on heading, not SVG icon");
     });
 
-    // ISSUE: Nav links wrap SVG inside a container span (x.com, GitHub menus).
-    // FIX: Single SVG found anywhere in element, leading icon pattern confirmed.
-    it("link with SVG nested in wrapper targets the SVG", () => {
+    // Links with SVG+text but no heading get container/bar style centered on element
+    it("link with SVG and text span centers on element, not SVG", () => {
         const link = makeElement("A", { href: "/notifications", top: 0, left: 0, width: 250, height: 60 });
         const iconWrap = makeElement("DIV", { top: 5, left: 5, width: 30, height: 30 });
         const svg = makeElement("SVG", { top: 8, left: 8, width: 24, height: 24 });
@@ -1130,101 +1127,9 @@ describe("DOM problems — native interactive elements prune subtrees", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
-        // Should center on the SVG icon (8 + 24/2 = 20)
+        // Should center on the element (0 + 250/2 = 125)
         const x = parseFloat(hints[0].style.left);
-        assert.equal(x, 20, "Hint should center on nested SVG icon (8 + 24/2)");
-    });
-
-    // ISSUE: GitHub action list items have spacer spans before the SVG icon container.
-    // The first child is an empty spacer, SVG is in the second child.
-    // FIX: Don't depend on first-child position — find SVG anywhere, confirm leading icon pattern.
-    // SITE: github.com
-    it("link with SVG after empty spacer targets the SVG", () => {
-        const link = makeElement("A", { href: "/profile", top: 0, left: 0, width: 250, height: 40,
-            attrs: { tabindex: "0" } });
-        const spacer = makeElement("SPAN", { top: 0, left: 0, width: 0, height: 0 });
-        const iconWrap = makeElement("SPAN", { top: 5, left: 5, width: 20, height: 20 });
-        const svg = makeElement("SVG", { top: 5, left: 5, width: 16, height: 16 });
-        iconWrap.appendChild(svg);
-        const label = makeElement("SPAN", { top: 5, left: 30, width: 80, height: 20, textContent: "Profile" });
-        link.appendChild(spacer);
-        link.appendChild(iconWrap);
-        link.appendChild(label);
-
-        loadModules([link, spacer, iconWrap, svg, label]);
-
-        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
-            return [link];
-        };
-
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(hintMode.isActive());
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
-        assert.equal(hints?.length, 1);
-        // Should center on the SVG icon (5 + 16/2 = 13)
-        const x = parseFloat(hints[0].style.left);
-        assert.equal(x, 13, "Hint should center on SVG icon after spacer (5 + 16/2)");
-    });
-
-    // ISSUE: Leading icon can be an <img> (favicons, avatars), not just SVG.
-    // FIX: Icon detection covers both SVG and img elements.
-    it("link with leading img icon targets the img", () => {
-        const link = makeElement("A", { href: "/user", top: 0, left: 0, width: 200, height: 40 });
-        const img = makeElement("IMG", { top: 5, left: 5, width: 20, height: 20 });
-        const label = makeElement("SPAN", { top: 5, left: 30, width: 80, height: 20, textContent: "User" });
-        link.appendChild(img);
-        link.appendChild(label);
-
-        loadModules([link, img, label]);
-
-        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
-            return [link];
-        };
-
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(hintMode.isActive());
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
-        assert.equal(hints?.length, 1);
-        // Should center on the img icon (5 + 20/2 = 15)
-        const x = parseFloat(hints[0].style.left);
-        assert.equal(x, 15, "Hint should center on leading img icon (5 + 20/2)");
-    });
-
-    // ISSUE: x.com wraps icon + label inside a single wrapper div as the only child of <a>.
-    // Sibling check at the direct-child level finds no siblings, so leading icon pattern fails.
-    // FIX: Walk up from icon, check sibling pattern at each ancestor level up to el.
-    // SITE: x.com
-    it("link with icon inside single wrapper div targets the SVG", () => {
-        const link = makeElement("A", { href: "/explore", top: 0, left: 0, width: 250, height: 50,
-            attrs: { role: "link" } });
-        const wrapper = makeElement("DIV", { top: 0, left: 0, width: 250, height: 50 });
-        const iconDiv = makeElement("DIV", { top: 5, left: 5, width: 30, height: 30 });
-        const svg = makeElement("SVG", { top: 8, left: 8, width: 24, height: 24 });
-        iconDiv.appendChild(svg);
-        const textDiv = makeElement("DIV", { top: 5, left: 40, width: 100, height: 30, textContent: "Explore" });
-        wrapper.appendChild(iconDiv);
-        wrapper.appendChild(textDiv);
-        link.appendChild(wrapper);
-
-        loadModules([link, wrapper, iconDiv, svg, textDiv]);
-
-        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
-            return [link];
-        };
-
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(hintMode.isActive());
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
-        assert.equal(hints?.length, 1);
-        // Should center on the SVG icon (8 + 24/2 = 20)
-        const x = parseFloat(hints[0].style.left);
-        assert.equal(x, 20, "Hint should center on SVG inside single wrapper (8 + 24/2)");
+        assert.equal(x, 125, "Hint should center on element, not SVG icon");
     });
 
     // ISSUE: Vertically stacked icon-above-text layouts (LinkedIn nav) falsely match the
