@@ -345,7 +345,7 @@ export class HintMode {
     div.textContent = label;
 
     if (container) {
-      // Bar style: centered at bottom edge of container, 25% width
+      // Bar style: centered at bottom edge of container
       const elRect = element.getBoundingClientRect();
       const barWidth = elRect.width * 0.25;
       const pos = this.viewportToDocument(elRect.left + elRect.width / 2, elRect.bottom);
@@ -355,6 +355,16 @@ export class HintMode {
       div.style.width = barWidth + "px";
       div.textContent = "";
       div.dataset.label = label;
+
+      // Subtle glow overlay on the container so users see what the hint targets
+      const glow = document.createElement("div");
+      glow.className = "vimium-hint-container-glow";
+      const glowPos = this.viewportToDocument(elRect.left, elRect.top);
+      glow.style.left = glowPos.x + "px";
+      glow.style.top = glowPos.y + "px";
+      glow.style.width = elRect.width + "px";
+      glow.style.height = elRect.height + "px";
+      if (this.overlay) this.overlay.appendChild(glow);
     } else {
       const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
       div.style.left = Math.max(0, pos.x) + "px";
