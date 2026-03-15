@@ -327,9 +327,11 @@ export class HintMode {
    *  3. There's enough measured space after content for the pill */
   private canPlaceInside(el: HTMLElement, allElements: HTMLElement[]): boolean {
     const PILL_WIDTH = 30;
+    const INSET_MIN = 6;
     const elRect = el.getBoundingClientRect();
     const cs = getComputedStyle(el);
-    const containerInnerRight = elRect.right - (parseFloat(cs.paddingRight) || 0);
+    const insetRight = Math.max(INSET_MIN, parseFloat(cs.paddingRight) || 0);
+    const containerInnerRight = elRect.right - insetRight;
 
     // Find the rightmost rendered content edge using the layout engine
     let rightmostEdge = elRect.left;
@@ -426,10 +428,11 @@ export class HintMode {
       if (this.overlay) this.overlay.appendChild(glow);
 
       if (placeInside) {
-        // Inside-end: pill inside container, right-aligned, vertically centered
-        const paddingRight = parseFloat(cs.paddingRight) || 0;
+        // Inside-end: pill inside container, right-aligned, vertically centered.
+        // Inset by at least 6px from each edge for breathing room.
+        const insetRight = Math.max(6, parseFloat(cs.paddingRight) || 0);
         const pos = this.viewportToDocument(
-          elRect.right - paddingRight - 4,
+          elRect.right - insetRight,
           elRect.top + elRect.height / 2
         );
         div.style.left = pos.x + "px";

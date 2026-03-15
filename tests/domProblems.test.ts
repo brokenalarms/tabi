@@ -1235,9 +1235,9 @@ describe("native interactive elements prune subtrees", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
-        // Inside-end: right-aligned inside container (250 - 0 padding - 4 gap = 246)
+        // Inside-end: right-aligned inside container (250 - 6 inset = 244)
         const x = parseFloat(hints[0].style.left);
-        assert.equal(x, 246, "Hint should be inside-end positioned");
+        assert.equal(x, 244, "Hint should be inside-end positioned");
         assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
             "Container should have glow border");
         assert.ok(!hints[0].querySelector(".vimium-hint-tail"),
