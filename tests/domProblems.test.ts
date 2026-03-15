@@ -5,7 +5,7 @@ import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
-import { discoverElements, findBlockAncestor } from "../src/modules/ElementGatherer";
+import { discoverElements, findBlockAncestor, walkerFilter } from "../src/modules/ElementGatherer";
 
 describe("DOM problems — element discovery", () => {
     afterEach(() => {
@@ -1765,5 +1765,37 @@ describe("DOM problems — atomic controls never get container style", () => {
         hints = overlay?.querySelectorAll(".vimium-hint");
         assert.ok(!hints[0].classList.contains("vimium-hint-bar"),
             "div[role=button] should get pill hint, not bar");
+    });
+});
+
+// display:none on a container must return FILTER_REJECT (prune subtree),
+// not FILTER_SKIP. Children of display:none elements are never rendered,
+// so the walker should not waste time visiting them.
+describe("DOM problems — display:none returns FILTER_REJECT", () => {
+    let cleanup: () => void;
+
+    afterEach(() => {
+        if (cleanup) cleanup();
+    });
+
+    it("adding display:none changes walkerFilter from SKIP to REJECT", () => {
+        const env = createDOM(`
+            <div id="container">
+                <a href="/link">Link</a>
+            </div>
+        `);
+        cleanup = env.cleanup;
+
+        const container = env.document.getElementById("container") as Node;
+
+        // display:block — SKIP (not clickable, but children still walked)
+        (container as any).style.display = "block";
+        assert.equal(walkerFilter(container), NodeFilter.FILTER_SKIP,
+            "display:block container should SKIP, allowing children to be visited");
+
+        // display:none — same element now returns REJECT (subtree pruned)
+        (container as any).style.display = "none";
+        assert.equal(walkerFilter(container), NodeFilter.FILTER_REJECT,
+            "display:none container must REJECT to prune entire subtree");
     });
 });
