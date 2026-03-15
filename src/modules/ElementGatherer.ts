@@ -321,56 +321,13 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
     return (ra.top - rb.top) || (ra.left - rb.left);
   });
 
-  // --- Label-control association dedup ---
-  // Labels and their associated controls represent the same click target.
-  // Resolve before containment dedup so the redundant element is already gone.
-  //   Wrapping label  (<label><input></label>)  → keep label (visible surface)
-  //   Explicit for=   (<label for="x"> + <input id="x">) → keep control (separate element)
+  // --- Containment-based dedup ---
   const resultSet = new Set(result);
   const toRemove = new Set<HTMLElement>();
-  const labelForIds = new Set<string>();
-
-  for (const el of result) {
-    if (el.tagName.toLowerCase() !== "label") continue;
-    const label = el as HTMLLabelElement;
-
-    if (label.htmlFor) {
-      // Explicit for= association — keep the control, remove the label
-      const control = document.getElementById(label.htmlFor);
-      if (control && resultSet.has(control as HTMLElement)) {
-        toRemove.add(el);
-        resultSet.delete(el);
-      } else {
-        labelForIds.add(label.htmlFor);
-      }
-    } else {
-      // Wrapping association — label is the visible surface, remove the control
-      const control = el.querySelector("input, select, textarea");
-      if (control && resultSet.has(control as HTMLElement)) {
-        toRemove.add(control as HTMLElement);
-        resultSet.delete(control as HTMLElement);
-      }
-    }
-  }
-
-  // Anchors linking to label-for targets are duplicates too
-  if (labelForIds.size > 0) {
-    for (const el of result) {
-      if (el.tagName.toLowerCase() === "a") {
-        const href = el.getAttribute("href");
-        if (href && href.charAt(0) === "#" && labelForIds.has(href.slice(1))) {
-          toRemove.add(el);
-        }
-      }
-    }
-  }
-
-  // --- Containment-based dedup ---
 
   // Build parentMap: each candidate → its nearest candidate ancestor
   const parentMap = new Map<HTMLElement, HTMLElement>();
   for (const el of result) {
-    if (!resultSet.has(el)) continue;
     let anc = el.parentElement;
     while (anc) {
       if (anc !== el && resultSet.has(anc as HTMLElement)) {
@@ -406,6 +363,30 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
       toRemove.add(root);
     }
     // Mixed specific types — keep both
+  }
+
+  // Label-for dedup
+  const labelForIds = new Set<string>();
+  for (const el of result) {
+    if (el.tagName.toLowerCase() === "label" && (el as HTMLLabelElement).htmlFor) {
+      const forId = (el as HTMLLabelElement).htmlFor;
+      const input = document.getElementById(forId);
+      if (input && resultSet.has(input as HTMLElement)) {
+        toRemove.add(el);
+      } else {
+        labelForIds.add(forId);
+      }
+    }
+  }
+  if (labelForIds.size > 0) {
+    for (const el of result) {
+      if (el.tagName.toLowerCase() === "a") {
+        const href = el.getAttribute("href");
+        if (href && href.charAt(0) === "#" && labelForIds.has(href.slice(1))) {
+          toRemove.add(el);
+        }
+      }
+    }
   }
 
   // Sibling dedup: remove generic candidates when a non-generic sibling exists.
