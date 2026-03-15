@@ -963,7 +963,7 @@ describe("DOM problems — clickable sibling occlusion", () => {
     // ISSUE: Decorative aria-hidden overlays (thread lines, visual chrome) block hints
     // on interactive elements behind them via elementsFromPoint occlusion check.
     // SITE: reddit.com — toggle comment thread button behind aria-hidden thread line
-    // FIX: aria-hidden="true" elements are decorative, not popups — treat as transparent.
+    // FIX: cursor:pointer covers are interactive — they don't block hints.
     it("element behind aria-hidden overlay still gets hint", () => {
         const btn = makeElement("BUTTON", { top: 10, left: 10, width: 24, height: 24 });
         btn.setAttribute("aria-controls", "children");
@@ -975,12 +975,31 @@ describe("DOM problems — clickable sibling occlusion", () => {
         });
 
         loadModules([btn]);
+        // threadLine must be in DOM for getComputedStyle to resolve cursor:pointer
+        (globalThis as any).document.body.appendChild(threadLine);
 
         (globalThis as any).document.elementsFromPoint = () => [threadLine, btn];
 
         const { hintMode } = getState();
         hintMode.activate(false);
         assert.ok(hintMode.isActive(), "Button behind aria-hidden overlay should get a hint");
+    });
+
+    // ISSUE: Disabled button overlay covers interactive element — disabled elements
+    // are not interactive, so they should block hints like any other non-interactive cover.
+    // FIX: coveredByOverlay uses isInteractive which checks disabled property.
+    it("element behind disabled button overlay gets filtered", () => {
+        const link = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 20 });
+        const disabledBtn = makeElement("BUTTON", { top: 0, left: 0, width: 1024, height: 768 });
+        (disabledBtn as HTMLButtonElement).disabled = true;
+
+        loadModules([link]);
+
+        (globalThis as any).document.elementsFromPoint = () => [disabledBtn, link];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(!hintMode.isActive(), "Link behind disabled button overlay should be filtered");
     });
 });
 
