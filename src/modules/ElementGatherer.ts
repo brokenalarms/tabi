@@ -102,16 +102,6 @@ function isContentlessOverlay(el: HTMLElement): boolean {
   return adj !== null && (adj.textContent || "").trim().length > 0;
 }
 
-/** Is this element visible and semantically interactive?
- *  Used by coveredByOverlay to decide if a cover is a real interactive element
- *  (which shouldn't block hints behind it) vs a non-interactive overlay (which should).
- *  Does NOT check cursor:pointer — visual style, not semantic interactivity. */
-function isInteractive(el: HTMLElement): boolean {
-  if ((el as HTMLButtonElement).disabled) return false;
-  if (!isVisible(el)) return false;
-  return el.matches(CLICKABLE_SELECTOR);
-}
-
 
 // --- Walker filter ---
 // Routes to REJECT/SKIP/ACCEPT by calling predicates.
@@ -176,8 +166,6 @@ export function walkerFilter(node: Node): number {
   // cursor:pointer is checked here (not just CLICKABLE_SELECTOR) because many modern
   // SPAs make elements clickable via JS listeners (React onClick, Vue @click) without
   // adding ARIA roles or HTML attributes. cursor:pointer is their only discoverable signal.
-  // It is NOT in isInteractive because that would let styled wrappers pass as interactive
-  // covers in occlusion checks.
   if (!el.matches(CLICKABLE_SELECTOR) && style.cursor !== "pointer") return NodeFilter.FILTER_SKIP;
 
   // Stretched-link card overlay — empty <a> duplicating visible sibling content
@@ -207,14 +195,16 @@ export function walkerFilter(node: Node): number {
   const px = Math.min(Math.max(centerX, 0), window.innerWidth - 1);
   const py = Math.min(Math.max(centerY, 0), window.innerHeight - 1);
 
-  /** Is the topmost element at a point a non-interactive overlay blocking this element?
-   *  Containment (parent/child) and interactive covers (links, buttons) are fine.
-   *  Covers in removed subtrees (aria-hidden, inert) are ignored — they won't get
-   *  their own hint, so they shouldn't block hints on elements behind them. */
+  /** Is the topmost element at a point blocking this element?
+   *  Containment (parent/child = same tree) is fine — a wrapper doesn't occlude its children.
+   *  Elements that won't receive hints themselves shouldn't block hints behind them:
+   *  removed subtrees (aria-hidden, inert) and contentless overlay links.
+   *  Any other unrelated element covering this point = occluded. */
   const coveredByOverlay = (cover: HTMLElement): boolean => {
     if (el.contains(cover) || cover.contains(el)) return false;
     if (isSubtreeRemoved(cover)) return false;
-    return !isInteractive(cover);
+    if (isContentlessOverlay(cover)) return false;
+    return true;
   };
 
   const centerHits = document.elementsFromPoint(px, py);
