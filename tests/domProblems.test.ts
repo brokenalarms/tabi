@@ -1117,8 +1117,8 @@ describe("native interactive elements prune subtrees", () => {
     });
 
     // GitHub PR sidebar: wide <summary role="button"> with gear icon + title text.
-    // Mixed content (svg + text) makes it a container → bar-style hint.
-    it("wide summary with mixed content gets bar-style hint", () => {
+    // Mixed content (svg + text) makes it a container → glow border shown.
+    it("wide summary with mixed content gets container glow", () => {
         const summary = makeElement("SUMMARY", {
             top: 10, left: 0, width: 300, height: 30,
             attrs: { role: "button" },
@@ -1135,9 +1135,8 @@ describe("native interactive elements prune subtrees", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
-        assert.ok(hints[0].classList.contains("vimium-hint-bar"),
-            "wide summary with mixed content should get bar-style hint");
+        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+            "wide summary with mixed content should get container glow");
     });
 
     it("button does not produce hints for interactive children inside it", () => {
@@ -1214,8 +1213,8 @@ describe("native interactive elements prune subtrees", () => {
         assert.equal(x, 100, "Hint should center on heading, not SVG icon");
     });
 
-    // Links with SVG+text but no heading get container/bar style centered on element
-    it("link with SVG and text span centers on element, not SVG", () => {
+    // Links with SVG+text and trailing space get inside-end placement with glow
+    it("link with SVG and text span gets inside-end hint with glow", () => {
         const link = makeElement("A", { href: "/notifications", top: 0, left: 0, width: 250, height: 60 });
         const iconWrap = makeElement("DIV", { top: 5, left: 5, width: 30, height: 30 });
         const svg = makeElement("SVG", { top: 8, left: 8, width: 24, height: 24 });
@@ -1236,9 +1235,13 @@ describe("native interactive elements prune subtrees", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
-        // Should center on the element (0 + 250/2 = 125)
+        // Inside-end: right-aligned inside container (250 - 0 padding - 4 gap = 246)
         const x = parseFloat(hints[0].style.left);
-        assert.equal(x, 125, "Hint should center on element, not SVG icon");
+        assert.equal(x, 246, "Hint should be inside-end positioned");
+        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+            "Container should have glow border");
+        assert.ok(!hints[0].querySelector(".vimium-hint-tail"),
+            "Inside-end hint should not have a pointer tail");
     });
 
     // ISSUE: Vertically stacked icon-above-text layouts (LinkedIn nav) falsely match the
@@ -1277,7 +1280,7 @@ describe("native interactive elements prune subtrees", () => {
     // get a pointed hint in the middle, which looks arbitrary. Bar style is more appropriate.
     // FIX: When getHintTargetElement returns the element itself and it has children, use bar style.
     // SITE: x.com (trending topics), github.com (sidebar sections)
-    it("container link with children gets bar-style hint", () => {
+    it("container link with children gets container glow", () => {
         const link = makeElement("DIV", { top: 10, left: 10, width: 300, height: 80,
             attrs: { role: "link", tabindex: "0" } });
         const subtitle = makeElement("DIV", { top: 15, left: 15, width: 200, height: 16, textContent: "Trending" });
@@ -1297,8 +1300,8 @@ describe("native interactive elements prune subtrees", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
-        assert.ok(hints[0].classList.contains("vimium-hint-bar"), "Container link should use bar-style hint");
-        assert.equal(hints[0].dataset.label, "s", "Bar hint should have label in data-label attribute");
+        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+            "Container link should get container glow");
     });
 
     // Verify a link with a specific target (heading, icon) still gets a normal pointed hint
@@ -1319,7 +1322,7 @@ describe("native interactive elements prune subtrees", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
-        assert.ok(!hints[0].classList.contains("vimium-hint-bar"), "Link with heading should use normal hint");
+        assert.ok(!overlay?.querySelector(".vimium-hint-container-glow"), "Link with heading should not get container glow");
     });
 
     // ISSUE: Block-level link with single descendant chain (<a display:block><span>text</span></a>)
@@ -1344,7 +1347,7 @@ describe("native interactive elements prune subtrees", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
-        assert.ok(!hints[0].classList.contains("vimium-hint-bar"), "Single descendant chain should use normal hint, not bar");
+        assert.ok(!overlay?.querySelector(".vimium-hint-container-glow"), "Single descendant chain should not get container glow");
     });
 
     // Accordion row: div[tabindex] with heading gets bar-style hint (not heading drill-down).
@@ -1369,7 +1372,8 @@ describe("native interactive elements prune subtrees", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
-        assert.ok(hints[0].classList.contains("vimium-hint-bar"), "Accordion row should use bar-style hint");
+        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+            "Accordion row should get container glow");
     });
 
     // Small icon buttons (< 64px wide) should get pill+pointer, not bar-style.
@@ -1391,7 +1395,7 @@ describe("native interactive elements prune subtrees", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
-        assert.ok(!hints[0].classList.contains("vimium-hint-bar"), "Small button should use pill hint, not bar");
+        assert.ok(!overlay?.querySelector(".vimium-hint-container-glow"), "Small button should not get container glow");
     });
 
     // Sibling <a> elements each get their own hint position — inline centering
@@ -1753,8 +1757,8 @@ describe("container style is determined by content structure", () => {
         if (keyHandler) keyHandler.destroy();
     });
 
-    it("branching children → bar, single-child chain → pill", () => {
-        // Wide element with branching children — bar style
+    it("branching children → container glow, single-child chain → no glow", () => {
+        // Wide element with branching children — container with glow
         const bar = makeElement("DIV", {
             top: 10, left: 0, width: 800, height: 50,
             attrs: { role: "button" },
@@ -1771,12 +1775,11 @@ describe("container style is determined by content structure", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
         let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        let hints = overlay?.querySelectorAll(".vimium-hint");
-        assert.ok(hints[0].classList.contains("vimium-hint-bar"),
-            "Wide element with branching children should get bar-style hint");
+        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+            "Wide element with branching children should get container glow");
         hintMode.deactivate();
 
-        // Same width, but single-child chain to text — pill style
+        // Same width, but single-child chain to text — no glow
         const pill = makeElement("DIV", {
             top: 10, left: 0, width: 800, height: 50,
             attrs: { role: "button" },
@@ -1790,9 +1793,8 @@ describe("container style is determined by content structure", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
         overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        hints = overlay?.querySelectorAll(".vimium-hint");
-        assert.ok(!hints[0].classList.contains("vimium-hint-bar"),
-            "Wide element with single-child chain should get pill hint");
+        assert.ok(!overlay?.querySelector(".vimium-hint-container-glow"),
+            "Wide element with single-child chain should not get container glow");
     });
 });
 
