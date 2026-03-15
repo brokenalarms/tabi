@@ -265,6 +265,7 @@ function interactiveType(el: HTMLElement): string {
   if (tag === "input" || tag === "textarea" || tag === "select" ||
       role === "checkbox" || role === "radio" || role === "switch" || role === "option") return "form";
   if (tag === "summary" || tag === "details" || role === "tab") return "disclosure";
+  if (tag === "label") return "label";
   return "generic";
 }
 
@@ -361,6 +362,10 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
       toRemove.add(root);
     } else if (allSameType) {
       toRemove.add(root);
+    } else if (rootType === "label") {
+      // Wrapping label is the visible interactive surface — keep it,
+      // remove contained form controls (clicking label activates them anyway)
+      for (const d of descendants) toRemove.add(d);
     }
     // Mixed specific types — keep both
   }
