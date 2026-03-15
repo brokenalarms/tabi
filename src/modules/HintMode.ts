@@ -348,14 +348,19 @@ export class HintMode {
       div.textContent = "";
       div.dataset.label = label;
 
-      // Subtle glow overlay on the container so users see what the hint targets
+      // Subtle glow overlay on the container so users see what the hint targets.
+      // Expand the glow to ensure breathing room — if the element already has
+      // internal padding, no expansion needed; otherwise pad to at least 4px.
+      const cs = getComputedStyle(element);
+      const padH = Math.max(0, 4 - parseFloat(cs.paddingLeft));
+      const padV = Math.max(0, 4 - parseFloat(cs.paddingTop));
       const glow = document.createElement("div");
       glow.className = "vimium-hint-container-glow";
-      const glowPos = this.viewportToDocument(elRect.left, elRect.top);
+      const glowPos = this.viewportToDocument(elRect.left - padH, elRect.top - padV);
       glow.style.left = glowPos.x + "px";
       glow.style.top = glowPos.y + "px";
-      glow.style.width = elRect.width + "px";
-      glow.style.height = elRect.height + "px";
+      glow.style.width = (elRect.width + padH * 2) + "px";
+      glow.style.height = (elRect.height + padV * 2) + "px";
       if (this.overlay) this.overlay.appendChild(glow);
     } else {
       const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
