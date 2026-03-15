@@ -1619,3 +1619,151 @@ describe("DOM problems — hints deactivate on resize", () => {
     });
 });
 
+// ISSUE: Elements inside overflow:scroll/auto containers that are scrolled out of view still
+// get hints because the overflow check only handles overflow:hidden and overflow:clip.
+// SITE: facebook.com (stories carousel), any horizontal scroll container
+// FIX: Extend overflow clipping check to all non-visible overflow modes (scroll, auto).
+describe("DOM problems — overflow:scroll/auto clips elements", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("without overflow on container, link beyond container edge gets hint", () => {
+        const container = makeElement("DIV", { top: 0, left: 0, width: 400, height: 300, display: "block" });
+        const link = makeElement("A", { href: "#", top: 50, left: 500, width: 100, height: 20 });
+        container.appendChild(link);
+        loadModules([link]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(), "Link should get hint when container has no overflow clipping");
+    });
+
+    it("with overflow:scroll on container, link beyond container edge is filtered out", () => {
+        const container = makeElement("DIV", { top: 0, left: 0, width: 400, height: 300, overflow: "scroll", display: "block" });
+        const link = makeElement("A", { href: "#", top: 50, left: 500, width: 100, height: 20 });
+        container.appendChild(link);
+        loadModules([link]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(!hintMode.isActive(), "Link outside overflow:scroll container should be filtered out");
+    });
+
+    it("with overflow:auto on container, link beyond container edge is filtered out", () => {
+        const container = makeElement("DIV", { top: 0, left: 0, width: 400, height: 300, overflow: "auto", display: "block" });
+        const link = makeElement("A", { href: "#", top: 50, left: 500, width: 100, height: 20 });
+        container.appendChild(link);
+        loadModules([link]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(!hintMode.isActive(), "Link outside overflow:auto container should be filtered out");
+    });
+
+    it("with overflow:scroll, link inside container bounds still gets hint", () => {
+        const container = makeElement("DIV", { top: 0, left: 0, width: 400, height: 300, overflow: "scroll", display: "block" });
+        const link = makeElement("A", { href: "#", top: 50, left: 50, width: 100, height: 20 });
+        container.appendChild(link);
+        loadModules([link]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(), "Link inside overflow:scroll container bounds should get hint");
+    });
+});
+
+// ISSUE: cursor:pointer covers are treated as interactive in occlusion checks, letting
+// elements behind cursor:pointer wrappers (e.g. styled containers) pass through.
+// SITE: facebook.com — carousel cards behind cursor:pointer divs get hints
+// FIX: Only use CLICKABLE_SELECTOR (semantic interactivity) for occlusion cover checks,
+// not cursor:pointer (visual style only).
+describe("DOM problems — cursor:pointer cover occlusion", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("without cursor:pointer cover, link gets hint", () => {
+        const link = makeElement("A", { href: "#", top: 50, left: 50, width: 100, height: 20 });
+        loadModules([link]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(), "Uncovered link should get hint");
+    });
+
+    it("with cursor:pointer cover (non-CLICKABLE_SELECTOR), link is occluded", () => {
+        // A div with cursor:pointer is NOT semantically interactive — it should
+        // act as a blocking overlay, not let elements behind it through.
+        // Cover is smaller than link so it appears first in the elementsFromPoint
+        // mock (which sorts by area ascending, simulating "topmost" element).
+        // Link is wrapped so it's not a sibling of cover (avoids sibling dedup).
+        const wrapper = makeElement("DIV", { top: 50, left: 50, width: 100, height: 20, display: "block" });
+        const link = makeElement("A", { href: "#", top: 50, left: 50, width: 100, height: 20 });
+        wrapper.appendChild(link);
+        const cover = makeElement("DIV", { top: 48, left: 48, width: 60, height: 15, cursor: "pointer" });
+        loadModules([link, cover]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        // Should have hints for the cover (cursor:pointer discovery) but NOT the link behind it
+        const hintCount = hints?.length ?? 0;
+        assert.equal(hintCount, 1, "Only the cover div should get a hint, not the occluded link behind it");
+    });
+});
+
+// ISSUE: Wide div[role="button"] gets container/bar-style hint with glow extending
+// across the full container width, even though the visible button is a small centered pill.
+// SITE: google.com — "Show more" AI Overview button
+// FIX: Elements with declared widget types (ARIA roles, native tags) are atomic controls —
+// only generic clickable elements (tabindex, onclick, cursor:pointer) can be containers.
+describe("DOM problems — atomic controls never get container style", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("role=button is the variable that prevents container style", () => {
+        // Wide div with branching children — container candidate
+        const btn = makeElement("DIV", {
+            top: 10, left: 0, width: 800, height: 50,
+            attrs: { tabindex: "0" },
+        });
+        const label = makeElement("SPAN", { top: 20, left: 310, width: 100, height: 20, textContent: "Show more" });
+        const icon = makeElement("SPAN", { top: 20, left: 420, width: 20, height: 20, textContent: "▼" });
+        btn.appendChild(label);
+        btn.appendChild(icon);
+
+        loadModules([btn, label, icon]);
+
+        (globalThis as any).document.elementsFromPoint = () => [btn];
+
+        const { hintMode } = getState();
+
+        // Without role="button" — generic tabindex div, gets container/bar style
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        let hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.ok(hints[0].classList.contains("vimium-hint-bar"),
+            "Generic div[tabindex] should get bar-style hint");
+        hintMode.deactivate();
+
+        // With role="button" — atomic control, gets pill style
+        btn.setAttribute("role", "button");
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.ok(!hints[0].classList.contains("vimium-hint-bar"),
+            "div[role=button] should get pill hint, not bar");
+    });
+});
