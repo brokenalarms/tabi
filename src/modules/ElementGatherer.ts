@@ -265,7 +265,6 @@ function interactiveType(el: HTMLElement): string {
   if (tag === "input" || tag === "textarea" || tag === "select" ||
       role === "checkbox" || role === "radio" || role === "switch" || role === "option") return "form";
   if (tag === "summary" || tag === "details" || role === "tab") return "disclosure";
-  if (tag === "label") return "label";
   return "generic";
 }
 
