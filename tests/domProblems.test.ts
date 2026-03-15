@@ -1083,13 +1083,13 @@ describe("DOM problems — cursor:pointer sibling dedup", () => {
     });
 });
 
-// ISSUE: Native interactive elements (button, summary) produce duplicate overlapping hints
-// with their parent containers. E.g. <details> + <summary role="button"> both get hints
-// because the walker descends into accepted interactive elements.
+// ISSUE: Native interactive elements (button, input, etc.) produce duplicate overlapping hints
+// with their parent containers when the walker descends into accepted interactive elements.
 // SITE: GitHub PR sidebar — each section has <details><summary role="button">...</summary></details>
-// FIX: Native interactive elements are atomic — the walker should prune their subtrees.
-// <details> is a container (delegates to <summary>) and shouldn't be clickable itself.
-describe("DOM problems — native interactive elements prune subtrees", () => {
+// FIX: Native interactive elements are atomic — the walker prunes their subtrees.
+// <summary> is not natively interactive — it's clickable here via role="button".
+// <details> has no clickable signal, so it gets SKIP'd.
+describe("native interactive elements prune subtrees", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
