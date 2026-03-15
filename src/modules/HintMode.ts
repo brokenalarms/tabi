@@ -155,7 +155,8 @@ export class HintMode {
     }
 
     /** Elements matching CLICKABLE_SELECTOR are interactive — return directly.
-     *  Only <a> tags attempt heading drill-down (card-style links). */
+     *  Only <a> tags attempt heading drill-down (card-style links).
+     *  Empty <a> overlays (card pattern) search the parent subtree for headings. */
     const tag = el.tagName.toLowerCase();
     if (el.matches(CLICKABLE_SELECTOR)) {
       if (tag === "a") {
@@ -163,6 +164,15 @@ export class HintMode {
         if (heading) {
           const hr = heading.getBoundingClientRect();
           if (hr.width > 0 && hr.height > 0) return heading;
+        }
+        // Card overlay pattern: empty <a> positioned over a card.
+        // Search the parent's subtree for a heading to anchor the hint.
+        if (el.children.length === 0 && el.parentElement) {
+          const siblingHeading = el.parentElement.querySelector("h1, h2, h3, h4, h5, h6") as HTMLElement | null;
+          if (siblingHeading) {
+            const hr = siblingHeading.getBoundingClientRect();
+            if (hr.width > 0 && hr.height > 0) return siblingHeading;
+          }
         }
       }
       return el;
