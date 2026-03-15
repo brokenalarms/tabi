@@ -5,7 +5,7 @@ import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
-import { discoverElements } from "../src/modules/ElementGatherer";
+import { discoverElements, findBlockAncestor } from "../src/modules/ElementGatherer";
 
 describe("DOM problems — element discovery", () => {
     afterEach(() => {
@@ -46,11 +46,17 @@ describe("DOM problems — element discovery", () => {
 
     // ISSUE: label[for] not discovered as clickable — CSS checkbox hack menus use label as the visible "button"
     // FIX: add label[for] to clickable selector
-    it("discovers label[for] as a clickable element", () => {
+    it("the [for] attribute is what makes a label discoverable", () => {
         const label = makeElement("LABEL", { top: 10, left: 10, width: 80, height: 20 });
-        (label as any).htmlFor = "menu-toggle";
         loadModules([label]);
         const { hintMode } = getState();
+
+        // Without [for] — bare label is not interactive
+        hintMode.activate(false);
+        assert.ok(!hintMode.isActive(), "label without [for] should not get a hint");
+
+        // With [for] — label becomes clickable
+        (label as any).htmlFor = "menu-toggle";
         hintMode.activate(false);
         assert.ok(hintMode.isActive(), "label[for] should be discovered as clickable");
         fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
@@ -1403,6 +1409,213 @@ describe("DOM problems — native interactive elements prune subtrees", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1, "Expected 1 hint (anchor only) — nested button should be pruned");
+    });
+});
+
+// ISSUE: role="treeitem" not recognized as interactive — treeitems with tabindex="-1"
+// fall through to cursor:pointer path, causing inconsistent hint styles vs tabindex="0" siblings.
+// SITE: github.com PR file tree — expanded folder gets container hint, collapsed folder gets pill
+// FIX: Add "treeitem" to CLICKABLE_ROLES so all treeitems are treated as interactive regardless of tabindex.
+describe("DOM problems — treeitem discovery", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("role=treeitem is the variable that makes tabindex=-1 discoverable", () => {
+        const tree = makeElement("UL", { top: 0, left: 0, width: 300, height: 200,
+            attrs: { role: "tree" } });
+
+        const item = makeElement("LI", { top: 50, left: 0, width: 300, height: 30,
+            attrs: { tabindex: "-1" } });
+        tree.appendChild(item);
+
+        loadModules([item]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            const r = item.getBoundingClientRect();
+            return (x >= r.left && x < r.right && y >= r.top && y < r.bottom) ? [item] : [];
+        };
+
+        // Without role="treeitem" — tabindex="-1" alone is not discoverable
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(!hintMode.isActive(), "tabindex=-1 without role=treeitem should NOT get a hint");
+
+        // Add role="treeitem" — now it should be discovered
+        item.setAttribute("role", "treeitem");
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(), "tabindex=-1 WITH role=treeitem should get a hint");
+    });
+});
+
+// ISSUE: Inline link inside inline <span> inside block <li> — inline expansion only walks
+// one level up to parent. If parent is also inline, hint stays narrow instead of expanding
+// to the block container width.
+// SITE: amazon.com search filter sidebar — checkbox+text links in <li> items
+// FIX: findBlockAncestor walks up through inline single-child ancestors to the nearest block container.
+describe("DOM problems — inline expansion walks up to block ancestor", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("inline wrapper depth is the variable that determines expansion width", () => {
+        // Without intermediate inline wrapper: <li> > <a> — single parent already block, centers on li
+        const li1 = makeElement("LI", { top: 10, left: 0, width: 300, height: 25, display: "list-item" });
+        const a1 = makeElement("A", { href: "/direct", top: 10, left: 0, width: 150, height: 20, display: "inline" });
+        li1.appendChild(a1);
+
+        loadModules([a1]);
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        let hints = overlay?.querySelectorAll(".vimium-hint");
+        const directLeft = parseFloat(hints[0].style.left);
+        assert.equal(directLeft, 150, `Direct child: hint should center on <li> (150)`);
+        hintMode.deactivate();
+
+        // With intermediate inline wrapper: <li> > <span> > <a> — walk-up needed to reach <li>
+        const li2 = makeElement("LI", { top: 10, left: 0, width: 300, height: 25, display: "list-item" });
+        const span = makeElement("SPAN", { top: 10, left: 0, width: 200, height: 20, display: "inline" });
+        const a2 = makeElement("A", { href: "/wrapped", top: 10, left: 0, width: 150, height: 20, display: "inline" });
+        span.appendChild(a2);
+        li2.appendChild(span);
+
+        loadModules([a2]);
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        hints = overlay?.querySelectorAll(".vimium-hint");
+        const wrappedLeft = parseFloat(hints[0].style.left);
+
+        // Both should produce the same result — the walk-up reaches <li> in both cases
+        assert.equal(wrappedLeft, directLeft,
+            `Wrapped (${wrappedLeft}) should match direct (${directLeft}) — walk-up reaches same <li>`);
+    });
+
+    it("stops walk-up at parent with multiple children", () => {
+        // <div display:block> > <span display:inline>a1</span> + <span display:inline>a2</span>
+        const div = makeElement("DIV", { top: 0, left: 0, width: 400, height: 30, display: "block" });
+        const a1 = makeElement("A", { href: "/one", top: 5, left: 10, width: 80, height: 20, display: "inline" });
+        const a2 = makeElement("A", { href: "/two", top: 5, left: 200, width: 80, height: 20, display: "inline" });
+        div.appendChild(a1);
+        div.appendChild(a2);
+
+        loadModules([a1, a2]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 2, "Both links should get hints");
+        const x1 = parseFloat(hints[0].style.left);
+        const x2 = parseFloat(hints[1].style.left);
+        assert.ok(x1 !== x2, `Sibling hints should NOT be expanded to same position: ${x1} vs ${x2}`);
+    });
+});
+
+// findBlockAncestor utility — walks up through inline single-child ancestors
+// to the nearest block-level container. Used for hint width expansion.
+describe("findBlockAncestor utility", () => {
+    let cleanup: () => void;
+
+    afterEach(() => {
+        if (cleanup) cleanup();
+    });
+
+    it("returns block parent when element is inline single child", () => {
+        const env = createDOM(`
+            <li>
+                <a id="t" href="#">link</a>
+            </li>
+        `);
+        cleanup = env.cleanup;
+        const a = env.document.getElementById("t")!;
+        assert.equal(findBlockAncestor(a as unknown as HTMLElement), a.parentElement);
+    });
+
+    it("walks through multiple inline wrappers", () => {
+        const env = createDOM(`
+            <li>
+                <span>
+                    <a id="t" href="#">link</a>
+                </span>
+            </li>
+        `);
+        cleanup = env.cleanup;
+        const a = env.document.getElementById("t")!;
+        const li = a.parentElement!.parentElement!;
+        assert.equal(findBlockAncestor(a as unknown as HTMLElement), li);
+    });
+
+    it("returns null when parent has multiple children", () => {
+        const env = createDOM(`
+            <div>
+                <a id="t" href="#">one</a>
+                <a href="#">two</a>
+            </div>
+        `);
+        cleanup = env.cleanup;
+        const a = env.document.getElementById("t")!;
+        assert.equal(findBlockAncestor(a as unknown as HTMLElement), null);
+    });
+
+    it("returns null when element is already block-level", () => {
+        const env = createDOM(`
+            <div id="t">block</div>
+        `);
+        cleanup = env.cleanup;
+        const div = env.document.getElementById("t")!;
+        assert.equal(findBlockAncestor(div as unknown as HTMLElement), null);
+    });
+
+    it("returns null when no parent exists", () => {
+        const env = createDOM(``);
+        cleanup = env.cleanup;
+        const a = env.document.createElement("a");
+        assert.equal(findBlockAncestor(a as unknown as HTMLElement), null);
+    });
+
+    it("stops at body element", () => {
+        const env = createDOM(`
+            <span id="t">text</span>
+        `);
+        cleanup = env.cleanup;
+        const span = env.document.getElementById("t")!;
+        const result = findBlockAncestor(span as unknown as HTMLElement);
+        assert.ok(result !== env.document.body, "Should not return body element");
+    });
+});
+
+// ISSUE: Hints drift from their target elements when viewport resizes (e.g. DevTools open).
+// Hint positions are calculated once at activation with absolute pixel coordinates.
+// FIX: Deactivate hints on window resize, consistent with existing scroll deactivation.
+describe("DOM problems — hints deactivate on resize", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("deactivates hint mode when window is resized", () => {
+        const link = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 20 });
+        loadModules([link]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(), "Hints should be active before resize");
+
+        // Simulate resize event (use happy-dom's Event via the test window)
+        const Event = (globalThis as any).window.Event || globalThis.Event;
+        window.dispatchEvent(new Event("resize"));
+
+        assert.ok(!hintMode.isActive(), "Hints should deactivate on window resize");
     });
 });
 

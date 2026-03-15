@@ -4,7 +4,7 @@
 
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
-import { discoverElements, findAssociatedLabel, CLICKABLE_SELECTOR } from "./ElementGatherer";
+import { discoverElements, findAssociatedLabel, findBlockAncestor, CLICKABLE_SELECTOR } from "./ElementGatherer";
 import { Mode } from "../commands";
 
 declare const browser: {
@@ -39,6 +39,7 @@ export class HintMode {
   private activating: boolean;
   private readonly onMouseDown: () => void;
   private readonly onScroll: () => void;
+  private readonly onResize: () => void;
 
   constructor(keyHandler: KeyHandlerLike) {
     this.keyHandler = keyHandler;
@@ -50,6 +51,7 @@ export class HintMode {
     this.activating = false;
     this.onMouseDown = this.deactivate.bind(this);
     this.onScroll = this.deactivate.bind(this);
+    this.onResize = this.deactivate.bind(this);
   }
 
   // --- Public API ---
@@ -81,6 +83,7 @@ export class HintMode {
     this.keyHandler.setModeKeyDelegate(this.handleKey.bind(this));
     document.addEventListener("mousedown", this.onMouseDown, true);
     window.addEventListener("scroll", this.onScroll, true);
+    window.addEventListener("resize", this.onResize);
   }
 
   deactivate(): void {
@@ -92,6 +95,7 @@ export class HintMode {
     this.keyHandler.clearModeKeyDelegate();
     document.removeEventListener("mousedown", this.onMouseDown, true);
     window.removeEventListener("scroll", this.onScroll, true);
+    window.removeEventListener("resize", this.onResize);
 
     if (this.overlay) {
       this.overlay.classList.remove("visible");
@@ -231,19 +235,21 @@ export class HintMode {
       }
     }
 
-    // Inline elements in vertical lists: expand to parent width so hints align.
-    // Only when the element is the sole child — siblings mean each element
-    // keeps its own position (e.g. <div><a>Open</a><a>Closed</a></div>).
+    // Inline elements in vertical lists: expand to nearest block ancestor's width
+    // so hints align. Walks up through inline single-child wrappers (e.g.
+    // <li><span><a>text</a></span></li> expands to <li> width).
     const tag = target.tagName.toLowerCase();
     const isFormControl = tag === "input" || tag === "textarea" || tag === "select";
-    if (!isFormControl && getComputedStyle(target).display.startsWith("inline") && target.parentElement) {
-      const parent = target.parentElement;
-      const hasMixedContent = Array.from(parent.childNodes).some(
-        n => n !== target && n.nodeType === 3 && (n.textContent || "").trim().length > 0
-      );
-      if (!hasMixedContent && parent.children.length === 1) {
-        const parentRect = parent.getBoundingClientRect();
-        rect = new DOMRect(parentRect.left, rect.top, parentRect.width, rect.height);
+    if (!isFormControl) {
+      const blockAncestor = findBlockAncestor(target);
+      if (blockAncestor) {
+        const hasMixedContent = Array.from(blockAncestor.childNodes).some(
+          n => n.nodeType === 3 && (n.textContent || "").trim().length > 0
+        );
+        if (!hasMixedContent) {
+          const ancestorRect = blockAncestor.getBoundingClientRect();
+          rect = new DOMRect(ancestorRect.left, rect.top, ancestorRect.width, rect.height);
+        }
       }
     }
 

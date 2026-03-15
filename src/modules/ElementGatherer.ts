@@ -7,7 +7,7 @@
 // The walker accepts these and prunes their subtrees: children are content/labels,
 // not separate click targets. This prevents duplicate hints inside buttons, links, etc.
 export const NATIVE_INTERACTIVE_ELEMENTS = ["a", "button", "input", "textarea", "select", "summary"];
-const CLICKABLE_ROLES = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch"];
+const CLICKABLE_ROLES = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch", "treeitem"];
 const CLICKABLE_ATTRS = ["label[for]", "[tabindex]:not([tabindex='-1'])", "[onclick]", "[onmousedown]"];
 
 export const CLICKABLE_SELECTOR = [
@@ -174,6 +174,28 @@ function isInteractive(el: HTMLElement): boolean {
   if (el.hasAttribute("inert")) return false;
   if (!isVisible(el)) return false;
   return el.matches(CLICKABLE_SELECTOR) || getComputedStyle(el).cursor === "pointer";
+}
+
+/** Walk up through inline single-child ancestors to the nearest block-level container.
+ *  Returns null if element is already block, has no parent, or a parent has multiple children.
+ *  Stops at body/documentElement — never returns those. */
+export function findBlockAncestor(el: HTMLElement): HTMLElement | null {
+  if (isBlockLevel(el)) return null;
+  let node = el;
+  while (node.parentElement) {
+    const parent = node.parentElement;
+    if (parent === document.body || parent === document.documentElement) return null;
+    if (parent.children.length !== 1) return null;
+    if (isBlockLevel(parent)) return parent;
+    node = parent;
+  }
+  return null;
+}
+
+/** Block-level display check — treats missing/empty display as inline (browser default). */
+function isBlockLevel(el: HTMLElement): boolean {
+  const display = getComputedStyle(el).display;
+  return display !== "" && !display.startsWith("inline");
 }
 
 // --- Interactive type ---
