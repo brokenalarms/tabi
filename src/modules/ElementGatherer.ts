@@ -29,6 +29,15 @@ function isSubtreeRemoved(el: HTMLElement): boolean {
   return false;
 }
 
+/** Excluded by developer intent: subtree removal (aria-hidden, inert),
+ *  element-level hidden attribute, or disabled state. */
+function isExcludedByIntent(el: HTMLElement): boolean {
+  if (isSubtreeRemoved(el)) return true;
+  if (el.hidden) return true;
+  if ((el as HTMLButtonElement).disabled) return true;
+  return false;
+}
+
 /** Is this rect non-zero and within the viewport? */
 function isOnScreen(rect: DOMRect): boolean {
   if (rect.width === 0 || rect.height === 0) return false;
@@ -37,11 +46,19 @@ function isOnScreen(rect: DOMRect): boolean {
   return true;
 }
 
+/** Can children of this element still be visible?
+ *  display:none is the only CSS property that irrecoverably hides all descendants.
+ *  visibility:hidden and opacity:0 can be overridden by children. */
+function childrenMightBeVisible(el: HTMLElement): boolean {
+  return getComputedStyle(el).display !== "none";
+}
+
 /** Stateless visibility check — does this element have a non-zero, on-screen,
- *  non-hidden rect? No clickability or occlusion logic — just geometry + CSS. */
-function isVisible(el: HTMLElement): boolean {
-  const rect = el.getBoundingClientRect();
-  if (!isOnScreen(rect)) return false;
+ *  non-hidden rect? No clickability or occlusion logic — just geometry + CSS.
+ *  Accepts an optional pre-computed rect (e.g. fallback rect for zero-size anchors). */
+function isVisible(el: HTMLElement, rect?: DOMRect): boolean {
+  const r = rect ?? el.getBoundingClientRect();
+  if (!isOnScreen(r)) return false;
   const style = getComputedStyle(el);
   if (style.display === "none") return false;
   if (style.visibility === "hidden") return false;
@@ -82,6 +99,20 @@ function isInteractive(el: HTMLElement): boolean {
   return el.matches(CLICKABLE_SELECTOR);
 }
 
+// Roles that are always atomic — children are rendering details, never containers.
+// "link" is excluded: div[role="link"] can be a card-style container (X.com trends).
+const ATOMIC_ROLES = ["button", "tab", "menuitem", "option", "checkbox", "radio", "switch", "treeitem"];
+
+/** Did this element declare a widget type that is always atomic?
+ *  Used to gate container/bar hint style: atomic controls get pill hints,
+ *  only generic clickable elements can be containers. */
+export function isAtomicControl(el: HTMLElement): boolean {
+  const tag = el.tagName.toLowerCase();
+  if (tag !== "a" && NATIVE_INTERACTIVE_ELEMENTS.includes(tag)) return true;
+  const role = el.getAttribute("role")?.toLowerCase() ?? "";
+  return ATOMIC_ROLES.includes(role);
+}
+
 // --- Walker filter ---
 // Routes to REJECT/SKIP/ACCEPT by calling predicates.
 // FILTER_REJECT prunes entire subtrees (developer intent, display:none).
@@ -91,22 +122,13 @@ function isInteractive(el: HTMLElement): boolean {
 export function walkerFilter(node: Node): number {
   const el = node as HTMLElement;
 
-  // Developer intent — prune entire subtree
-  if (el.getAttribute("aria-hidden") === "true") return NodeFilter.FILTER_REJECT;
-  if (el.hasAttribute("inert")) return NodeFilter.FILTER_REJECT;
-  if (el.hidden) return NodeFilter.FILTER_REJECT;
-  if ((el as HTMLButtonElement).disabled) return NodeFilter.FILTER_REJECT;
-
-  const style = getComputedStyle(el);
-
-  // display:none — irrecoverable, prune subtree
-  if (style.display === "none") return NodeFilter.FILTER_REJECT;
-
-  // visibility:hidden — children can override with visibility:visible, so SKIP
-  if (style.visibility === "hidden") return NodeFilter.FILTER_SKIP;
+  // Developer intent or display:none — prune entire subtree
+  if (isExcludedByIntent(el)) return NodeFilter.FILTER_REJECT;
+  if (!childrenMightBeVisible(el)) return NodeFilter.FILTER_REJECT;
 
   // Visually-hidden pattern: clip/clip-path reducing visible area to zero
   // (e.g. "skip to content" links, sr-only elements)
+  const style = getComputedStyle(el);
   const clipPath = style.clipPath || el.style.clipPath;
   if (clipPath && clipPath !== "none") {
     const m = clipPath.match(/inset\((\d+)%/);
@@ -158,7 +180,7 @@ export function walkerFilter(node: Node): number {
   // covers in occlusion checks.
   if (!el.matches(CLICKABLE_SELECTOR) && style.cursor !== "pointer") return NodeFilter.FILTER_SKIP;
 
-  // Opacity:0 with radio/checkbox label redirect
+  // Opacity:0 radio/checkbox with visible label — redirect to label
   if (parseFloat(style.opacity) === 0) {
     if (el.tagName.toLowerCase() === "input") {
       const type = ((el as HTMLInputElement).type || "").toLowerCase();
@@ -169,6 +191,9 @@ export function walkerFilter(node: Node): number {
     }
     return NodeFilter.FILTER_SKIP;
   }
+
+  // visibility:hidden, remaining invisibility — children may override
+  if (!isVisible(el, rect)) return NodeFilter.FILTER_SKIP;
 
   // Overflow clipping
   if (isClippedByOverflow(el, rect)) return NodeFilter.FILTER_SKIP;

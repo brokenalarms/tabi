@@ -1719,3 +1719,51 @@ describe("DOM problems — cursor:pointer cover occlusion", () => {
     });
 });
 
+// ISSUE: Wide div[role="button"] gets container/bar-style hint with glow extending
+// across the full container width, even though the visible button is a small centered pill.
+// SITE: google.com — "Show more" AI Overview button
+// FIX: Elements with declared widget types (ARIA roles, native tags) are atomic controls —
+// only generic clickable elements (tabindex, onclick, cursor:pointer) can be containers.
+describe("DOM problems — atomic controls never get container style", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("role=button is the variable that prevents container style", () => {
+        // Wide div with branching children — container candidate
+        const btn = makeElement("DIV", {
+            top: 10, left: 0, width: 800, height: 50,
+            attrs: { tabindex: "0" },
+        });
+        const label = makeElement("SPAN", { top: 20, left: 310, width: 100, height: 20, textContent: "Show more" });
+        const icon = makeElement("SPAN", { top: 20, left: 420, width: 20, height: 20, textContent: "▼" });
+        btn.appendChild(label);
+        btn.appendChild(icon);
+
+        loadModules([btn, label, icon]);
+
+        (globalThis as any).document.elementsFromPoint = () => [btn];
+
+        const { hintMode } = getState();
+
+        // Without role="button" — generic tabindex div, gets container/bar style
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        let hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.ok(hints[0].classList.contains("vimium-hint-bar"),
+            "Generic div[tabindex] should get bar-style hint");
+        hintMode.deactivate();
+
+        // With role="button" — atomic control, gets pill style
+        btn.setAttribute("role", "button");
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.ok(!hints[0].classList.contains("vimium-hint-bar"),
+            "div[role=button] should get pill hint, not bar");
+    });
+});

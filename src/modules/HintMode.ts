@@ -4,7 +4,7 @@
 
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
-import { discoverElements, findAssociatedLabel, findBlockAncestor, CLICKABLE_SELECTOR } from "./ElementGatherer";
+import { discoverElements, findAssociatedLabel, findBlockAncestor, isAtomicControl, CLICKABLE_SELECTOR } from "./ElementGatherer";
 import { Mode } from "../commands";
 
 declare const browser: {
@@ -206,6 +206,7 @@ export class HintMode {
     const isRectangular = aspectRatio >= 1.5;
     const isLarge = rect.width > window.innerWidth * 0.25;
     if (target === el && el.children.length > 0 &&
+        !isAtomicControl(el) &&
         rect.width > 64 && (isRectangular || isLarge) &&
         !getComputedStyle(el).display.startsWith("inline")) {
       // Walk the single-child chain — if it reaches a leaf with no sibling
