@@ -1786,15 +1786,15 @@ describe("DOM problems — display:none returns FILTER_REJECT", () => {
         `);
         cleanup = env.cleanup;
 
-        const container = env.document.getElementById("container")! as unknown as Node;
+        const container = env.document.getElementById("container") as HTMLElement;
 
         // Without display:none — SKIP (not clickable, but children still walked)
-        assert.equal(walkerFilter(container), NodeFilter.FILTER_SKIP,
+        assert.equal(walkerFilter(container as unknown as Node), NodeFilter.FILTER_SKIP,
             "visible container should SKIP, allowing children to be visited");
 
         // Add display:none — same element now returns REJECT (subtree pruned)
-        (container as unknown as HTMLElement).style.display = "none";
-        assert.equal(walkerFilter(container), NodeFilter.FILTER_REJECT,
+        container.style.display = "none";
+        assert.equal(walkerFilter(container as unknown as Node), NodeFilter.FILTER_REJECT,
             "display:none container must REJECT to prune entire subtree");
     });
 });
