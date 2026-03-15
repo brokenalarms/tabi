@@ -6,7 +6,7 @@
 // Native interactive elements — atomic controls at the lowest level of the DOM.
 // The walker accepts these and prunes their subtrees: children are content/labels,
 // not separate click targets. This prevents duplicate hints inside buttons, links, etc.
-export const NATIVE_INTERACTIVE_ELEMENTS = ["a", "button", "input", "textarea", "select", "summary"];
+export const NATIVE_INTERACTIVE_ELEMENTS = ["a", "button", "input", "textarea", "select"];
 const CLICKABLE_ROLES = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch", "treeitem"];
 const CLICKABLE_ATTRS = ["label[for]", "[tabindex]:not([tabindex='-1'])", "[onclick]", "[onmousedown]"];
 
@@ -99,19 +99,6 @@ function isInteractive(el: HTMLElement): boolean {
   return el.matches(CLICKABLE_SELECTOR);
 }
 
-// Roles that are always atomic — children are rendering details, never containers.
-// "link" is excluded: div[role="link"] can be a card-style container (X.com trends).
-const ATOMIC_ROLES = ["button", "tab", "menuitem", "option", "checkbox", "radio", "switch", "treeitem"];
-
-/** Did this element declare a widget type that is always atomic?
- *  Used to gate container/bar hint style: atomic controls get pill hints,
- *  only generic clickable elements can be containers. */
-export function isAtomicControl(el: HTMLElement): boolean {
-  const tag = el.tagName.toLowerCase();
-  if (tag !== "a" && NATIVE_INTERACTIVE_ELEMENTS.includes(tag)) return true;
-  const role = el.getAttribute("role")?.toLowerCase() ?? "";
-  return ATOMIC_ROLES.includes(role);
-}
 
 // --- Walker filter ---
 // Routes to REJECT/SKIP/ACCEPT by calling predicates.
