@@ -1161,7 +1161,7 @@ describe("native interactive elements prune subtrees", () => {
     });
 
     // Card-style link with heading + description gets container hint at the link level
-    it("link containing a heading gets container hint at link level", () => {
+    it("link containing a heading gets hint at link level", () => {
         const link = makeElement("A", { href: "/article", top: 0, left: 0, width: 600, height: 120 });
         const heading = makeElement("H3", { top: 10, left: 10, width: 400, height: 24, textContent: "Article Title" });
         const desc = makeElement("P", { top: 40, left: 10, width: 580, height: 60, textContent: "Description text" });
@@ -1180,9 +1180,9 @@ describe("native interactive elements prune subtrees", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
-        // Hint should be at the link level, with container glow
-        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
-            "Wide link with branching content should get container glow");
+        // Text fills the width — pill+pointer below, no glow
+        assert.ok(hints[0].querySelector(".vimium-hint-tail"),
+            "Text-filled container should get pill+pointer");
     });
 
     // Links with SVG+text and trailing space get inside-end placement with glow
@@ -1460,10 +1460,10 @@ describe("native interactive elements prune subtrees", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
-        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
-            "Should still be detected as container");
+        assert.ok(!overlay?.querySelector(".vimium-hint-container-glow"),
+            "Text-filled container should not get glow");
         assert.ok(hints[0].querySelector(".vimium-hint-tail"),
-            "Text overlap should force container-external with pointer");
+            "Text overlap should force pill+pointer");
     });
 
     // Sibling <a> elements each get their own hint position — inline centering

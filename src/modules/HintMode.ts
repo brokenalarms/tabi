@@ -390,8 +390,9 @@ export class HintMode {
 
     const placeInside = container && this.canPlaceInside(element, allElements);
 
-    if (container) {
-      // Glow overlay on the container so users see what the hint targets.
+    if (placeInside) {
+      // Inside-end: pill inside container, right-aligned, vertically centered.
+      // Glow border shows what the hint targets.
       const elRect = element.getBoundingClientRect();
       const cs = getComputedStyle(element);
       const padH = Math.max(0, 4 - parseFloat(cs.paddingLeft));
@@ -405,28 +406,17 @@ export class HintMode {
       glow.style.height = (elRect.height + padV * 2) + "px";
       if (this.overlay) this.overlay.appendChild(glow);
 
-      if (placeInside) {
-        // Inside-end: pill inside container, right-aligned, vertically centered.
-        // Inset by at least 6px from each edge for breathing room.
-        const insetRight = Math.max(6, parseFloat(cs.paddingRight) || 0);
-        const pos = this.viewportToDocument(
-          elRect.right - insetRight,
-          elRect.top + elRect.height / 2
-        );
-        div.style.left = pos.x + "px";
-        div.style.top = pos.y + "px";
-        div.style.transform = "translate(-100%, -50%)";
-      } else {
-        // Container-external: pill below center with pointer
-        const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
-        div.style.left = Math.max(0, pos.x) + "px";
-        div.style.top = Math.max(0, pos.y) + "px";
-        div.style.transform = "translateX(-50%)";
-        const tail = document.createElement("div");
-        tail.className = "vimium-hint-tail";
-        div.appendChild(tail);
-      }
+      const insetRight = Math.max(6, parseFloat(cs.paddingRight) || 0);
+      const pos = this.viewportToDocument(
+        elRect.right - insetRight,
+        elRect.top + elRect.height / 2
+      );
+      div.style.left = pos.x + "px";
+      div.style.top = pos.y + "px";
+      div.style.transform = "translate(-100%, -50%)";
     } else {
+      // Pill below with pointer — for non-containers and containers
+      // that can't fit the hint inside (too narrow, tall, or text-filled).
       const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
       div.style.left = Math.max(0, pos.x) + "px";
       div.style.top = Math.max(0, pos.y) + "px";
