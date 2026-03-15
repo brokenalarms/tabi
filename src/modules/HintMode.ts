@@ -4,7 +4,7 @@
 
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
-import { discoverElements, findAssociatedLabel, findBlockAncestor, isContentless, CLICKABLE_SELECTOR } from "./ElementGatherer";
+import { discoverElements, findAssociatedLabel, findBlockAncestor, CLICKABLE_SELECTOR } from "./ElementGatherer";
 import { Mode } from "../commands";
 
 declare const browser: {
@@ -154,29 +154,8 @@ export class HintMode {
       }
     }
 
-    /** Elements matching CLICKABLE_SELECTOR are interactive — return directly.
-     *  Only <a> tags attempt heading drill-down (card-style links).
-     *  Empty <a> overlays (card pattern) search the parent subtree for headings. */
-    const tag = el.tagName.toLowerCase();
-    if (el.matches(CLICKABLE_SELECTOR)) {
-      if (tag === "a") {
-        const heading = el.querySelector("h1, h2, h3, h4, h5, h6") as HTMLElement | null;
-        if (heading) {
-          const hr = heading.getBoundingClientRect();
-          if (hr.width > 0 && hr.height > 0) return heading;
-        }
-        // Card overlay pattern: contentless <a> positioned over a card.
-        // Search the parent's subtree for a heading to anchor the hint.
-        if (isContentless(el) && el.parentElement) {
-          const siblingHeading = el.parentElement.querySelector("h1, h2, h3, h4, h5, h6") as HTMLElement | null;
-          if (siblingHeading) {
-            const hr = siblingHeading.getBoundingClientRect();
-            if (hr.width > 0 && hr.height > 0) return siblingHeading;
-          }
-        }
-      }
-      return el;
-    }
+    /** Elements matching CLICKABLE_SELECTOR are interactive — return directly. */
+    if (el.matches(CLICKABLE_SELECTOR)) return el;
 
     // Below: generic cursor:pointer wrappers only — find the best visual target.
 
