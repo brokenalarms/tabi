@@ -1031,17 +1031,24 @@ describe("clickable sibling occlusion", () => {
         assert.ok(!hintMode.isActive(), "Link behind non-clickable overlay should be filtered");
     });
 
-    it("element behind clickable sibling still gets hint", () => {
-        const a1 = makeElement("A", { href: "/one", top: 10, left: 10, width: 200, height: 20 });
-        const a2 = makeElement("A", { href: "/two", top: 10, left: 10, width: 200, height: 20 });
+    // ISSUE: Element fully covered by an unrelated interactive element (e.g. dropdown
+    // menu item over a sidebar link) should be occluded — interactivity of the cover
+    // is irrelevant; what matters is whether they share a DOM tree (containment).
+    // SITE: github.com — profile dropdown menu items cover sidebar links
+    // FIX: coveredByOverlay checks containment only, not interactivity of cover
+    it("element behind unrelated interactive element gets filtered", () => {
+        const menuItem = makeElement("A", { href: "/menu", top: 10, left: 10, width: 200, height: 20 });
+        const sidebarLink = makeElement("A", { href: "/sidebar", top: 10, left: 10, width: 200, height: 20 });
 
-        loadModules([a1, a2]);
+        // Only sidebarLink is a candidate; menuItem is from a separate tree (dropdown)
+        loadModules([sidebarLink]);
 
-        (globalThis as any).document.elementsFromPoint = () => [a1, a2];
+        // menuItem covers sidebarLink at both test points
+        (globalThis as any).document.elementsFromPoint = () => [menuItem, sidebarLink];
 
         const { hintMode } = getState();
         hintMode.activate(false);
-        assert.ok(hintMode.isActive(), "Links behind clickable siblings should still get hints");
+        assert.ok(!hintMode.isActive(), "Element fully covered by unrelated element should be filtered");
     });
 
     // ISSUE: Decorative aria-hidden overlays (thread lines, visual chrome) block hints
@@ -1069,9 +1076,8 @@ describe("clickable sibling occlusion", () => {
         assert.ok(hintMode.isActive(), "Button behind aria-hidden overlay should get a hint");
     });
 
-    // ISSUE: Disabled button overlay covers interactive element — disabled elements
-    // are not interactive, so they should block hints like any other non-interactive cover.
-    // FIX: coveredByOverlay uses isInteractive which checks disabled property.
+    // ISSUE: Disabled button overlay covers interactive element.
+    // FIX: Any unrelated element covering both test points blocks hints.
     it("element behind disabled button overlay gets filtered", () => {
         const link = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 20 });
         const disabledBtn = makeElement("BUTTON", { top: 0, left: 0, width: 1024, height: 768 });
