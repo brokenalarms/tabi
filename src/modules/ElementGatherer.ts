@@ -7,7 +7,7 @@
 // The walker accepts these and prunes their subtrees: children are content/labels,
 // not separate click targets. This prevents duplicate hints inside buttons, links, etc.
 export const NATIVE_INTERACTIVE_ELEMENTS = ["a", "button", "input", "textarea", "select", "summary"];
-export const CLICKABLE_ROLES = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch"];
+const CLICKABLE_ROLES = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch"];
 const CLICKABLE_ATTRS = ["label[for]", "[tabindex]:not([tabindex='-1'])", "[onclick]", "[onmousedown]"];
 
 export const CLICKABLE_SELECTOR = [
@@ -120,10 +120,14 @@ export function walkerFilter(node: Node): number {
   const px = Math.min(Math.max(centerX, 0), window.innerWidth - 1);
   const py = Math.min(Math.max(centerY, 0), window.innerHeight - 1);
 
+  /** Filters elements hidden behind non-interactive overlays (popups, modals).
+   *  Elements behind other clickable elements (sibling links, buttons) are
+   *  still discoverable — only non-clickable covers indicate a popup. */
   const topHitMatches = (point: Element[]): boolean => {
     if (point.length === 0) return false;
     const top = point[0];
-    return el.contains(top) || top.contains(el);
+    return el.contains(top) || top.contains(el) ||
+      (top as HTMLElement).matches(CLICKABLE_SELECTOR);
   };
 
   const centerHits = document.elementsFromPoint(px, py);
@@ -152,99 +156,17 @@ export function findAssociatedLabel(el: HTMLElement): HTMLElement | null {
   return null;
 }
 
+/** Stateless visibility check — does this element have a non-zero, on-screen,
+ *  non-hidden rect? No clickability or occlusion logic — just geometry + CSS. */
 function isVisible(el: HTMLElement): boolean {
   const rect = el.getBoundingClientRect();
-  if (rect.width === 0 || rect.height === 0) {
-    if (el.tagName.toLowerCase() === "a") {
-      for (const child of el.children) {
-        const cr = (child as HTMLElement).getBoundingClientRect();
-        if (cr.width > 0 && cr.height > 0) {
-          return isVisible(child as HTMLElement);
-        }
-      }
-    }
-    if (el.tagName.toLowerCase() === "input") {
-      const type = ((el as HTMLInputElement).type || "").toLowerCase();
-      if (type === "radio" || type === "checkbox") {
-        const label = findAssociatedLabel(el);
-        if (label) return isVisible(label);
-      }
-    }
-    return false;
-  }
+  if (rect.width === 0 || rect.height === 0) return false;
   if (rect.bottom < 0 || rect.top > window.innerHeight) return false;
   if (rect.right < 0 || rect.left > window.innerWidth) return false;
-
   const style = getComputedStyle(el);
   if (style.display === "none") return false;
   if (style.visibility === "hidden") return false;
-
-  // Visually-hidden: clip/clip-path reducing visible area to zero
-  const clipPath = style.clipPath || el.style.clipPath;
-  if (clipPath && clipPath !== "none") {
-    const cm = clipPath.match(/inset\((\d+)%/);
-    if (cm && parseInt(cm[1]) >= 50) return false;
-  }
-  const clip = style.getPropertyValue("clip") || el.style.getPropertyValue("clip");
-  if (clip && clip !== "auto") {
-    const cm = clip.match(/rect\(([^)]+)\)/);
-    if (cm) {
-      const vals = cm[1].split(/[,\s]+/).map(parseFloat).filter(v => !isNaN(v));
-      if (vals.length >= 4 && (vals[2] - vals[0]) <= 1 && (vals[1] - vals[3]) <= 1) {
-        return false;
-      }
-    }
-  }
-
-  // Opacity:0 — excluded, with radio/checkbox → label redirect
-  if (parseFloat(style.opacity) === 0) {
-    if (el.tagName.toLowerCase() === "input") {
-      const type = ((el as HTMLInputElement).type || "").toLowerCase();
-      if (type === "radio" || type === "checkbox") {
-        const label = findAssociatedLabel(el);
-        if (label) return isVisible(label);
-      }
-    }
-    return false;
-  }
-
-  // Check if element is clipped by an ancestor with overflow:hidden/clip
-  let ancestor = el.parentElement;
-  while (ancestor && ancestor !== document.body) {
-    const overflow = getComputedStyle(ancestor).overflow;
-    if (overflow === "hidden" || overflow === "clip") {
-      const ar = ancestor.getBoundingClientRect();
-      if (rect.bottom <= ar.top || rect.top >= ar.bottom ||
-          rect.right <= ar.left || rect.left >= ar.right) {
-        return false;
-      }
-    }
-    ancestor = ancestor.parentElement;
-  }
-
-  // Check if element is actually reachable (not fully covered by another element).
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  const px = Math.min(Math.max(centerX, 0), window.innerWidth - 1);
-  const py = Math.min(Math.max(centerY, 0), window.innerHeight - 1);
-
-  const topHitMatches = (point: Element[]): boolean => {
-    if (point.length === 0) return false;
-    const top = point[0];
-    return el.contains(top) || top.contains(el);
-  };
-
-  const centerHits = document.elementsFromPoint(px, py);
-  if (centerHits.length > 0 && !topHitMatches(centerHits)) {
-    const tlHits = document.elementsFromPoint(
-      Math.min(Math.max(rect.left + 2, 0), window.innerWidth - 1),
-      Math.min(Math.max(rect.top + 2, 0), window.innerHeight - 1)
-    );
-    if (tlHits.length === 0 || !topHitMatches(tlHits)) {
-      return false;
-    }
-  }
-
+  if (parseFloat(style.opacity) === 0) return false;
   return true;
 }
 
