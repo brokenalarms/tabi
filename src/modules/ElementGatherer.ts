@@ -53,6 +53,15 @@ function childrenMightBeVisible(el: HTMLElement): boolean {
   return getComputedStyle(el).display !== "none";
 }
 
+/** Does this element have no visible content of its own?
+ *  True for elements with no children and no text — purely positional overlays
+ *  that rely on sibling content for their visual presence. */
+export function isContentless(el: HTMLElement): boolean {
+  if (el.children.length > 0) return false;
+  if ((el.textContent || "").trim().length > 0) return false;
+  return true;
+}
+
 /** Stateless visibility check — does this element have a non-zero, on-screen,
  *  non-hidden rect? No clickability or occlusion logic — just geometry + CSS.
  *  Accepts an optional pre-computed rect (e.g. fallback rect for zero-size anchors). */
@@ -66,8 +75,10 @@ function isVisible(el: HTMLElement, rect?: DOMRect): boolean {
   return true;
 }
 
-/** Is this element fully outside a clipping overflow ancestor?
- *  Checks overflowX/overflowY per axis — any value that isn't "visible" clips. */
+/** Is this element clipped to an unusable size by an overflow ancestor?
+ *  Checks overflowX/overflowY per axis — any value that isn't "visible" clips.
+ *  Rejects both fully-outside elements and elements whose visible area within
+ *  the clipping ancestor is too small to be a useful click target (< 4px). */
 function isClippedByOverflow(el: HTMLElement, rect: DOMRect): boolean {
   let ancestor = el.parentElement;
   while (ancestor && ancestor !== document.body) {
@@ -79,10 +90,9 @@ function isClippedByOverflow(el: HTMLElement, rect: DOMRect): boolean {
     const clipsY = oy !== "" && oy !== "visible";
     if (clipsX || clipsY) {
       const ar = ancestor.getBoundingClientRect();
-      if ((clipsX && (rect.right <= ar.left || rect.left >= ar.right)) ||
-          (clipsY && (rect.bottom <= ar.top || rect.top >= ar.bottom))) {
-        return true;
-      }
+      const visibleW = clipsX ? Math.max(0, Math.min(rect.right, ar.right) - Math.max(rect.left, ar.left)) : rect.width;
+      const visibleH = clipsY ? Math.max(0, Math.min(rect.bottom, ar.bottom) - Math.max(rect.top, ar.top)) : rect.height;
+      if (visibleW < 4 || visibleH < 4) return true;
     }
     ancestor = ancestor.parentElement;
   }

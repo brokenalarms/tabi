@@ -1867,3 +1867,163 @@ describe("display:none returns FILTER_REJECT", () => {
             "display:none container must REJECT to prune entire subtree");
     });
 });
+
+// ISSUE: Visually-hidden skip-nav buttons inside overflow:hidden container with
+// near-zero height get hints — isClippedByOverflow only checks full clipping
+// SITE: linkedin.com — a11y menu with "Skip to search", "Skip to main content"
+// FIX: Reject elements whose visible area within a clipping ancestor is < 4px
+describe("DOM problems — overflow clipping with near-zero visible area", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("buttons inside overflow:hidden container with near-zero height are excluded", () => {
+        // Container: overflow:hidden, 1px height (border/padding sliver)
+        const container = makeElement("DIV", {
+            top: 0, left: 0, width: 400, height: 1,
+            overflow: "hidden",
+        });
+        // Skip-nav button inside — has normal height but is mostly clipped
+        const skipBtn = makeElement("BUTTON", {
+            top: 0, left: 0, width: 120, height: 30,
+            textContent: "Skip to search",
+        });
+        container.appendChild(skipBtn);
+
+        // Real interactive elements below
+        const input = makeElement("INPUT", {
+            top: 50, left: 50, width: 300, height: 30,
+            attrs: { type: "text", role: "combobox", placeholder: "Search" },
+        });
+        const searchBtn = makeElement("BUTTON", {
+            top: 50, left: 10, width: 30, height: 30,
+            textContent: "Search",
+        });
+
+        loadModules([container, skipBtn, input, searchBtn]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+
+        // Should have 2 hints (input + search button), NOT 3 (skip button excluded)
+        assert.equal(hints?.length, 2,
+            "Skip-nav button inside near-zero-height overflow:hidden container should be excluded");
+    });
+
+    it("buttons inside normal overflow:hidden container are kept", () => {
+        // Container with overflow:hidden but normal height — buttons are visible
+        const container = makeElement("DIV", {
+            top: 0, left: 0, width: 400, height: 50,
+            overflow: "hidden",
+        });
+        const btn = makeElement("BUTTON", {
+            top: 5, left: 5, width: 120, height: 30,
+            textContent: "Click me",
+        });
+        container.appendChild(btn);
+
+        loadModules([container, btn]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+
+        assert.equal(hints?.length, 1,
+            "Button inside normal-height overflow:hidden container should get a hint");
+    });
+});
+
+// ISSUE: Empty card-overlay <a> gets hint positioned above the headline text
+// instead of near visible content; clicking hint should navigate
+// SITE: theguardian.com — card overlay link pattern
+// FIX: For empty <a> overlays, redirect hint target to heading in parent subtree
+describe("DOM problems — empty card-overlay link hint positioning", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("empty overlay <a> redirects hint target to sibling heading", () => {
+        // Card structure: empty <a> overlay + sibling content with heading
+        const card = makeElement("DIV", { top: 0, left: 0, width: 400, height: 400 });
+
+        const overlayLink = makeElement("A", {
+            href: "/article",
+            top: 0, left: 0, width: 400, height: 400,
+            attrs: { "aria-label": "Article title" },
+        });
+        // Empty <a> — no children
+
+        const content = makeElement("DIV", { top: 0, left: 0, width: 400, height: 400 });
+        const heading = makeElement("H3", {
+            top: 200, left: 10, width: 380, height: 30,
+            textContent: "Headline text",
+        });
+        content.appendChild(heading);
+        card.appendChild(overlayLink);
+        card.appendChild(content);
+
+        loadModules([card, overlayLink, content, heading]);
+        (globalThis as any).document.elementsFromPoint = () => [overlayLink];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.ok(hints?.length >= 1, "Should have at least one hint");
+
+        // The hint position should be near the heading (y ≈ 230+), not at the
+        // <a>'s own rect bottom (y ≈ 400). Pill hints are at rect.bottom + 2.
+        const hintTop = parseFloat(hints[0].style.top);
+        const headingBottom = 230; // heading top (200) + height (30)
+        const linkBottom = 400;    // overlay link bottom
+
+        assert.ok(hintTop < linkBottom - 50,
+            `Hint should be near the heading (got top=${hintTop}), not at the link bottom (${linkBottom})`);
+    });
+
+    it("non-empty <a> with children does not redirect to sibling heading", () => {
+        const card = makeElement("DIV", { top: 0, left: 0, width: 400, height: 400 });
+
+        const link = makeElement("A", {
+            href: "/article",
+            top: 0, left: 0, width: 400, height: 50,
+        });
+        const linkText = makeElement("SPAN", {
+            top: 10, left: 10, width: 100, height: 20,
+            textContent: "Read more",
+        });
+        link.appendChild(linkText);
+
+        const heading = makeElement("H3", {
+            top: 200, left: 10, width: 380, height: 30,
+            textContent: "Headline",
+        });
+        card.appendChild(link);
+        card.appendChild(heading);
+
+        loadModules([card, link, linkText, heading]);
+        (globalThis as any).document.elementsFromPoint = () => [link];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.ok(hints?.length >= 1);
+
+        // Hint should be near the link itself, not the sibling heading
+        const hintTop = parseFloat(hints[0].style.top);
+        assert.ok(hintTop < 100,
+            `Non-empty <a> should use its own rect for hint position (got top=${hintTop})`);
+    });
+});
