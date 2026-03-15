@@ -1417,36 +1417,30 @@ describe("DOM problems — treeitem discovery", () => {
         if (keyHandler) keyHandler.destroy();
     });
 
-    it("discovers role=treeitem with tabindex=-1 as interactive", () => {
+    it("role=treeitem is the variable that makes tabindex=-1 discoverable", () => {
         const tree = makeElement("UL", { top: 0, left: 0, width: 300, height: 200,
             attrs: { role: "tree" } });
 
-        // Focused item (tabindex="0") — already works
-        const item1 = makeElement("LI", { top: 10, left: 0, width: 300, height: 30,
-            attrs: { role: "treeitem", tabindex: "0" } });
-        // Non-focused item (tabindex="-1") — should also be discovered
-        const item2 = makeElement("LI", { top: 50, left: 0, width: 300, height: 30,
-            attrs: { role: "treeitem", tabindex: "-1" } });
+        const item = makeElement("LI", { top: 50, left: 0, width: 300, height: 30,
+            attrs: { tabindex: "-1" } });
+        tree.appendChild(item);
 
-        tree.appendChild(item1);
-        tree.appendChild(item2);
-
-        loadModules([item1, item2]);
+        loadModules([item]);
 
         (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
-            const all = [item1, item2];
-            return all.filter((el: any) => {
-                const r = el.getBoundingClientRect();
-                return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
-            });
+            const r = item.getBoundingClientRect();
+            return (x >= r.left && x < r.right && y >= r.top && y < r.bottom) ? [item] : [];
         };
 
+        // Without role="treeitem" — tabindex="-1" alone is not discoverable
         const { hintMode } = getState();
         hintMode.activate(false);
-        assert.ok(hintMode.isActive());
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
-        assert.equal(hints?.length, 2, "Both treeitems should get hints (tabindex=0 and tabindex=-1)");
+        assert.ok(!hintMode.isActive(), "tabindex=-1 without role=treeitem should NOT get a hint");
+
+        // Add role="treeitem" — now it should be discovered
+        item.setAttribute("role", "treeitem");
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(), "tabindex=-1 WITH role=treeitem should get a hint");
     });
 });
 
@@ -1462,28 +1456,39 @@ describe("DOM problems — inline expansion walks up to block ancestor", () => {
         if (keyHandler) keyHandler.destroy();
     });
 
-    it("expands hint width to block ancestor through inline wrappers", () => {
-        // <li display:block> > <span display:inline> > <a display:inline>
-        const li = makeElement("LI", { top: 10, left: 0, width: 300, height: 25, display: "list-item" });
-        const span = makeElement("SPAN", { top: 10, left: 0, width: 200, height: 20, display: "inline" });
-        const a = makeElement("A", { href: "/filter", top: 10, left: 0, width: 150, height: 20, display: "inline" });
-        span.appendChild(a);
-        li.appendChild(span);
+    it("inline wrapper depth is the variable that determines expansion width", () => {
+        // Without intermediate inline wrapper: <li> > <a> — single parent already block, centers on li
+        const li1 = makeElement("LI", { top: 10, left: 0, width: 300, height: 25, display: "list-item" });
+        const a1 = makeElement("A", { href: "/direct", top: 10, left: 0, width: 150, height: 20, display: "inline" });
+        li1.appendChild(a1);
 
-        loadModules([a]);
-
+        loadModules([a1]);
         const { hintMode } = getState();
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
+        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        let hints = overlay?.querySelectorAll(".vimium-hint");
+        const directLeft = parseFloat(hints[0].style.left);
+        assert.equal(directLeft, 150, `Direct child: hint should center on <li> (150)`);
+        hintMode.deactivate();
 
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
-        assert.equal(hints?.length, 1);
+        // With intermediate inline wrapper: <li> > <span> > <a> — walk-up needed to reach <li>
+        const li2 = makeElement("LI", { top: 10, left: 0, width: 300, height: 25, display: "list-item" });
+        const span = makeElement("SPAN", { top: 10, left: 0, width: 200, height: 20, display: "inline" });
+        const a2 = makeElement("A", { href: "/wrapped", top: 10, left: 0, width: 150, height: 20, display: "inline" });
+        span.appendChild(a2);
+        li2.appendChild(span);
 
-        // Hint should center on <li> width (300), not <span> width (200) or <a> width (150)
-        // li center = 0 + 300/2 = 150
-        const hintLeft = parseFloat(hints[0].style.left);
-        assert.equal(hintLeft, 150, `Hint should center on <li> (150), got ${hintLeft}`);
+        loadModules([a2]);
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        hints = overlay?.querySelectorAll(".vimium-hint");
+        const wrappedLeft = parseFloat(hints[0].style.left);
+
+        // Both should produce the same result — the walk-up reaches <li> in both cases
+        assert.equal(wrappedLeft, directLeft,
+            `Wrapped (${wrappedLeft}) should match direct (${directLeft}) — walk-up reaches same <li>`);
     });
 
     it("stops walk-up at parent with multiple children", () => {
