@@ -120,23 +120,20 @@ export function walkerFilter(node: Node): number {
   const px = Math.min(Math.max(centerX, 0), window.innerWidth - 1);
   const py = Math.min(Math.max(centerY, 0), window.innerHeight - 1);
 
-  /** Filters elements hidden behind non-interactive overlays (popups, modals).
-   *  Elements behind other clickable elements (sibling links, buttons) are
-   *  still discoverable — only non-clickable covers indicate a popup. */
-  const topHitMatches = (point: Element[]): boolean => {
-    if (point.length === 0) return false;
-    const top = point[0];
-    return el.contains(top) || top.contains(el) ||
-      (top as HTMLElement).matches(CLICKABLE_SELECTOR);
+  /** Is the topmost element at a point a non-interactive overlay blocking this element?
+   *  Containment (parent/child) and interactive covers (links, buttons) are fine. */
+  const coveredByOverlay = (cover: HTMLElement): boolean => {
+    if (el.contains(cover) || cover.contains(el)) return false;
+    return !isInteractive(cover);
   };
 
   const centerHits = document.elementsFromPoint(px, py);
-  if (centerHits.length > 0 && !topHitMatches(centerHits)) {
+  if (centerHits.length > 0 && coveredByOverlay(centerHits[0] as HTMLElement)) {
     const tlHits = document.elementsFromPoint(
       Math.min(Math.max(rect.left + 2, 0), window.innerWidth - 1),
       Math.min(Math.max(rect.top + 2, 0), window.innerHeight - 1)
     );
-    if (tlHits.length === 0 || !topHitMatches(tlHits)) {
+    if (tlHits.length === 0 || coveredByOverlay(tlHits[0] as HTMLElement)) {
       return NodeFilter.FILTER_SKIP;
     }
   }
@@ -168,6 +165,15 @@ function isVisible(el: HTMLElement): boolean {
   if (style.visibility === "hidden") return false;
   if (parseFloat(style.opacity) === 0) return false;
   return true;
+}
+
+/** Is this element both visible and interactive (clickable/focusable)?
+ *  Composes isVisible + interactivity guards (disabled, inert). */
+function isInteractive(el: HTMLElement): boolean {
+  if ((el as HTMLButtonElement).disabled) return false;
+  if (el.hasAttribute("inert")) return false;
+  if (!isVisible(el)) return false;
+  return el.matches(CLICKABLE_SELECTOR) || getComputedStyle(el).cursor === "pointer";
 }
 
 // --- Interactive type ---
