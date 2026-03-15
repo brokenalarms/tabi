@@ -191,8 +191,7 @@ export class HintMode {
     // wrapper nesting — not containers. Inline elements get pill+pointer.
     let rect = target.getBoundingClientRect();
     let container = false;
-    const aspectRatio = Math.max(rect.width, rect.height) / (Math.min(rect.width, rect.height) || 1);
-    const isRectangular = aspectRatio >= 1.5;
+    const isRectangular = rect.width / (rect.height || 1) >= 1.5;
     const isLarge = rect.width > window.innerWidth * 0.25;
     if (target === el && el.children.length > 0 &&
         rect.width > 64 && (isRectangular || isLarge) &&
@@ -320,8 +319,9 @@ export class HintMode {
     const cs = getComputedStyle(el);
     const insetRight = Math.max(INSET_MIN, parseFloat(cs.paddingRight) || 0);
 
-    // Container must be wide enough to fit the pill
-    if (elRect.width < PILL_WIDTH + insetRight + INSET_MIN) return false;
+    // Container must be row-like (wider than tall) and wide enough that
+    // the pill doesn't crowd the text in narrow nav tabs.
+    if (elRect.width < 200 || elRect.height >= elRect.width) return false;
 
     // Check no other hinted element occupies the right zone of this container
     const pillZoneLeft = elRect.right - insetRight - PILL_WIDTH;
