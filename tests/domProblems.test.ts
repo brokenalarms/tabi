@@ -959,6 +959,29 @@ describe("DOM problems — clickable sibling occlusion", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive(), "Links behind clickable siblings should still get hints");
     });
+
+    // ISSUE: Decorative aria-hidden overlays (thread lines, visual chrome) block hints
+    // on interactive elements behind them via elementsFromPoint occlusion check.
+    // SITE: reddit.com — toggle comment thread button behind aria-hidden thread line
+    // FIX: aria-hidden="true" elements are decorative, not popups — treat as transparent.
+    it("element behind aria-hidden overlay still gets hint", () => {
+        const btn = makeElement("BUTTON", { top: 10, left: 10, width: 24, height: 24 });
+        btn.setAttribute("aria-controls", "children");
+        btn.setAttribute("aria-expanded", "false");
+
+        const threadLine = makeElement("DIV", {
+            top: 0, left: 0, width: 24, height: 500, cursor: "pointer",
+            attrs: { "aria-hidden": "true" },
+        });
+
+        loadModules([btn]);
+
+        (globalThis as any).document.elementsFromPoint = () => [threadLine, btn];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(), "Button behind aria-hidden overlay should get a hint");
+    });
 });
 
 // ISSUE: Non-interactive cursor:pointer divs (overlays, icon containers) get

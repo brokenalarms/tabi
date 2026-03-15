@@ -121,13 +121,15 @@ export function walkerFilter(node: Node): number {
   const py = Math.min(Math.max(centerY, 0), window.innerHeight - 1);
 
   /** Filters elements hidden behind non-interactive overlays (popups, modals).
-   *  Elements behind other clickable elements (sibling links, buttons) are
-   *  still discoverable — only non-clickable covers indicate a popup. */
+   *  Elements behind other clickable elements (sibling links, buttons) or
+   *  decorative aria-hidden elements (thread lines, visual chrome) are still
+   *  discoverable — only non-clickable, non-decorative covers indicate a popup. */
   const topHitMatches = (point: Element[]): boolean => {
     if (point.length === 0) return false;
     const top = point[0];
     return el.contains(top) || top.contains(el) ||
-      (top as HTMLElement).matches(CLICKABLE_SELECTOR);
+      (top as HTMLElement).matches(CLICKABLE_SELECTOR) ||
+      top.getAttribute("aria-hidden") === "true";
   };
 
   const centerHits = document.elementsFromPoint(px, py);
