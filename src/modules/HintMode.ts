@@ -209,6 +209,7 @@ export class HintMode {
     let rect = target.getBoundingClientRect();
     let container = false;
     if (target === el && el.children.length > 0 &&
+        rect.width > 64 &&
         !getComputedStyle(el).display.startsWith("inline")) {
       // Walk the single-child chain — if it reaches a leaf with no sibling
       // text, it's just wrapper nesting (e.g. <a><span>text</span></a>).
@@ -245,15 +246,9 @@ export class HintMode {
       }
     }
 
-    // Inline elements have tight text rects — center on nearest block ancestor instead
-    // so hints in vertical lists align rather than scattering with text width.
-    // Exclude form controls — they are discrete positioned elements that should keep their own rect.
-    // Exclude mixed content — when the parent has sibling text (e.g. <p>text <a>link</a></p>),
-    // the link's natural position is correct.
-    // Only expand when parent is the sole wrapper — a lone link in a wide
-    // heading should stay near its text, not drift to the parent's center.
-    // Skip when the parent is a single-child wrapper (e.g. <h2><a>text</a></h2>)
-    // since there are no siblings to align with.
+    // Inline elements in vertical lists: expand to parent width so hints align.
+    // Only when the element is the sole child — siblings mean each element
+    // keeps its own position (e.g. <div><a>Open</a><a>Closed</a></div>).
     const tag = target.tagName.toLowerCase();
     const isFormControl = tag === "input" || tag === "textarea" || tag === "select";
     if (!isFormControl && getComputedStyle(target).display.startsWith("inline") && target.parentElement) {
@@ -261,13 +256,7 @@ export class HintMode {
       const hasMixedContent = Array.from(parent.childNodes).some(
         n => n !== target && n.nodeType === 3 && (n.textContent || "").trim().length > 0
       );
-      // Skip when the element is the sole child of a standalone parent
-      // (e.g. <h2><a>text</a></h2>) — hint should center on the text.
-      // But keep centering when the parent is part of a repeating list
-      // (parent has siblings), so adjacent items align their hints.
-      const isSoleInStandalone = parent.children.length === 1 &&
-        (!parent.parentElement || parent.parentElement.children.length <= 1);
-      if (!hasMixedContent && !isSoleInStandalone) {
+      if (!hasMixedContent && parent.children.length === 1) {
         const parentRect = parent.getBoundingClientRect();
         rect = new DOMRect(parentRect.left, rect.top, parentRect.width, rect.height);
       }
