@@ -40,6 +40,7 @@ export class HintMode {
   private readonly onMouseDown: () => void;
   private readonly onScroll: () => void;
   private readonly onResize: () => void;
+  private hintInfoCache: Map<HTMLElement, { rect: DOMRect; container: boolean }>;
 
   constructor(keyHandler: KeyHandlerLike) {
     this.keyHandler = keyHandler;
@@ -52,6 +53,7 @@ export class HintMode {
     this.onMouseDown = this.deactivate.bind(this);
     this.onScroll = this.deactivate.bind(this);
     this.onResize = this.deactivate.bind(this);
+    this.hintInfoCache = new Map();
   }
 
   // --- Public API ---
@@ -107,6 +109,7 @@ export class HintMode {
     }
 
     this.hints = [];
+    this.hintInfoCache.clear();
     this.keyHandler.setMode(Mode.NORMAL);
   }
 
@@ -191,6 +194,8 @@ export class HintMode {
   }
 
   private getHintInfo(el: HTMLElement): { rect: DOMRect; container: boolean } {
+    const cached = this.hintInfoCache.get(el);
+    if (cached) return cached;
     const target = this.getHintTargetElement(el);
     // Bar style: for block-level containers with branching content.
     // Single descendant chains (e.g. <a><span>text</span></a>) are just
@@ -256,7 +261,9 @@ export class HintMode {
       }
     }
 
-    return { rect, container };
+    const result = { rect, container };
+    this.hintInfoCache.set(el, result);
+    return result;
   }
 
   // --- Label generation ---

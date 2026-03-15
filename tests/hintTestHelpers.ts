@@ -71,6 +71,8 @@ export function makeElement(tag: string, opts: any = {}) {
     if (opts.opacity != null && String(opts.opacity) !== "1") el.style.opacity = String(opts.opacity);
     if (opts.cursor && opts.cursor !== "default") el.style.cursor = opts.cursor;
     if (opts.overflow && opts.overflow !== "visible") el.style.overflow = opts.overflow;
+    if (opts.overflowX && opts.overflowX !== "visible") el.style.overflowX = opts.overflowX;
+    if (opts.overflowY && opts.overflowY !== "visible") el.style.overflowY = opts.overflowY;
     if (opts.paddingTop && opts.paddingTop !== "0px") el.style.paddingTop = opts.paddingTop;
 
     // HTML attributes
