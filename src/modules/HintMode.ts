@@ -78,7 +78,7 @@ export class HintMode {
     this.createOverlay();
     this.hints = elements.map((el, i) => {
       const label = labels[i];
-      const div = this.createHintDiv(el, label);
+      const div = this.createHintDiv(el, label, elements);
       return { element: el, label, div };
     });
 
@@ -320,27 +320,101 @@ export class HintMode {
     this.overlay.classList.add("visible");
   }
 
-  private createHintDiv(element: HTMLElement, label: string): HTMLDivElement {
+  /** Can the hint pill fit inside the container at the right end?
+   *  Returns true only when:
+   *  1. No visible content follows the last non-empty text node
+   *  2. No other hinted element occupies the right zone
+   *  3. There's enough measured space after content for the pill */
+  private canPlaceInside(el: HTMLElement, allElements: HTMLElement[]): boolean {
+    const PILL_WIDTH = 30;
+    const INSET_MIN = 6;
+    const elRect = el.getBoundingClientRect();
+    const cs = getComputedStyle(el);
+    const insetRight = Math.max(INSET_MIN, parseFloat(cs.paddingRight) || 0);
+    const containerInnerRight = elRect.right - insetRight;
+
+    // Find the rightmost rendered content edge using the layout engine
+    let rightmostEdge = elRect.left;
+    const walkContent = (node: Node): void => {
+      for (let i = 0; i < node.childNodes.length; i++) {
+        const child = node.childNodes[i];
+        if (child.nodeType === 3) { // text node
+          const text = (child.textContent || "").trim();
+          if (text.length > 0) {
+            try {
+              const range = document.createRange();
+              range.selectNodeContents(child);
+              const rangeRect = range.getBoundingClientRect();
+              if (rangeRect.width > 0) {
+                rightmostEdge = Math.max(rightmostEdge, rangeRect.right);
+              }
+            } catch (_) {
+              // Range API unavailable (e.g. happy-dom) — use parent bounds
+              const parent = child.parentElement;
+              if (parent) {
+                const pr = parent.getBoundingClientRect();
+                rightmostEdge = Math.max(rightmostEdge, pr.right);
+              }
+            }
+          }
+        } else if (child.nodeType === 1) {
+          const childEl = child as HTMLElement;
+          const cr = childEl.getBoundingClientRect();
+          if (cr.width > 0 && cr.height > 0) {
+            rightmostEdge = Math.max(rightmostEdge, cr.right);
+          }
+          walkContent(childEl);
+        }
+      }
+    };
+    walkContent(el);
+
+    // Not enough trailing space for the pill
+    if (rightmostEdge + PILL_WIDTH > containerInnerRight) return false;
+
+    // Check nothing visible follows the last non-empty text node.
+    // Walk direct children in reverse to find last text, then check
+    // if any element child comes after it.
+    let lastTextIndex = -1;
+    let lastElementIndex = -1;
+    for (let i = el.childNodes.length - 1; i >= 0; i--) {
+      const child = el.childNodes[i];
+      if (child.nodeType === 3 && (child.textContent || "").trim().length > 0) {
+        if (lastTextIndex === -1) lastTextIndex = i;
+      } else if (child.nodeType === 1) {
+        const cr = (child as HTMLElement).getBoundingClientRect();
+        if (cr.width > 0 && cr.height > 0) {
+          if (lastElementIndex === -1) lastElementIndex = i;
+        }
+      }
+    }
+    // If there's a visible element after the last text, content trails — can't fit
+    if (lastTextIndex >= 0 && lastElementIndex > lastTextIndex) return false;
+
+    // Check no other hinted element occupies the right zone of this container
+    const pillZoneLeft = containerInnerRight - PILL_WIDTH;
+    for (const other of allElements) {
+      if (other === el) continue;
+      if (el.contains(other)) {
+        const otherRect = other.getBoundingClientRect();
+        if (otherRect.right > pillZoneLeft) return false;
+      }
+    }
+
+    return true;
+  }
+
+  private createHintDiv(element: HTMLElement, label: string, allElements: HTMLElement[]): HTMLDivElement {
     const { rect, container } = this.getHintInfo(element);
     const div = document.createElement("div");
-    div.className = container ? "vimium-hint vimium-hint-bar" : "vimium-hint";
+    div.className = "vimium-hint";
     div.textContent = label;
 
-    if (container) {
-      // Bar style: centered at bottom edge of container
-      const elRect = element.getBoundingClientRect();
-      const barWidth = elRect.width * 0.25;
-      const pos = this.viewportToDocument(elRect.left + elRect.width / 2, elRect.bottom);
-      div.style.left = Math.max(0, pos.x) + "px";
-      div.style.top = Math.max(0, pos.y) + "px";
-      div.style.transform = "translateX(-50%)";
-      div.style.width = barWidth + "px";
-      div.textContent = "";
-      div.dataset.label = label;
+    const placeInside = container && this.canPlaceInside(element, allElements);
 
-      // Subtle glow overlay on the container so users see what the hint targets.
-      // Expand the glow to ensure breathing room — if the element already has
-      // internal padding, no expansion needed; otherwise pad to at least 4px.
+    if (container) {
+      // Glow overlay on the container so users see what the hint targets.
+      const elRect = element.getBoundingClientRect();
       const cs = getComputedStyle(element);
       const padH = Math.max(0, 4 - parseFloat(cs.paddingLeft));
       const padV = Math.max(0, 4 - parseFloat(cs.paddingTop));
@@ -352,6 +426,28 @@ export class HintMode {
       glow.style.width = (elRect.width + padH * 2) + "px";
       glow.style.height = (elRect.height + padV * 2) + "px";
       if (this.overlay) this.overlay.appendChild(glow);
+
+      if (placeInside) {
+        // Inside-end: pill inside container, right-aligned, vertically centered.
+        // Inset by at least 6px from each edge for breathing room.
+        const insetRight = Math.max(6, parseFloat(cs.paddingRight) || 0);
+        const pos = this.viewportToDocument(
+          elRect.right - insetRight,
+          elRect.top + elRect.height / 2
+        );
+        div.style.left = pos.x + "px";
+        div.style.top = pos.y + "px";
+        div.style.transform = "translate(-100%, -50%)";
+      } else {
+        // Container-external: pill below center with pointer
+        const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
+        div.style.left = Math.max(0, pos.x) + "px";
+        div.style.top = Math.max(0, pos.y) + "px";
+        div.style.transform = "translateX(-50%)";
+        const tail = document.createElement("div");
+        tail.className = "vimium-hint-tail";
+        div.appendChild(tail);
+      }
     } else {
       const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
       div.style.left = Math.max(0, pos.x) + "px";
@@ -428,18 +524,14 @@ export class HintMode {
       if (matches) {
         const matched = hint.label.slice(0, this.typed.length);
         const remaining = hint.label.slice(this.typed.length);
-        if (hint.div.classList.contains("vimium-hint-bar")) {
-          hint.div.dataset.label = hint.label;
-        } else {
-          hint.div.innerHTML = "";
-          if (matched) {
-            const span = document.createElement("span");
-            span.className = "vimium-hint-matched";
-            span.textContent = matched;
-            hint.div.appendChild(span);
-          }
-          hint.div.appendChild(document.createTextNode(remaining));
+        hint.div.innerHTML = "";
+        if (matched) {
+          const span = document.createElement("span");
+          span.className = "vimium-hint-matched";
+          span.textContent = matched;
+          hint.div.appendChild(span);
         }
+        hint.div.appendChild(document.createTextNode(remaining));
       }
     }
   }
