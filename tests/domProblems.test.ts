@@ -1116,6 +1116,30 @@ describe("native interactive elements prune subtrees", () => {
         assert.equal(hints?.length, 1, "Expected 1 hint (summary only) — details should not get a separate hint");
     });
 
+    // GitHub PR sidebar: wide <summary role="button"> with gear icon + title text.
+    // Mixed content (svg + text) makes it a container → bar-style hint.
+    it("wide summary with mixed content gets bar-style hint", () => {
+        const summary = makeElement("SUMMARY", {
+            top: 10, left: 0, width: 300, height: 30,
+            attrs: { role: "button" },
+        });
+        const icon = makeElement("SPAN", { top: 15, left: 270, width: 16, height: 16 });
+        const text = makeElement("SPAN", { top: 15, left: 10, width: 80, height: 16, textContent: "Reviewers" });
+        summary.appendChild(icon);
+        summary.appendChild(text);
+
+        loadModules([summary, icon, text]);
+        (globalThis as any).document.elementsFromPoint = () => [summary];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.ok(hints[0].classList.contains("vimium-hint-bar"),
+            "wide summary with mixed content should get bar-style hint");
+    });
+
     it("button does not produce hints for interactive children inside it", () => {
         const button = makeElement("BUTTON", { top: 10, left: 10, width: 200, height: 40 });
         const innerSpan = makeElement("SPAN", { top: 12, left: 12, width: 100, height: 20 });
@@ -1719,52 +1743,56 @@ describe("DOM problems — cursor:pointer cover occlusion", () => {
     });
 });
 
-// ISSUE: Wide div[role="button"] gets container/bar-style hint with glow extending
-// across the full container width, even though the visible button is a small centered pill.
-// SITE: google.com — "Show more" AI Overview button
-// FIX: Elements with declared widget types (ARIA roles, native tags) are atomic controls —
-// only generic clickable elements (tabindex, onclick, cursor:pointer) can be containers.
-describe("DOM problems — atomic controls never get container style", () => {
+// Container/bar style is determined by content structure, not element type or role.
+// Branching content (multiple children, text alongside elements) → bar.
+// Single-child wrapper chain to text → pill.
+describe("container style is determined by content structure", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
         if (keyHandler) keyHandler.destroy();
     });
 
-    it("role=button is the variable that prevents container style", () => {
-        // Wide div with branching children — container candidate
-        const btn = makeElement("DIV", {
+    it("branching children → bar, single-child chain → pill", () => {
+        // Wide element with branching children — bar style
+        const bar = makeElement("DIV", {
             top: 10, left: 0, width: 800, height: 50,
-            attrs: { tabindex: "0" },
+            attrs: { role: "button" },
         });
         const label = makeElement("SPAN", { top: 20, left: 310, width: 100, height: 20, textContent: "Show more" });
         const icon = makeElement("SPAN", { top: 20, left: 420, width: 20, height: 20, textContent: "▼" });
-        btn.appendChild(label);
-        btn.appendChild(icon);
+        bar.appendChild(label);
+        bar.appendChild(icon);
 
-        loadModules([btn, label, icon]);
-
-        (globalThis as any).document.elementsFromPoint = () => [btn];
+        loadModules([bar, label, icon]);
+        (globalThis as any).document.elementsFromPoint = () => [bar];
 
         const { hintMode } = getState();
-
-        // Without role="button" — generic tabindex div, gets container/bar style
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
         let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         let hints = overlay?.querySelectorAll(".vimium-hint");
         assert.ok(hints[0].classList.contains("vimium-hint-bar"),
-            "Generic div[tabindex] should get bar-style hint");
+            "Wide element with branching children should get bar-style hint");
         hintMode.deactivate();
 
-        // With role="button" — atomic control, gets pill style
-        btn.setAttribute("role", "button");
+        // Same width, but single-child chain to text — pill style
+        const pill = makeElement("DIV", {
+            top: 10, left: 0, width: 800, height: 50,
+            attrs: { role: "button" },
+        });
+        const wrapper = makeElement("SPAN", { top: 20, left: 310, width: 100, height: 20, textContent: "Show more" });
+        pill.appendChild(wrapper);
+
+        loadModules([pill, wrapper]);
+        (globalThis as any).document.elementsFromPoint = () => [pill];
+
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
         overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         hints = overlay?.querySelectorAll(".vimium-hint");
         assert.ok(!hints[0].classList.contains("vimium-hint-bar"),
-            "div[role=button] should get pill hint, not bar");
+            "Wide element with single-child chain should get pill hint");
     });
 });
 

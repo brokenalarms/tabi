@@ -99,19 +99,6 @@ function isInteractive(el: HTMLElement): boolean {
   return el.matches(CLICKABLE_SELECTOR);
 }
 
-// Roles that are always atomic — children are rendering details, never containers.
-// "link" is excluded: div[role="link"] can be a card-style container (X.com trends).
-const ATOMIC_ROLES = ["button", "tab", "menuitem", "option", "checkbox", "radio", "switch", "treeitem"];
-
-/** Did this element declare a widget type that is always atomic?
- *  Used to gate container/bar hint style: atomic controls get pill hints,
- *  only generic clickable elements can be containers. */
-export function isAtomicControl(el: HTMLElement): boolean {
-  const tag = el.tagName.toLowerCase();
-  if (tag !== "a" && NATIVE_INTERACTIVE_ELEMENTS.includes(tag)) return true;
-  const role = el.getAttribute("role")?.toLowerCase() ?? "";
-  return ATOMIC_ROLES.includes(role);
-}
 
 // --- Walker filter ---
 // Routes to REJECT/SKIP/ACCEPT by calling predicates.
