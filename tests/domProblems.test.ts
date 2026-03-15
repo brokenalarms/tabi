@@ -1778,26 +1778,23 @@ describe("DOM problems — display:none returns FILTER_REJECT", () => {
         if (cleanup) cleanup();
     });
 
-    it("REJECT for display:none container, SKIP for visible container", () => {
+    it("adding display:none changes walkerFilter from SKIP to REJECT", () => {
         const env = createDOM(`
-            <div id="hidden-parent" style="display: none;">
-                <a href="/hidden">Hidden</a>
-            </div>
-            <div id="visible-parent">
-                <a href="/visible">Visible</a>
+            <div id="container">
+                <a href="/link">Link</a>
             </div>
         `);
         cleanup = env.cleanup;
 
-        const hiddenParent = env.document.getElementById("hidden-parent")!;
-        const visibleParent = env.document.getElementById("visible-parent")!;
+        const container = env.document.getElementById("container")! as unknown as Node;
 
-        // display:none → REJECT (prune entire subtree)
-        assert.equal(walkerFilter(hiddenParent as unknown as Node), NodeFilter.FILTER_REJECT,
-            "display:none container must return FILTER_REJECT to prune subtree");
+        // Without display:none — SKIP (not clickable, but children still walked)
+        assert.equal(walkerFilter(container), NodeFilter.FILTER_SKIP,
+            "visible container should SKIP, allowing children to be visited");
 
-        // visible container with zero-size rect → SKIP (children may still be visible)
-        assert.equal(walkerFilter(visibleParent as unknown as Node), NodeFilter.FILTER_SKIP,
-            "visible container should return FILTER_SKIP, not FILTER_REJECT");
+        // Add display:none — same element now returns REJECT (subtree pruned)
+        (container as unknown as HTMLElement).style.display = "none";
+        assert.equal(walkerFilter(container), NodeFilter.FILTER_REJECT,
+            "display:none container must REJECT to prune entire subtree");
     });
 });
