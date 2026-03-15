@@ -7,7 +7,7 @@
 // The walker accepts these and prunes their subtrees: children are content/labels,
 // not separate click targets. This prevents duplicate hints inside buttons, links, etc.
 export const NATIVE_INTERACTIVE_ELEMENTS = ["a", "button", "input", "textarea", "select", "summary"];
-export const CLICKABLE_ROLES = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch"];
+const CLICKABLE_ROLES = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch"];
 const CLICKABLE_ATTRS = ["label[for]", "[tabindex]:not([tabindex='-1'])", "[onclick]", "[onmousedown]"];
 
 export const CLICKABLE_SELECTOR = [
@@ -120,10 +120,14 @@ export function walkerFilter(node: Node): number {
   const px = Math.min(Math.max(centerX, 0), window.innerWidth - 1);
   const py = Math.min(Math.max(centerY, 0), window.innerHeight - 1);
 
+  /** Filters elements hidden behind non-interactive overlays (popups, modals).
+   *  Elements behind other clickable elements (sibling links, buttons) are
+   *  still discoverable — only non-clickable covers indicate a popup. */
   const topHitMatches = (point: Element[]): boolean => {
     if (point.length === 0) return false;
     const top = point[0];
-    return el.contains(top) || top.contains(el);
+    return el.contains(top) || top.contains(el) ||
+      (top as HTMLElement).matches(CLICKABLE_SELECTOR);
   };
 
   const centerHits = document.elementsFromPoint(px, py);
@@ -228,10 +232,13 @@ function isVisible(el: HTMLElement): boolean {
   const px = Math.min(Math.max(centerX, 0), window.innerWidth - 1);
   const py = Math.min(Math.max(centerY, 0), window.innerHeight - 1);
 
+  /** Elements behind other clickable elements are still visible —
+   *  only non-clickable covers indicate a popup/overlay. */
   const topHitMatches = (point: Element[]): boolean => {
     if (point.length === 0) return false;
     const top = point[0];
-    return el.contains(top) || top.contains(el);
+    return el.contains(top) || top.contains(el) ||
+      (top as HTMLElement).matches(CLICKABLE_SELECTOR);
   };
 
   const centerHits = document.elementsFromPoint(px, py);

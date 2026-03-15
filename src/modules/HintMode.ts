@@ -4,7 +4,7 @@
 
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
-import { discoverElements, findAssociatedLabel, CLICKABLE_SELECTOR, NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_ROLES } from "./ElementGatherer";
+import { discoverElements, findAssociatedLabel, CLICKABLE_SELECTOR } from "./ElementGatherer";
 import { Mode } from "../commands";
 
 declare const browser: {
@@ -147,36 +147,21 @@ export class HintMode {
       }
     }
 
-    // Native interactive elements are atomic — drill down to heading or
-    // text anchor if available, otherwise keep the element itself (which
-    // may get bar/container style if block-level with content).
+    /** Elements matching CLICKABLE_SELECTOR are interactive — return directly.
+     *  Only <a> tags attempt heading drill-down (card-style links). */
     const tag = el.tagName.toLowerCase();
-    const role = el.getAttribute("role") || "";
-    const isInteractive = NATIVE_INTERACTIVE_ELEMENTS.includes(tag) ||
-      CLICKABLE_ROLES.includes(role);
-    if (isInteractive) {
-      const heading = el.querySelector("h1, h2, h3, h4, h5, h6") as HTMLElement | null;
-      if (heading) {
-        const hr = heading.getBoundingClientRect();
-        if (hr.width > 0 && hr.height > 0) return heading;
+    if (el.matches(CLICKABLE_SELECTOR)) {
+      if (tag === "a") {
+        const heading = el.querySelector("h1, h2, h3, h4, h5, h6") as HTMLElement | null;
+        if (heading) {
+          const hr = heading.getBoundingClientRect();
+          if (hr.width > 0 && hr.height > 0) return heading;
+        }
       }
       return el;
     }
 
-    // If this element contains other clickable children, don't redirect — keep
-    // the hint on the first-level element. Inner clickable elements get their own hints.
-    const hasClickableChildren = el.querySelector(CLICKABLE_SELECTOR) !== null;
-    if (hasClickableChildren) return el;
-
-    // For generic wrappers with no competing clickable children, find the best
-    // visual target: sole clickable child, or first text-bearing element.
-    const clickableChildren = el.querySelectorAll(CLICKABLE_SELECTOR);
-    for (let i = 0; i < clickableChildren.length; i++) {
-      const child = clickableChildren[i] as HTMLElement;
-      if (child === el) continue;
-      const cr = child.getBoundingClientRect();
-      if (cr.width > 0 && cr.height > 0) return child;
-    }
+    // Below: generic cursor:pointer wrappers only — find the best visual target.
 
     const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT, {
       acceptNode: (node) =>

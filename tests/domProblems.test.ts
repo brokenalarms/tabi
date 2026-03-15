@@ -924,6 +924,43 @@ describe("DOM problems — overlay occlusion", () => {
     });
 });
 
+// ISSUE: Clickable elements behind other clickable siblings (e.g. stacked links)
+// are filtered by elementsFromPoint because the sibling is topmost.
+// FIX: topHitMatches allows elements behind other CLICKABLE_SELECTOR matches.
+describe("DOM problems — clickable sibling occlusion", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("element behind non-clickable overlay gets filtered", () => {
+        const link = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 20 });
+        const overlay = makeElement("DIV", { top: 0, left: 0, width: 1024, height: 768 });
+
+        loadModules([link]);
+
+        (globalThis as any).document.elementsFromPoint = () => [overlay, link];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(!hintMode.isActive(), "Link behind non-clickable overlay should be filtered");
+    });
+
+    it("element behind clickable sibling still gets hint", () => {
+        const a1 = makeElement("A", { href: "/one", top: 10, left: 10, width: 200, height: 20 });
+        const a2 = makeElement("A", { href: "/two", top: 10, left: 10, width: 200, height: 20 });
+
+        loadModules([a1, a2]);
+
+        (globalThis as any).document.elementsFromPoint = () => [a1, a2];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(), "Links behind clickable siblings should still get hints");
+    });
+});
+
 // ISSUE: Non-interactive cursor:pointer divs (overlays, icon containers) get
 // separate hints alongside the real interactive sibling (input, button, etc.)
 // SITE: linkedin.com/feed — search bar has overlay div, icon div, and input
@@ -1236,6 +1273,75 @@ describe("DOM problems — native interactive elements prune subtrees", () => {
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
         assert.ok(!hints[0].classList.contains("vimium-hint-bar"), "Single descendant chain should use normal hint, not bar");
+    });
+
+    // Accordion row: div[tabindex] with heading gets bar-style hint (not heading drill-down).
+    // Non-<a> interactive elements return directly — bar style comes from getHintInfo.
+    it("accordion div[tabindex] with heading gets bar-style hint", () => {
+        const row = makeElement("DIV", { top: 10, left: 10, width: 300, height: 50,
+            attrs: { tabindex: "0" } });
+        const heading = makeElement("H3", { top: 15, left: 15, width: 200, height: 24, textContent: "Section" });
+        const arrow = makeElement("SPAN", { top: 15, left: 270, width: 16, height: 16, textContent: "▸" });
+        row.appendChild(heading);
+        row.appendChild(arrow);
+
+        loadModules([row, heading, arrow]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [row];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        assert.ok(hints[0].classList.contains("vimium-hint-bar"), "Accordion row should use bar-style hint");
+    });
+
+    // Small icon buttons (< 64px wide) should get pill+pointer, not bar-style.
+    // Bar style is for wide containers with branching content.
+    it("small button gets pill hint, not bar", () => {
+        const btn = makeElement("BUTTON", { top: 10, left: 10, width: 32, height: 32 });
+        const icon = makeElement("SVG", { top: 14, left: 14, width: 24, height: 24 });
+        btn.appendChild(icon);
+
+        loadModules([btn, icon]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            return [btn];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        assert.ok(!hints[0].classList.contains("vimium-hint-bar"), "Small button should use pill hint, not bar");
+    });
+
+    // Sibling <a> elements each get their own hint position — inline centering
+    // should NOT apply when there are multiple children in the parent.
+    it("sibling links each keep their own hint position", () => {
+        const div = makeElement("DIV", { top: 0, left: 0, width: 300, height: 30, display: "block" });
+        const a1 = makeElement("A", { href: "/open", top: 5, left: 10, width: 50, height: 20, display: "inline" });
+        const a2 = makeElement("A", { href: "/closed", top: 5, left: 80, width: 60, height: 20, display: "inline" });
+        div.appendChild(a1);
+        div.appendChild(a2);
+
+        loadModules([a1, a2]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 2, "Both sibling links should get hints");
+        const x1 = parseFloat(hints[0].style.left);
+        const x2 = parseFloat(hints[1].style.left);
+        assert.ok(x1 !== x2, `Sibling hints should have different x positions: ${x1} vs ${x2}`);
     });
 
     it("anchor does not produce hints for interactive children inside it", () => {
