@@ -309,9 +309,9 @@ export class HintMode {
   }
 
   /** Can the hint pill fit inside the container at the right end?
-   *  Always places inside when the container is wide enough, overlapping
-   *  trailing content (badges, chevrons) for visual consistency across
-   *  sibling rows. Only blocked by competing hinted interactive elements. */
+   *  Places inside when the container is wide enough and the pill won't
+   *  overlap text content. Trailing non-text elements (badges, chevrons)
+   *  may be overlapped for visual consistency across sibling rows. */
   private canPlaceInside(el: HTMLElement, allElements: HTMLElement[]): boolean {
     const PILL_WIDTH = 30;
     const INSET_MIN = 6;
@@ -319,12 +319,58 @@ export class HintMode {
     const cs = getComputedStyle(el);
     const insetRight = Math.max(INSET_MIN, parseFloat(cs.paddingRight) || 0);
 
-    // Container must be row-like (wider than tall) and wide enough that
-    // the pill doesn't crowd the text in narrow nav tabs.
+    // Container must be row-like (wider than tall) and wide enough
     if (elRect.width < 200 || elRect.height >= elRect.width) return false;
 
-    // Check no other hinted element occupies the right zone of this container
+    // Check primary text content doesn't extend into the pill zone.
+    // Only measures text that starts in the left 70% of the container —
+    // trailing text (badges, labels) in the right 30% is allowed to be
+    // overlapped for visual consistency across sibling rows.
     const pillZoneLeft = elRect.right - insetRight - PILL_WIDTH;
+    const trailingThreshold = elRect.left + elRect.width * 0.7;
+    let textOverlaps = false;
+    const walkText = (node: Node): void => {
+      if (textOverlaps) return;
+      for (let i = 0; i < node.childNodes.length; i++) {
+        const child = node.childNodes[i];
+        if (child.nodeType === 3) {
+          const text = (child.textContent || "").trim();
+          if (text.length > 0) {
+            let measured = false;
+            try {
+              const range = document.createRange();
+              range.selectNodeContents(child);
+              const rangeRect = range.getBoundingClientRect();
+              if (rangeRect.width > 0) {
+                measured = true;
+                // Only block if this text starts in the primary content zone
+                if (rangeRect.left < trailingThreshold && rangeRect.right > pillZoneLeft) {
+                  textOverlaps = true;
+                  return;
+                }
+              }
+            } catch (_) { /* Range API unavailable */ }
+            // Fallback: no layout engine (e.g. happy-dom) — use parent bounds
+            if (!measured) {
+              const parent = child.parentElement;
+              if (parent) {
+                const pr = parent.getBoundingClientRect();
+                if (pr.left < trailingThreshold && pr.right > pillZoneLeft) {
+                  textOverlaps = true;
+                  return;
+                }
+              }
+            }
+          }
+        } else if (child.nodeType === 1) {
+          walkText(child);
+        }
+      }
+    };
+    walkText(el);
+    if (textOverlaps) return false;
+
+    // Check no other hinted element occupies the right zone
     for (const other of allElements) {
       if (other === el) continue;
       if (el.contains(other)) {
