@@ -46,11 +46,17 @@ describe("DOM problems — element discovery", () => {
 
     // ISSUE: label[for] not discovered as clickable — CSS checkbox hack menus use label as the visible "button"
     // FIX: add label[for] to clickable selector
-    it("discovers label[for] as a clickable element", () => {
+    it("the [for] attribute is what makes a label discoverable", () => {
         const label = makeElement("LABEL", { top: 10, left: 10, width: 80, height: 20 });
-        (label as any).htmlFor = "menu-toggle";
         loadModules([label]);
         const { hintMode } = getState();
+
+        // Without [for] — bare label is not interactive
+        hintMode.activate(false);
+        assert.ok(!hintMode.isActive(), "label without [for] should not get a hint");
+
+        // With [for] — label becomes clickable
+        (label as any).htmlFor = "menu-toggle";
         hintMode.activate(false);
         assert.ok(hintMode.isActive(), "label[for] should be discovered as clickable");
         fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));

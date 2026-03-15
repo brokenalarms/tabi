@@ -45,21 +45,7 @@ If the user agrees, you may proceed:
      ```
      Only fall back to `makeElement()` when the test needs mock bounding rects (happy-dom has no layout engine), specific `getBoundingClientRect` values for positioning assertions, or other attributes that can't be expressed in HTML. Never use `makeElement` + `appendChild` chains when a readable HTML string would work.
    - Includes a comment at the top of the test in the same format, stating the ISSUE, SITE, and FIX, or **what the test proves** (e.g. "GitHub: nested `<button>` inside `<button>` — only inner buttons get hints, not the wrapper").
-   - **Prove causality by isolating the variable.** A test must show the behavior is absent WITHOUT the variable, then present WITH it. This proves the specific attribute/property causes the change, not some other confounding factor.
-     ```ts
-     // BAD — doesn't prove role is the cause (could be tabindex or cursor:pointer)
-     item.setAttribute("role", "treeitem");
-     hintMode.activate(false);
-     assert.ok(hintMode.isActive());
-
-     // GOOD — proves role="treeitem" is the specific cause
-     hintMode.activate(false);
-     assert.ok(!hintMode.isActive(), "without role, no hint");
-     item.setAttribute("role", "treeitem");
-     hintMode.activate(false);
-     assert.ok(hintMode.isActive(), "with role, hint appears");
-     ```
-     Only skip the negative case when the fixture inherently isolates the variable (e.g., a pure function test, or a single-attribute element).
+   - **Prove causality by isolating the variable.** When a test claims that a specific attribute or property causes a behavior change, it must assert the behavior is absent WITHOUT that variable, then assert it is present WITH it. The delta between the two assertions is what proves the variable is the cause. Skip the negative case only when the fixture inherently has a single variable (e.g., pure function tests).
    - Asserts the correct behavior: right number of hints, correct elements hinted, correct dedup outcome.
    - Run the test and assert that it fails.
 
