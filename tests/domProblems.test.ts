@@ -5,7 +5,7 @@ import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
-import { discoverElements, findBlockAncestor } from "../src/modules/ElementGatherer";
+import { discoverElements, findBlockAncestor, walkerFilter } from "../src/modules/ElementGatherer";
 
 describe("DOM problems — element discovery", () => {
     afterEach(() => {
@@ -1765,5 +1765,39 @@ describe("DOM problems — atomic controls never get container style", () => {
         hints = overlay?.querySelectorAll(".vimium-hint");
         assert.ok(!hints[0].classList.contains("vimium-hint-bar"),
             "div[role=button] should get pill hint, not bar");
+    });
+});
+
+// display:none on a container must return FILTER_REJECT (prune subtree),
+// not FILTER_SKIP. Children of display:none elements are never rendered,
+// so the walker should not waste time visiting them.
+describe("DOM problems — display:none returns FILTER_REJECT", () => {
+    let cleanup: () => void;
+
+    afterEach(() => {
+        if (cleanup) cleanup();
+    });
+
+    it("REJECT for display:none container, SKIP for visible container", () => {
+        const env = createDOM(`
+            <div id="hidden-parent" style="display: none;">
+                <a href="/hidden">Hidden</a>
+            </div>
+            <div id="visible-parent">
+                <a href="/visible">Visible</a>
+            </div>
+        `);
+        cleanup = env.cleanup;
+
+        const hiddenParent = env.document.getElementById("hidden-parent")!;
+        const visibleParent = env.document.getElementById("visible-parent")!;
+
+        // display:none → REJECT (prune entire subtree)
+        assert.equal(walkerFilter(hiddenParent as unknown as Node), NodeFilter.FILTER_REJECT,
+            "display:none container must return FILTER_REJECT to prune subtree");
+
+        // visible container with zero-size rect → SKIP (children may still be visible)
+        assert.equal(walkerFilter(visibleParent as unknown as Node), NodeFilter.FILTER_SKIP,
+            "visible container should return FILTER_SKIP, not FILTER_REJECT");
     });
 });
