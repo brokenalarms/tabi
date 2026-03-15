@@ -1398,12 +1398,11 @@ describe("native interactive elements prune subtrees", () => {
         assert.ok(!overlay?.querySelector(".vimium-hint-container-glow"), "Small button should not get container glow");
     });
 
-    // ISSUE: Flex-expanding wrapper divs fill available space, so their bounding
-    // rects extend far right even though actual text is short. canPlaceInside must
-    // measure text nodes via Range API, not element rects.
+    // ISSUE: Wide container nav items should always get inside-end placement
+    // regardless of flex layout or trailing content.
     // SITE: facebook.com sidebar nav (icon + "Meta AI" in flex row)
-    // FIX: Only measure text node ranges in walkContent, not element bounding rects.
-    it("flex-expanding wrapper does not block inside-end placement", () => {
+    // FIX: Always place inside-end for wide containers; only check for competing interactives.
+    it("wide container always gets inside-end placement", () => {
         // <a role="link"> with flex row: icon (36px) + text column (stretches to fill)
         const link = makeElement("A", { href: "/meta-ai", top: 0, left: 0, width: 400, height: 52,
             attrs: { role: "link" } });
@@ -1434,6 +1433,34 @@ describe("native interactive elements prune subtrees", () => {
             "Should be detected as container");
         assert.ok(!hints[0].querySelector(".vimium-hint-tail"),
             "Should use inside-end placement, not pointer");
+    });
+
+    // ISSUE: Trailing badges/chevrons in container rows cause inconsistent
+    // hint placement — some rows get inside-end, others fall back to pointer.
+    // SITE: github.com settings sidebar ("Models" row has "Preview" badge)
+    // FIX: Always place inside-end for containers, overlapping trailing content.
+    it("trailing badge does not block inside-end placement", () => {
+        const link = makeElement("A", { href: "/settings/models", top: 0, left: 0, width: 500, height: 40 });
+        const icon = makeElement("SVG", { top: 10, left: 10, width: 16, height: 16 });
+        const text = makeElement("SPAN", { top: 10, left: 36, width: 60, height: 20, textContent: "Models" });
+        const badge = makeElement("SPAN", { top: 8, left: 420, width: 70, height: 24, textContent: "Preview" });
+        link.appendChild(icon);
+        link.appendChild(text);
+        link.appendChild(badge);
+
+        loadModules([link, icon, text, badge]);
+        (globalThis as any).document.elementsFromPoint = () => [link];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+            "Should be detected as container");
+        assert.ok(!hints[0].querySelector(".vimium-hint-tail"),
+            "Trailing badge should not block inside-end placement");
     });
 
     // Sibling <a> elements each get their own hint position — inline centering

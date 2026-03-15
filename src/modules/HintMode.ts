@@ -331,84 +331,21 @@ export class HintMode {
   }
 
   /** Can the hint pill fit inside the container at the right end?
-   *  Returns true only when:
-   *  1. No visible content follows the last non-empty text node
-   *  2. No other hinted element occupies the right zone
-   *  3. There's enough measured space after content for the pill */
+   *  Always places inside when the container is wide enough, overlapping
+   *  trailing content (badges, chevrons) for visual consistency across
+   *  sibling rows. Only blocked by competing hinted interactive elements. */
   private canPlaceInside(el: HTMLElement, allElements: HTMLElement[]): boolean {
     const PILL_WIDTH = 30;
     const INSET_MIN = 6;
     const elRect = el.getBoundingClientRect();
     const cs = getComputedStyle(el);
     const insetRight = Math.max(INSET_MIN, parseFloat(cs.paddingRight) || 0);
-    const containerInnerRight = elRect.right - insetRight;
 
-    // Find the rightmost rendered content edge. Measures text nodes via
-    // Range API and replaced elements (img, svg, etc.) via bounding rect.
-    // Generic wrapper elements (div, span) are skipped because flex items
-    // stretch to fill available space regardless of their content width.
-    const REPLACED = new Set(["img", "svg", "canvas", "video", "iframe", "object"]);
-    let rightmostEdge = elRect.left;
-    const walkContent = (node: Node): void => {
-      for (let i = 0; i < node.childNodes.length; i++) {
-        const child = node.childNodes[i];
-        if (child.nodeType === 3) { // text node
-          const text = (child.textContent || "").trim();
-          if (text.length > 0) {
-            try {
-              const range = document.createRange();
-              range.selectNodeContents(child);
-              const rangeRect = range.getBoundingClientRect();
-              if (rangeRect.width > 0) {
-                rightmostEdge = Math.max(rightmostEdge, rangeRect.right);
-              }
-            } catch (_) {
-              // Range API unavailable (e.g. happy-dom) — use parent bounds
-              const parent = child.parentElement;
-              if (parent) {
-                const pr = parent.getBoundingClientRect();
-                rightmostEdge = Math.max(rightmostEdge, pr.right);
-              }
-            }
-          }
-        } else if (child.nodeType === 1) {
-          const childEl = child as HTMLElement;
-          if (REPLACED.has(childEl.tagName.toLowerCase())) {
-            const cr = childEl.getBoundingClientRect();
-            if (cr.width > 0 && cr.height > 0) {
-              rightmostEdge = Math.max(rightmostEdge, cr.right);
-            }
-          }
-          walkContent(childEl);
-        }
-      }
-    };
-    walkContent(el);
-
-    // Not enough trailing space for the pill
-    if (rightmostEdge + PILL_WIDTH > containerInnerRight) return false;
-
-    // Check nothing visible follows the last non-empty text node.
-    // Walk direct children in reverse to find last text, then check
-    // if any element child comes after it.
-    let lastTextIndex = -1;
-    let lastElementIndex = -1;
-    for (let i = el.childNodes.length - 1; i >= 0; i--) {
-      const child = el.childNodes[i];
-      if (child.nodeType === 3 && (child.textContent || "").trim().length > 0) {
-        if (lastTextIndex === -1) lastTextIndex = i;
-      } else if (child.nodeType === 1) {
-        const cr = (child as HTMLElement).getBoundingClientRect();
-        if (cr.width > 0 && cr.height > 0) {
-          if (lastElementIndex === -1) lastElementIndex = i;
-        }
-      }
-    }
-    // If there's a visible element after the last text, content trails — can't fit
-    if (lastTextIndex >= 0 && lastElementIndex > lastTextIndex) return false;
+    // Container must be wide enough to fit the pill
+    if (elRect.width < PILL_WIDTH + insetRight + INSET_MIN) return false;
 
     // Check no other hinted element occupies the right zone of this container
-    const pillZoneLeft = containerInnerRight - PILL_WIDTH;
+    const pillZoneLeft = elRect.right - insetRight - PILL_WIDTH;
     for (const other of allElements) {
       if (other === el) continue;
       if (el.contains(other)) {
