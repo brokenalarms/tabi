@@ -44,6 +44,7 @@ If the user agrees, you may proceed:
      `);
      ```
      Only fall back to `makeElement()` when the test needs mock bounding rects (happy-dom has no layout engine), specific `getBoundingClientRect` values for positioning assertions, or other attributes that can't be expressed in HTML. Never use `makeElement` + `appendChild` chains when a readable HTML string would work.
+   - The test title summarizes the assertion, eg 'it selects only top level xyz'
    - Includes a comment at the top of the test in the same format, stating the ISSUE, SITE, and FIX, or **what the test proves** (e.g. "GitHub: nested `<button>` inside `<button>` — only inner buttons get hints, not the wrapper").
    - **Prove causality by isolating the variable.** When a test claims that a specific attribute or property causes a behavior change, it must assert the behavior is absent WITHOUT that variable, then assert it is present WITH it. The delta between the two assertions is what proves the variable is the cause. Skip the negative case only when the fixture inherently has a single variable (e.g., pure function tests).
    - Asserts the correct behavior: right number of hints, correct elements hinted, correct dedup outcome.
