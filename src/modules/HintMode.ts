@@ -197,8 +197,11 @@ export class HintMode {
     // wrapper nesting — not containers. Inline elements get pill+pointer.
     let rect = target.getBoundingClientRect();
     let container = false;
+    const aspectRatio = Math.max(rect.width, rect.height) / (Math.min(rect.width, rect.height) || 1);
+    const isRectangular = aspectRatio >= 1.5;
+    const isLarge = rect.width > window.innerWidth * 0.25;
     if (target === el && el.children.length > 0 &&
-        rect.width > 64 &&
+        rect.width > 64 && (isRectangular || isLarge) &&
         !getComputedStyle(el).display.startsWith("inline")) {
       // Walk the single-child chain — if it reaches a leaf with no sibling
       // text, it's just wrapper nesting (e.g. <a><span>text</span></a>).
