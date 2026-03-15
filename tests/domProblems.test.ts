@@ -1398,6 +1398,44 @@ describe("native interactive elements prune subtrees", () => {
         assert.ok(!overlay?.querySelector(".vimium-hint-container-glow"), "Small button should not get container glow");
     });
 
+    // ISSUE: Flex-expanding wrapper divs fill available space, so their bounding
+    // rects extend far right even though actual text is short. canPlaceInside must
+    // measure text nodes via Range API, not element rects.
+    // SITE: facebook.com sidebar nav (icon + "Meta AI" in flex row)
+    // FIX: Only measure text node ranges in walkContent, not element bounding rects.
+    it("flex-expanding wrapper does not block inside-end placement", () => {
+        // <a role="link"> with flex row: icon (36px) + text column (stretches to fill)
+        const link = makeElement("A", { href: "/meta-ai", top: 0, left: 0, width: 400, height: 52,
+            attrs: { role: "link" } });
+        const flexRow = makeElement("DIV", { top: 0, left: 0, width: 400, height: 52, display: "flex" });
+        const iconWrap = makeElement("DIV", { top: 8, left: 8, width: 36, height: 36 });
+        const img = makeElement("IMG", { top: 8, left: 8, width: 36, height: 36 });
+        iconWrap.appendChild(img);
+        // Text column — flex item stretches to 400px but text "Meta AI" is only 60px
+        const textCol = makeElement("DIV", { top: 8, left: 52, width: 340, height: 36, display: "flex" });
+        const textWrap = makeElement("DIV", { top: 12, left: 52, width: 340, height: 20 });
+        const span = makeElement("SPAN", { top: 12, left: 52, width: 60, height: 20, textContent: "Meta AI" });
+        textWrap.appendChild(span);
+        textCol.appendChild(textWrap);
+        flexRow.appendChild(iconWrap);
+        flexRow.appendChild(textCol);
+        link.appendChild(flexRow);
+
+        loadModules([link, flexRow, iconWrap, img, textCol, textWrap, span]);
+        (globalThis as any).document.elementsFromPoint = () => [link];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+            "Should be detected as container");
+        assert.ok(!hints[0].querySelector(".vimium-hint-tail"),
+            "Should use inside-end placement, not pointer");
+    });
+
     // Sibling <a> elements each get their own hint position — inline centering
     // should NOT apply when there are multiple children in the parent.
     it("sibling links each keep their own hint position", () => {

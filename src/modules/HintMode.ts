@@ -333,7 +333,11 @@ export class HintMode {
     const insetRight = Math.max(INSET_MIN, parseFloat(cs.paddingRight) || 0);
     const containerInnerRight = elRect.right - insetRight;
 
-    // Find the rightmost rendered content edge using the layout engine
+    // Find the rightmost rendered content edge. Measures text nodes via
+    // Range API and replaced elements (img, svg, etc.) via bounding rect.
+    // Generic wrapper elements (div, span) are skipped because flex items
+    // stretch to fill available space regardless of their content width.
+    const REPLACED = new Set(["img", "svg", "canvas", "video", "iframe", "object"]);
     let rightmostEdge = elRect.left;
     const walkContent = (node: Node): void => {
       for (let i = 0; i < node.childNodes.length; i++) {
@@ -359,9 +363,11 @@ export class HintMode {
           }
         } else if (child.nodeType === 1) {
           const childEl = child as HTMLElement;
-          const cr = childEl.getBoundingClientRect();
-          if (cr.width > 0 && cr.height > 0) {
-            rightmostEdge = Math.max(rightmostEdge, cr.right);
+          if (REPLACED.has(childEl.tagName.toLowerCase())) {
+            const cr = childEl.getBoundingClientRect();
+            if (cr.width > 0 && cr.height > 0) {
+              rightmostEdge = Math.max(rightmostEdge, cr.right);
+            }
           }
           walkContent(childEl);
         }
