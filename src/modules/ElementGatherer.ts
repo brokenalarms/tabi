@@ -168,6 +168,17 @@ export function walkerFilter(node: Node): number {
   // covers in occlusion checks.
   if (!el.matches(CLICKABLE_SELECTOR) && style.cursor !== "pointer") return NodeFilter.FILTER_SKIP;
 
+  // Contentless overlay links: <a> with no text, no visual children, and a sibling
+  // with visible content. This is the "stretched-link" card pattern — an empty <a>
+  // positioned over a card whose visible text lives in a sibling element.
+  if (el.tagName.toLowerCase() === "a" && !(el.textContent || "").trim() &&
+      !el.querySelector("img, svg, picture, video, canvas")) {
+    const adj = el.nextElementSibling || el.previousElementSibling;
+    if (adj && (adj.textContent || "").trim()) {
+      return NodeFilter.FILTER_SKIP;
+    }
+  }
+
   // Opacity:0 radio/checkbox with visible label — redirect to label
   if (parseFloat(style.opacity) === 0) {
     if (el.tagName.toLowerCase() === "input") {
