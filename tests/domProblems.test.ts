@@ -7,7 +7,7 @@ import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from ".
 import { createDOM } from "./helpers/dom";
 import { discoverElements, findBlockAncestor, walkerFilter } from "../src/modules/ElementGatherer";
 
-describe("DOM problems — element discovery", () => {
+describe("element discovery", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -148,7 +148,7 @@ describe("DOM problems — element discovery", () => {
     });
 });
 
-describe("DOM problems — visibility edge cases", () => {
+describe("visibility edge cases", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -210,7 +210,7 @@ describe("DOM problems — visibility edge cases", () => {
     });
 });
 
-describe("DOM problems — label-for dedup", () => {
+describe("label-for dedup", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -264,7 +264,7 @@ describe("DOM problems — label-for dedup", () => {
     });
 });
 
-describe("DOM problems — hash-link/label dedup", () => {
+describe("hash-link/label dedup", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -316,7 +316,7 @@ describe("DOM problems — hash-link/label dedup", () => {
     });
 });
 
-describe("DOM problems — disclosure trigger dedup", () => {
+describe("disclosure trigger dedup", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -388,7 +388,7 @@ describe("DOM problems — disclosure trigger dedup", () => {
 // where <ul> and <li> report zero-size rects (no layout engine). Previously
 // walkerFilter used FILTER_REJECT for zero-size elements, pruning the entire
 // subtree and dropping all the <a> links inside.
-describe("DOM problems — flex container with zero-size parents", () => {
+describe("flex container with zero-size parents", () => {
     let cleanup: () => void;
 
     afterEach(() => {
@@ -449,7 +449,7 @@ describe("DOM problems — flex container with zero-size parents", () => {
 
 // Facebook "Create story" card: cursor:pointer wrapper div around an <a> produces
 // duplicate hints because dedup didn't remove generic roots with specific descendants.
-describe("DOM problems — generic cursor:pointer wrapper dedup", () => {
+describe("generic cursor:pointer wrapper dedup", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -482,7 +482,7 @@ describe("DOM problems — generic cursor:pointer wrapper dedup", () => {
 // Hint target redirect: a wrapper with a single clickable child should position
 // the hint at the child, not the wrapper. This is the common case of a large
 // card/container wrapping one interactive element.
-describe("DOM problems — hint target redirects to sole clickable child", () => {
+describe("hint target redirects to sole clickable child", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -528,7 +528,7 @@ describe("DOM problems — hint target redirects to sole clickable child", () =>
 // fixed-position banner with interactive nav links/buttons.
 // FIX: viewport bounds check uses FILTER_SKIP instead of FILTER_REJECT so children
 // of off-viewport containers are still visited.
-describe("DOM problems — fixed elements inside off-viewport ancestors", () => {
+describe("fixed elements inside off-viewport ancestors", () => {
     let cleanup: () => void;
 
     afterEach(() => {
@@ -609,7 +609,7 @@ describe("DOM problems — fixed elements inside off-viewport ancestors", () => 
 // causing hints to scatter horizontally in vertical lists where links have different text widths.
 // SITE: amazon.com.au footer
 // FIX: When element is inline, use nearest block-level ancestor's horizontal bounds for centering.
-describe("DOM problems — inline element hint alignment", () => {
+describe("inline element hint alignment", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -657,7 +657,7 @@ describe("DOM problems — inline element hint alignment", () => {
 // target div with tabindex) passes the zero-size check because it only requires BOTH dimensions
 // to be zero. The hint renders at (0,0), clipped by the viewport edge.
 // FIX: skip elements where either dimension is zero, not just both.
-describe("DOM problems — zero in one dimension filtered", () => {
+describe("zero in one dimension filtered", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -692,7 +692,7 @@ describe("DOM problems — zero in one dimension filtered", () => {
 // drift to the center of the parent text line.
 // SITE: GitHub PR task lists
 // FIX: Exclude checkbox and radio inputs from inline centering.
-describe("DOM problems — checkbox/radio hint positioning", () => {
+describe("checkbox/radio hint positioning", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -745,7 +745,7 @@ describe("DOM problems — checkbox/radio hint positioning", () => {
 // SITE: GitHub PR description — "Generated with Claude Code" paragraph
 // FIX: Only apply inline centering when the element is the primary content of its parent
 // (no sibling text nodes with non-whitespace text).
-describe("DOM problems — inline link in mixed text content", () => {
+describe("inline link in mixed text content", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -784,7 +784,7 @@ describe("DOM problems — inline link in mixed text content", () => {
 // The trend box should get its own hint separate from the button's hint.
 // Previously getHintTargetElement redirected to the inner button, making both hints overlap.
 // FIX: don't redirect to clickable children — let each candidate stand on its own.
-describe("DOM problems — role=link with inner button gets separate hints", () => {
+describe("role=link with inner button gets separate hints", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -827,7 +827,7 @@ describe("DOM problems — role=link with inner button gets separate hints", () 
 // still receive hints because they have non-zero bounding rects.
 // SITE: github.com — "Skip to content" link hidden with show-on-focus class
 // FIX: Check for clip/clip-path that reduce visible area to near-zero in walkerFilter
-describe("DOM problems — clip/clip-path visually-hidden elements", () => {
+describe("clip/clip-path visually-hidden elements", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -892,7 +892,7 @@ describe("DOM problems — clip/clip-path visually-hidden elements", () => {
 // check verifies the candidate appears anywhere in the list, not that it's topmost.
 // SITE: theguardian.com — support banner overlay covers article links
 // FIX: Only check if the candidate is the topmost element at the point
-describe("DOM problems — overlay occlusion", () => {
+describe("overlay occlusion", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -933,7 +933,7 @@ describe("DOM problems — overlay occlusion", () => {
 // ISSUE: Clickable elements behind other clickable siblings (e.g. stacked links)
 // are filtered by elementsFromPoint because the sibling is topmost.
 // FIX: topHitMatches allows elements behind other CLICKABLE_SELECTOR matches.
-describe("DOM problems — clickable sibling occlusion", () => {
+describe("clickable sibling occlusion", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -1014,7 +1014,7 @@ describe("DOM problems — clickable sibling occlusion", () => {
 // SITE: linkedin.com/feed — search bar has overlay div, icon div, and input
 // FIX: During dedup, remove cursor:pointer-only candidates when a sibling
 // matches CLICKABLE_SELECTOR
-describe("DOM problems — cursor:pointer sibling dedup", () => {
+describe("cursor:pointer sibling dedup", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -1440,7 +1440,7 @@ describe("native interactive elements prune subtrees", () => {
 // fall through to cursor:pointer path, causing inconsistent hint styles vs tabindex="0" siblings.
 // SITE: github.com PR file tree — expanded folder gets container hint, collapsed folder gets pill
 // FIX: Add "treeitem" to CLICKABLE_ROLES so all treeitems are treated as interactive regardless of tabindex.
-describe("DOM problems — treeitem discovery", () => {
+describe("treeitem discovery", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -1479,7 +1479,7 @@ describe("DOM problems — treeitem discovery", () => {
 // to the block container width.
 // SITE: amazon.com search filter sidebar — checkbox+text links in <li> items
 // FIX: findBlockAncestor walks up through inline single-child ancestors to the nearest block container.
-describe("DOM problems — inline expansion walks up to block ancestor", () => {
+describe("inline expansion walks up to block ancestor", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -1620,7 +1620,7 @@ describe("findBlockAncestor utility", () => {
 // ISSUE: Hints drift from their target elements when viewport resizes (e.g. DevTools open).
 // Hint positions are calculated once at activation with absolute pixel coordinates.
 // FIX: Deactivate hints on window resize, consistent with existing scroll deactivation.
-describe("DOM problems — hints deactivate on resize", () => {
+describe("hints deactivate on resize", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -1647,7 +1647,7 @@ describe("DOM problems — hints deactivate on resize", () => {
 // get hints because the overflow check only handles overflow:hidden and overflow:clip.
 // SITE: facebook.com (stories carousel), any horizontal scroll container
 // FIX: Extend overflow clipping check to all non-visible overflow modes (scroll, auto).
-describe("DOM problems — overflow:scroll/auto clips elements", () => {
+describe("overflow:scroll/auto clips elements", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -1704,7 +1704,7 @@ describe("DOM problems — overflow:scroll/auto clips elements", () => {
 // SITE: facebook.com — carousel cards behind cursor:pointer divs get hints
 // FIX: Only use CLICKABLE_SELECTOR (semantic interactivity) for occlusion cover checks,
 // not cursor:pointer (visual style only).
-describe("DOM problems — cursor:pointer cover occlusion", () => {
+describe("cursor:pointer cover occlusion", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -1799,7 +1799,7 @@ describe("container style is determined by content structure", () => {
 // display:none on a container must return FILTER_REJECT (prune subtree),
 // not FILTER_SKIP. Children of display:none elements are never rendered,
 // so the walker should not waste time visiting them.
-describe("DOM problems — display:none returns FILTER_REJECT", () => {
+describe("display:none returns FILTER_REJECT", () => {
     let cleanup: () => void;
 
     afterEach(() => {
