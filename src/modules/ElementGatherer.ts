@@ -90,6 +90,18 @@ function isClippedByOverflow(el: HTMLElement, rect: DOMRect): boolean {
   return false;
 }
 
+/** Is this a contentless overlay link?
+ *  True for <a> with no text, no visual children (img, svg, etc.), and a sibling
+ *  with visible content — the "stretched-link" card pattern where an empty <a>
+ *  is positioned over a card whose visible text lives in a sibling element. */
+function isContentlessOverlay(el: HTMLElement): boolean {
+  if (el.tagName.toLowerCase() !== "a") return false;
+  if ((el.textContent || "").trim()) return false;
+  if (el.querySelector("img, svg, picture, video, canvas")) return false;
+  const adj = el.nextElementSibling || el.previousElementSibling;
+  return adj !== null && (adj.textContent || "").trim().length > 0;
+}
+
 /** Is this element visible and semantically interactive?
  *  Used by coveredByOverlay to decide if a cover is a real interactive element
  *  (which shouldn't block hints behind it) vs a non-interactive overlay (which should).
@@ -167,6 +179,9 @@ export function walkerFilter(node: Node): number {
   // It is NOT in isInteractive because that would let styled wrappers pass as interactive
   // covers in occlusion checks.
   if (!el.matches(CLICKABLE_SELECTOR) && style.cursor !== "pointer") return NodeFilter.FILTER_SKIP;
+
+  // Stretched-link card overlay — empty <a> duplicating visible sibling content
+  if (isContentlessOverlay(el)) return NodeFilter.FILTER_SKIP;
 
   // Opacity:0 radio/checkbox with visible label — redirect to label
   if (parseFloat(style.opacity) === 0) {

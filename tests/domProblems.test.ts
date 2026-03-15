@@ -928,6 +928,84 @@ describe("overlay occlusion", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive(), "Topmost link should get a hint");
     });
+
+});
+
+// ISSUE: Empty overlay <a> (no text, no children) gets a hint because it's the
+// topmost element. These "stretched-link" overlays duplicate visible sibling content.
+// SITE: theguardian.com — card overlay <a> with aria-label covers entire card
+// FIX: Filter contentless <a> elements — links with no text and no visual children.
+describe("contentless overlay link", () => {
+    it("filters contentless overlay link, keeps sibling comment link", () => {
+        const env = createDOM(`
+            <div>
+                <a id="overlay" href="/article" aria-label="Article title"></a>
+                <div>
+                    <h3><span>Article title</span></h3>
+                    <footer>
+                        <a id="comments" href="/article#comments">24 comments</a>
+                    </footer>
+                </div>
+            </div>
+        `);
+
+        const overlay = env.document.getElementById("overlay") as unknown as HTMLElement;
+        const comments = env.document.getElementById("comments") as unknown as HTMLElement;
+
+        // Overlay stretches over entire card via position:absolute
+        overlay.getBoundingClientRect = () => ({ top: 0, left: 0, bottom: 300, right: 400, width: 400, height: 300, x: 0, y: 0, toJSON() { return this; } }) as DOMRect;
+        comments.getBoundingClientRect = () => ({ top: 260, left: 10, bottom: 280, right: 200, width: 190, height: 20, x: 10, y: 260, toJSON() { return this; } }) as DOMRect;
+
+        // Mock elementsFromPoint — overlay is topmost (position:absolute)
+        const allEls = [overlay, comments];
+        (env.document as any).elementsFromPoint = (x: number, y: number) => {
+            return allEls.filter((el: any) => {
+                const r = el.getBoundingClientRect();
+                return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
+            });
+        };
+
+        const elems = discoverElements(() => overlay.getBoundingClientRect());
+        const ids = elems.map(e => e.id);
+        assert.ok(!ids.includes("overlay"), "Empty overlay <a> should be filtered");
+        assert.ok(ids.includes("comments"), "Sibling comment link should remain");
+
+        env.cleanup();
+    });
+
+    it("keeps link with visible text content", () => {
+        const env = createDOM(`
+            <a id="textlink" href="/page">Click me</a>
+        `);
+
+        const link = env.document.getElementById("textlink") as unknown as HTMLElement;
+        link.getBoundingClientRect = () => ({ top: 10, left: 10, bottom: 30, right: 200, width: 190, height: 20, x: 10, y: 10, toJSON() { return this; } }) as DOMRect;
+
+        (env.document as any).elementsFromPoint = () => [link];
+
+        const elems = discoverElements(() => link.getBoundingClientRect());
+        assert.ok(elems.some(e => e.id === "textlink"), "Link with text should get a hint");
+
+        env.cleanup();
+    });
+
+    it("keeps link with image child", () => {
+        const env = createDOM(`
+            <a id="imglink" href="/page"><img src="logo.png" alt="Logo"></a>
+        `);
+
+        const link = env.document.getElementById("imglink") as unknown as HTMLElement;
+        link.getBoundingClientRect = () => ({ top: 10, left: 10, bottom: 60, right: 110, width: 100, height: 50, x: 10, y: 10, toJSON() { return this; } }) as DOMRect;
+        const img = link.querySelector("img") as unknown as HTMLElement;
+        img.getBoundingClientRect = () => ({ top: 10, left: 10, bottom: 60, right: 110, width: 100, height: 50, x: 10, y: 10, toJSON() { return this; } }) as DOMRect;
+
+        (env.document as any).elementsFromPoint = () => [link];
+
+        const elems = discoverElements(() => link.getBoundingClientRect());
+        assert.ok(elems.some(e => e.id === "imglink"), "Link with img child should get a hint");
+
+        env.cleanup();
+    });
 });
 
 // ISSUE: Clickable elements behind other clickable siblings (e.g. stacked links)
