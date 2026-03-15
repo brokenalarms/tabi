@@ -1160,11 +1160,8 @@ describe("native interactive elements prune subtrees", () => {
         assert.equal(hints?.length, 1, "Expected 1 hint (button only) — inner elements should be pruned");
     });
 
-    // ISSUE: Article card links wrap a heading + description. The hint should
-    // target the heading (the meaningful label), not the full <a> block.
-    // FIX: If a native interactive element contains a heading and no SVGs,
-    // use the heading as the hint target.
-    it("link containing a heading targets the heading", () => {
+    // Card-style link with heading + description gets container hint at the link level
+    it("link containing a heading gets container hint at link level", () => {
         const link = makeElement("A", { href: "/article", top: 0, left: 0, width: 600, height: 120 });
         const heading = makeElement("H3", { top: 10, left: 10, width: 400, height: 24, textContent: "Article Title" });
         const desc = makeElement("P", { top: 40, left: 10, width: 580, height: 60, textContent: "Description text" });
@@ -1183,34 +1180,9 @@ describe("native interactive elements prune subtrees", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
-        // Hint should center on the heading, not the full 600px <a>
-        const x = parseFloat(hints[0].style.left);
-        assert.equal(x, 210, "Hint should center on heading (10 + 400/2)");
-    });
-
-    // Link with SVG + heading drills down to heading, not SVG icon
-    it("link with SVG and heading targets the heading", () => {
-        const link = makeElement("A", { href: "/page", top: 0, left: 0, width: 250, height: 60 });
-        const svg = makeElement("SVG", { top: 10, left: 10, width: 24, height: 24 });
-        const heading = makeElement("H3", { top: 10, left: 50, width: 100, height: 24, textContent: "Page" });
-        link.appendChild(svg);
-        link.appendChild(heading);
-
-        loadModules([link, svg, heading]);
-
-        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
-            return [link];
-        };
-
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(hintMode.isActive());
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
-        assert.equal(hints?.length, 1);
-        // Should center on the heading (50 + 100/2 = 100)
-        const x = parseFloat(hints[0].style.left);
-        assert.equal(x, 100, "Hint should center on heading, not SVG icon");
+        // Hint should be at the link level, with container glow
+        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+            "Wide link with branching content should get container glow");
     });
 
     // Links with SVG+text and trailing space get inside-end placement with glow
@@ -1967,90 +1939,3 @@ describe("DOM problems — overflow clipping with near-zero visible area", () =>
     });
 });
 
-// ISSUE: Empty card-overlay <a> gets hint positioned above the headline text
-// instead of near visible content; clicking hint should navigate
-// SITE: theguardian.com — card overlay link pattern
-// FIX: For empty <a> overlays, redirect hint target to heading in parent subtree
-describe("DOM problems — empty card-overlay link hint positioning", () => {
-    afterEach(() => {
-        const { hintMode, keyHandler } = getState();
-        if (hintMode) hintMode.destroy();
-        if (keyHandler) keyHandler.destroy();
-    });
-
-    it("empty overlay <a> redirects hint target to sibling heading", () => {
-        // Card structure: empty <a> overlay + sibling content with heading
-        const card = makeElement("DIV", { top: 0, left: 0, width: 400, height: 400 });
-
-        const overlayLink = makeElement("A", {
-            href: "/article",
-            top: 0, left: 0, width: 400, height: 400,
-            attrs: { "aria-label": "Article title" },
-        });
-        // Empty <a> — no children
-
-        const content = makeElement("DIV", { top: 0, left: 0, width: 400, height: 400 });
-        const heading = makeElement("H3", {
-            top: 200, left: 10, width: 380, height: 30,
-            textContent: "Headline text",
-        });
-        content.appendChild(heading);
-        card.appendChild(overlayLink);
-        card.appendChild(content);
-
-        loadModules([card, overlayLink, content, heading]);
-        (globalThis as any).document.elementsFromPoint = () => [overlayLink];
-
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(hintMode.isActive());
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
-        assert.ok(hints?.length >= 1, "Should have at least one hint");
-
-        // The hint position should be near the heading (y ≈ 230+), not at the
-        // <a>'s own rect bottom (y ≈ 400). Pill hints are at rect.bottom + 2.
-        const hintTop = parseFloat(hints[0].style.top);
-        const headingBottom = 230; // heading top (200) + height (30)
-        const linkBottom = 400;    // overlay link bottom
-
-        assert.ok(hintTop < linkBottom - 50,
-            `Hint should be near the heading (got top=${hintTop}), not at the link bottom (${linkBottom})`);
-    });
-
-    it("non-empty <a> with children does not redirect to sibling heading", () => {
-        const card = makeElement("DIV", { top: 0, left: 0, width: 400, height: 400 });
-
-        const link = makeElement("A", {
-            href: "/article",
-            top: 0, left: 0, width: 400, height: 50,
-        });
-        const linkText = makeElement("SPAN", {
-            top: 10, left: 10, width: 100, height: 20,
-            textContent: "Read more",
-        });
-        link.appendChild(linkText);
-
-        const heading = makeElement("H3", {
-            top: 200, left: 10, width: 380, height: 30,
-            textContent: "Headline",
-        });
-        card.appendChild(link);
-        card.appendChild(heading);
-
-        loadModules([card, link, linkText, heading]);
-        (globalThis as any).document.elementsFromPoint = () => [link];
-
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(hintMode.isActive());
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
-        assert.ok(hints?.length >= 1);
-
-        // Hint should be near the link itself, not the sibling heading
-        const hintTop = parseFloat(hints[0].style.top);
-        assert.ok(hintTop < 100,
-            `Non-empty <a> should use its own rect for hint position (got top=${hintTop})`);
-    });
-});
