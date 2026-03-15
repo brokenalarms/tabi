@@ -140,10 +140,8 @@ export class HintMode {
     if (el.tagName.toLowerCase() === "input") {
       const type = ((el as HTMLInputElement).type || "").toLowerCase();
       if (type === "radio" || type === "checkbox") {
-        if ((rect.width === 0 && rect.height === 0) || parseFloat(getComputedStyle(el).opacity) === 0) {
-          const label = findAssociatedLabel(el);
-          if (label) return label;
-        }
+        const label = findAssociatedLabel(el);
+        if (label) return label;
       }
     }
 

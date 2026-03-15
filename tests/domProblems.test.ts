@@ -2115,10 +2115,10 @@ describe("wrapping label dedup", () => {
         const foundIds = found.map((el) => el.id);
 
         assert.equal(found.length, 2, "Should find exactly 2 hints (one per choice)");
-        assert.ok(!foundIds.includes("label1"), "wrapping label should be removed (generic container)");
-        assert.ok(!foundIds.includes("label2"), "wrapping label should be removed (generic container)");
-        assert.ok(foundIds.includes("radio1"), "radio should be kept as the specific interactive element");
-        assert.ok(foundIds.includes("radio2"), "radio should be kept as the specific interactive element");
+        assert.ok(!foundIds.includes("label1"), "wrapping label removed (generic container)");
+        assert.ok(!foundIds.includes("label2"), "wrapping label removed (generic container)");
+        assert.ok(foundIds.includes("radio1"), "radio kept as the specific form control");
+        assert.ok(foundIds.includes("radio2"), "radio kept as the specific form control");
     });
 });
 
