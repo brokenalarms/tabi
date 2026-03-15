@@ -4,7 +4,7 @@
 
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
-import { discoverElements, findAssociatedLabel, findBlockAncestor, CLICKABLE_SELECTOR } from "./ElementGatherer";
+import { discoverElements, findAssociatedLabel, findBlockAncestor, isContentless, CLICKABLE_SELECTOR } from "./ElementGatherer";
 import { Mode } from "../commands";
 
 declare const browser: {
@@ -165,9 +165,9 @@ export class HintMode {
           const hr = heading.getBoundingClientRect();
           if (hr.width > 0 && hr.height > 0) return heading;
         }
-        // Card overlay pattern: empty <a> positioned over a card.
+        // Card overlay pattern: contentless <a> positioned over a card.
         // Search the parent's subtree for a heading to anchor the hint.
-        if (el.children.length === 0 && el.parentElement) {
+        if (isContentless(el) && el.parentElement) {
           const siblingHeading = el.parentElement.querySelector("h1, h2, h3, h4, h5, h6") as HTMLElement | null;
           if (siblingHeading) {
             const hr = siblingHeading.getBoundingClientRect();

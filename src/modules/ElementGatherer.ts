@@ -53,6 +53,15 @@ function childrenMightBeVisible(el: HTMLElement): boolean {
   return getComputedStyle(el).display !== "none";
 }
 
+/** Does this element have no visible content of its own?
+ *  True for elements with no children and no text — purely positional overlays
+ *  that rely on sibling content for their visual presence. */
+export function isContentless(el: HTMLElement): boolean {
+  if (el.children.length > 0) return false;
+  if ((el.textContent || "").trim().length > 0) return false;
+  return true;
+}
+
 /** Stateless visibility check — does this element have a non-zero, on-screen,
  *  non-hidden rect? No clickability or occlusion logic — just geometry + CSS.
  *  Accepts an optional pre-computed rect (e.g. fallback rect for zero-size anchors). */
