@@ -1161,7 +1161,7 @@ describe("native interactive elements prune subtrees", () => {
     });
 
     // Card-style link with heading + description gets container hint at the link level
-    it("link containing a heading gets container hint at link level", () => {
+    it("link containing a heading gets hint at link level", () => {
         const link = makeElement("A", { href: "/article", top: 0, left: 0, width: 600, height: 120 });
         const heading = makeElement("H3", { top: 10, left: 10, width: 400, height: 24, textContent: "Article Title" });
         const desc = makeElement("P", { top: 40, left: 10, width: 580, height: 60, textContent: "Description text" });
@@ -1180,9 +1180,9 @@ describe("native interactive elements prune subtrees", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
-        // Hint should be at the link level, with container glow
-        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
-            "Wide link with branching content should get container glow");
+        // Text fills the width — pill+pointer below, no glow
+        assert.ok(hints[0].querySelector(".vimium-hint-tail"),
+            "Text-filled container should get pill+pointer");
     });
 
     // Links with SVG+text and trailing space get inside-end placement with glow
@@ -1433,6 +1433,37 @@ describe("native interactive elements prune subtrees", () => {
             "Should be detected as container");
         assert.ok(!hints[0].querySelector(".vimium-hint-tail"),
             "Trailing badge should not block inside-end placement");
+    });
+
+    // ISSUE: Text filling most of a container's width causes ugly overlap
+    // when the hint pill is placed inside-end.
+    // SITE: linkedin.com news sidebar (truncated headlines fill the row)
+    // FIX: Measure text node right edge via Range API; fall back to
+    // container-external when text extends into the pill zone.
+    it("text extending into pill zone prevents inside-end placement", () => {
+        // Container 300px wide, text fills to ~280px (truncated headline)
+        const link = makeElement("DIV", { top: 0, left: 0, width: 300, height: 50,
+            attrs: { role: "link", tabindex: "0" } });
+        const headline = makeElement("DIV", { top: 5, left: 10, width: 280, height: 20,
+            textContent: "White House to receive $10B for rol." });
+        const meta = makeElement("DIV", { top: 28, left: 10, width: 200, height: 16,
+            textContent: "6m ago · 11,805 readers" });
+        link.appendChild(headline);
+        link.appendChild(meta);
+
+        loadModules([link, headline, meta]);
+        (globalThis as any).document.elementsFromPoint = () => [link];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        assert.ok(!overlay?.querySelector(".vimium-hint-container-glow"),
+            "Text-filled container should not get glow");
+        assert.ok(hints[0].querySelector(".vimium-hint-tail"),
+            "Text overlap should force pill+pointer");
     });
 
     // Sibling <a> elements each get their own hint position — inline centering
