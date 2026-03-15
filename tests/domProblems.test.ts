@@ -2048,3 +2048,71 @@ describe("DOM problems — overflow clipping with near-zero visible area", () =>
     });
 });
 
+// Wrapping <label> containing <input type="radio"> — the label is an interactive
+// container. Clicking anywhere on it activates the radio. Should produce one hint
+// on the container, not duplicate hints on both label and radio.
+describe("wrapping label dedup", () => {
+    let cleanup: () => void;
+
+    afterEach(() => {
+        if (cleanup) cleanup();
+    });
+
+    it("keeps only the wrapping label, not the radio inside", () => {
+        const env = createDOM(`
+            <div class="question-form">
+                <label id="label1" class="input-radio">
+                    <input id="radio1" type="radio" name="choice" value="yes">
+                    <div class="option-inner"><h5>Yes</h5></div>
+                </label>
+                <label id="label2" class="input-radio">
+                    <input id="radio2" type="radio" name="choice" value="no">
+                    <div class="option-inner"><h5>Nope</h5></div>
+                </label>
+            </div>
+        `);
+        cleanup = env.cleanup;
+
+        // Give all labels and radios visible rects
+        const elements = env.document.querySelectorAll("label, input[type='radio']");
+        const rects: any[] = [];
+        let top = 10;
+        for (const el of elements) {
+            const isLabel = (el as Element).tagName === "LABEL";
+            const rect = {
+                top, left: 20,
+                bottom: top + (isLabel ? 60 : 20),
+                right: isLabel ? 400 : 40,
+                width: isLabel ? 380 : 20,
+                height: isLabel ? 60 : 20,
+                x: 20, y: top,
+                toJSON() { return this; }
+            };
+            (el as any).getBoundingClientRect = () => rect;
+            (el as any).getClientRects = () => [rect];
+            rects.push({ el, rect });
+            if (isLabel) top += 80;
+        }
+
+        // Labels have cursor:pointer (styled as clickable cards)
+        for (const label of env.document.querySelectorAll("label")) {
+            (label as any).style.cursor = "pointer";
+        }
+
+        (env.document as any).elementsFromPoint = (x: number, y: number) => {
+            return rects
+                .filter(({ rect: r }) => x >= r.left && x < r.right && y >= r.top && y < r.bottom)
+                .map(({ el }) => el as unknown as Element);
+        };
+
+        const found = discoverElements((el) => el.getBoundingClientRect());
+        const foundIds = found.map((el) => el.id);
+
+        assert.equal(found.length, 2, "Should find exactly 2 hints (one per choice)");
+        assert.ok(!foundIds.includes("label1"), "wrapping label should be removed (generic container)");
+        assert.ok(!foundIds.includes("label2"), "wrapping label should be removed (generic container)");
+        assert.ok(foundIds.includes("radio1"), "radio should be kept as the specific interactive element");
+        assert.ok(foundIds.includes("radio2"), "radio should be kept as the specific interactive element");
+    });
+});
+
