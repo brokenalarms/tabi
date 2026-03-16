@@ -172,14 +172,14 @@ export function isContentlessOverlay(el: HTMLElement): boolean {
 
 // --- Element characteristics ---
 
-const BLOCK_DISPLAY_VALUES = ["block", "flex", "grid", "list-item", "table", "flow-root"];
-
 /** Does this element generate a block-level box?
- *  Only returns true for known block display values — unknown or missing
- *  values default to false rather than accidentally qualifying. */
+ *  Unknown display values default to true — a block box can contain visible
+ *  children even if the element itself has zero dimensions, so it's safer to
+ *  over-count than to miss one.  Only inline and boxless values return false. */
 export function isBlockLevel(el: HTMLElement): boolean {
+  if (!hasBox(el)) return false;
   const display = getComputedStyle(el).display;
-  return BLOCK_DISPLAY_VALUES.includes(display);
+  return display !== "" && !display.startsWith("inline");
 }
 
 /** Is this element inside a vertically repeating container (list or table row)?
