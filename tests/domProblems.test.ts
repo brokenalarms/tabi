@@ -2384,8 +2384,9 @@ describe("block link hint positioning", () => {
             `Hint left (${hintLeft}) should center on heading (~200), not full-width link (~400)`);
     });
 
-    it("link inside <li> keeps hint centered on full container", () => {
-        // Same structure but inside a list item — hint should stay on full <a>
+    it("link inside <li> gets container treatment, not heading redirect", () => {
+        // Same structure but inside a list item — sized link in repeating
+        // container gets glow + inside-end, heading redirect is suppressed.
         const li = makeElement("LI", { top: 10, left: 0, width: 800, height: 60, display: "list-item" });
         const link = makeElement("A", { href: "/page", top: 10, left: 0, width: 800, height: 60, display: "block" });
         const heading = makeElement("H3", { top: 10, left: 0, width: 400, height: 25, textContent: "Short title" });
@@ -2400,11 +2401,12 @@ describe("block link hint positioning", () => {
         assert.ok(hintMode.isActive());
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+            "Link inside <li> should get container glow");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
-        const hintLeft = parseFloat(hints[0].style.left);
-        assert.ok(hintLeft >= 390 && hintLeft <= 410,
-            `Hint left (${hintLeft}) should center on full link (~400), not heading (~200)`);
+        assert.ok(!hints[0]?.querySelector(".vimium-hint-tail"),
+            "Link inside <li> should not get pointer tail");
     });
 });
 
@@ -2607,5 +2609,54 @@ describe("isSiblingInRepeatingContainer", () => {
         assert.equal(isSiblingInRepeatingContainer(t, cover), false);
 
         env.cleanup();
+    });
+});
+
+describe("repeating container forces container treatment", () => {
+    afterEach(() => {
+        const { hintMode } = getState();
+        if (hintMode.isActive()) hintMode.deactivate();
+    });
+
+    // ISSUE: Sized elements inside repeating containers (<li>, <tr>) should get
+    // container treatment (glow + inside-end pill) not external pointer.
+    // SITE: facebook.com top nav bar — icon links in <li> items
+    // FIX: isInRepeatingContainer + size criteria → container=true, skip
+    // branching content walk.
+    it("sized element inside <li> gets container glow, not pointer", () => {
+        // Base: wide link with single-child chain outside <li> → non-container
+        const baseLink = makeElement("A", { href: "/", top: 0, left: 0, width: 200, height: 50 });
+        const baseSpan = makeElement("SPAN", { top: 0, left: 0, width: 200, height: 50 });
+        baseLink.appendChild(baseSpan);
+
+        loadModules([baseLink]);
+        (globalThis as any).document.elementsFromPoint = () => [baseLink];
+        let { hintMode } = getState();
+        hintMode.activate(false);
+        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        assert.ok(!overlay?.querySelector(".vimium-hint-container-glow"),
+            "Base: link outside <li> with single-child chain should not get glow");
+        let hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.ok(hints[0]?.querySelector(".vimium-hint-tail"),
+            "Base: link outside <li> should get pointer tail");
+        hintMode.deactivate();
+
+        // Delta: same structure inside <li> → container (glow, no tail)
+        const li = makeElement("LI", { top: 0, left: 0, width: 200, height: 50, display: "list-item" });
+        const deltaLink = makeElement("A", { href: "/", top: 0, left: 0, width: 200, height: 50 });
+        const deltaSpan = makeElement("SPAN", { top: 0, left: 0, width: 200, height: 50 });
+        deltaLink.appendChild(deltaSpan);
+        li.appendChild(deltaLink);
+
+        loadModules([deltaLink]);
+        (globalThis as any).document.elementsFromPoint = () => [deltaLink];
+        ({ hintMode } = getState());
+        hintMode.activate(false);
+        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+            "Delta: sized link inside <li> should get container glow");
+        hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.ok(!hints[0]?.querySelector(".vimium-hint-tail"),
+            "Delta: sized link inside <li> should not get pointer tail");
     });
 });
