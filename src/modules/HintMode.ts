@@ -4,7 +4,8 @@
 
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
-import { discoverElements, findAssociatedLabel, findBlockAncestor, CLICKABLE_SELECTOR } from "./ElementGatherer";
+import { CLICKABLE_SELECTOR } from "./constants";
+import { discoverElements, findAssociatedLabel, findBlockAncestor, getHeading, hasHeadingContent, isBlockLevel, isInRepeatingContainer } from "./ElementGatherer";
 import { Mode } from "../commands";
 
 declare const browser: {
@@ -152,15 +153,12 @@ export class HintMode {
       }
     }
 
-    // Block-level links with a heading: redirect to the heading so the hint
-    // centers on the visible text, not the full-width block. Skip links inside
-    // <li> or <tr> — those are part of vertically flowing lists/tables where
-    // hints should stay aligned on the container width.
+    // Block-level links with headings: position hint at the heading so it
+    // centers on visible text, not the full-width block. Links in repeating
+    // containers (li, tr) keep full-width hints for vertical alignment.
     if (el.tagName.toLowerCase() === "a" &&
-        !getComputedStyle(el).display.startsWith("inline") &&
-        !el.closest("li") && !el.closest("tr")) {
-      const heading = el.querySelector("h1, h2, h3, h4, h5, h6");
-      if (heading) return heading as HTMLElement;
+        isBlockLevel(el) && hasHeadingContent(el) && !isInRepeatingContainer(el)) {
+      return getHeading(el)!;
     }
 
     return el;

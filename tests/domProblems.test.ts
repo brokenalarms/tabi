@@ -5,7 +5,7 @@ import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
-import { discoverElements, findBlockAncestor, isBlockLevel, walkerFilter } from "../src/modules/ElementGatherer";
+import { discoverElements, findBlockAncestor, hasHeadingContent, isBlockLevel, isInRepeatingContainer, walkerFilter } from "../src/modules/ElementGatherer";
 
 describe("element discovery", () => {
     afterEach(() => {
@@ -2154,7 +2154,54 @@ describe("wrapping label dedup", () => {
 // FIX: In getHintTargetElement, redirect to heading child when the <a> is block-level,
 // contains a heading, and is NOT inside a <li> or <tr> (which indicate list/table
 // layouts where hints should stay centered on the container).
-describe("block link redirects hint to heading", () => {
+describe("hasHeadingContent", () => {
+    it("returns true when element contains a heading", () => {
+        const env = createDOM(`<a id="t" href="#"><h3>Title</h3></a>`);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.ok(hasHeadingContent(el));
+        env.cleanup();
+    });
+
+    it("returns true for deeply nested heading", () => {
+        const env = createDOM(`<a id="t" href="#"><div><span><h4>Title</h4></span></div></a>`);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.ok(hasHeadingContent(el));
+        env.cleanup();
+    });
+
+    it("returns false when no heading exists", () => {
+        const env = createDOM(`<a id="t" href="#"><span>Title</span></a>`);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.ok(!hasHeadingContent(el));
+        env.cleanup();
+    });
+});
+
+describe("isInRepeatingContainer", () => {
+    it("returns true inside <li>", () => {
+        const env = createDOM(`<li><a id="t" href="#">link</a></li>`);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.ok(isInRepeatingContainer(el));
+        env.cleanup();
+    });
+
+    it("returns true inside <tr>", () => {
+        const env = createDOM(`<table><tr><td><a id="t" href="#">link</a></td></tr></table>`);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.ok(isInRepeatingContainer(el));
+        env.cleanup();
+    });
+
+    it("returns false for standalone element", () => {
+        const env = createDOM(`<div><a id="t" href="#">link</a></div>`);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.ok(!isInRepeatingContainer(el));
+        env.cleanup();
+    });
+});
+
+// Integration: verify hint positioning composes the predicates correctly
+describe("block link hint positioning", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -2170,7 +2217,6 @@ describe("block link redirects hint to heading", () => {
         link.appendChild(cite);
 
         loadModules([link]);
-
         (globalThis as any).document.elementsFromPoint = () => [link];
 
         const { hintMode } = getState();
@@ -2180,7 +2226,6 @@ describe("block link redirects hint to heading", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
-        // Hint should be centered on heading (200px), not full link (400px)
         const hintLeft = parseFloat(hints[0].style.left);
         assert.ok(hintLeft >= 190 && hintLeft <= 210,
             `Hint left (${hintLeft}) should center on heading (~200), not full-width link (~400)`);
@@ -2195,7 +2240,6 @@ describe("block link redirects hint to heading", () => {
         li.appendChild(link);
 
         loadModules([link]);
-
         (globalThis as any).document.elementsFromPoint = () => [link];
 
         const { hintMode } = getState();
@@ -2205,7 +2249,6 @@ describe("block link redirects hint to heading", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1);
-        // Hint should be centered on full link (400px), NOT redirected to heading (200px)
         const hintLeft = parseFloat(hints[0].style.left);
         assert.ok(hintLeft >= 390 && hintLeft <= 410,
             `Hint left (${hintLeft}) should center on full link (~400), not heading (~200)`);
