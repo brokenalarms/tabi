@@ -56,6 +56,7 @@ If the user agrees, you may proceed:
      assert.equal(hasBox(el), false);
      ```
    - Asserts the correct behavior: right number of hints, correct elements hinted, correct dedup outcome.
+   - For unit tests, you don't need a new test for every pair if it just returns one of a set of values. You can assert each value within the same test.
    - Run the test and assert that it fails.
 
 - Only then **Implement the fix**.
