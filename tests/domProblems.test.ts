@@ -5,7 +5,7 @@ import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
-import { discoverElements, findBlockAncestor, walkerFilter } from "../src/modules/ElementGatherer";
+import { discoverElements, findBlockAncestor, isBlockLevel, walkerFilter } from "../src/modules/ElementGatherer";
 
 describe("element discovery", () => {
     afterEach(() => {
@@ -1781,21 +1781,70 @@ describe("findBlockAncestor utility", () => {
     it("skips display:contents ancestors", () => {
         const env = createDOM(`
             <li>
-                <div id="contents-wrapper" style="display:contents">
+                <div id="wrapper">
                     <a id="t" href="#">link</a>
                 </div>
             </li>
         `);
         cleanup = env.cleanup;
         const a = env.document.getElementById("t")!;
-        const contentsDiv = env.document.getElementById("contents-wrapper")!;
-        const li = contentsDiv.parentElement!;
+        const wrapper = env.document.getElementById("wrapper")!;
+        const li = wrapper.parentElement!;
 
-        // Without fix: findBlockAncestor returns the display:contents div (zero rect)
-        // With fix: it skips the contents div and returns the <li>
-        const result = findBlockAncestor(a as unknown as HTMLElement);
-        assert.notEqual(result, contentsDiv, "display:contents element should not be a block ancestor");
-        assert.equal(result, li, "should walk through display:contents to the <li>");
+        // Base case: normal block div is returned as the block ancestor
+        assert.equal(findBlockAncestor(a as unknown as HTMLElement), wrapper,
+            "normal block div should be the block ancestor");
+
+        // With display:contents: div has no box, so findBlockAncestor skips it
+        wrapper.style.display = "contents";
+        assert.equal(findBlockAncestor(a as unknown as HTMLElement), li,
+            "should walk through display:contents to the <li>");
+    });
+});
+
+// isBlockLevel utility — classifies CSS display values as block-level or not.
+// Only values that generate a block-level box return true.
+describe("isBlockLevel utility", () => {
+    let cleanup: () => void;
+
+    afterEach(() => {
+        if (cleanup) cleanup();
+    });
+
+    it("returns true for box-generating block display values", () => {
+        const env = createDOM(``);
+        cleanup = env.cleanup;
+        for (const display of ["block", "flex", "grid", "list-item", "table"]) {
+            const el = env.document.createElement("div");
+            el.style.display = display;
+            env.document.body.appendChild(el);
+            assert.equal(isBlockLevel(el as unknown as HTMLElement), true,
+                `display:${display} should be block-level`);
+        }
+    });
+
+    it("returns false for inline display values", () => {
+        const env = createDOM(``);
+        cleanup = env.cleanup;
+        for (const display of ["inline", "inline-block", "inline-flex", "inline-grid"]) {
+            const el = env.document.createElement("span");
+            el.style.display = display;
+            env.document.body.appendChild(el);
+            assert.equal(isBlockLevel(el as unknown as HTMLElement), false,
+                `display:${display} should not be block-level`);
+        }
+    });
+
+    it("returns false for non-box-generating display values", () => {
+        const env = createDOM(``);
+        cleanup = env.cleanup;
+        for (const display of ["none", "contents"]) {
+            const el = env.document.createElement("div");
+            el.style.display = display;
+            env.document.body.appendChild(el);
+            assert.equal(isBlockLevel(el as unknown as HTMLElement), false,
+                `display:${display} should not be block-level (no box generated)`);
+        }
     });
 });
 
