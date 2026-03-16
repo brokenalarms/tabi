@@ -90,6 +90,23 @@ function isClippedByOverflow(el: HTMLElement, rect: DOMRect): boolean {
   return false;
 }
 
+/** Does the ancestor contain the descendant in the composed tree?
+ *  Like Node.contains(), but walks up through shadow root boundaries
+ *  so shadow hosts are recognized as ancestors of their shadow DOM content. */
+function composedContains(ancestor: Node, descendant: Node): boolean {
+  let node: Node | null = descendant;
+  while (node) {
+    if (node === ancestor) return true;
+    const root = node.getRootNode();
+    if (root !== node && root !== document && (root as any).host) {
+      node = (root as any).host;
+    } else {
+      node = node.parentNode;
+    }
+  }
+  return false;
+}
+
 /** Is this element occluded at any corner by an unrelated element?
  *  Tests all 4 corners (+2px inset) via elementsFromPoint. If ANY corner's
  *  topmost element is an unrelated, non-exempt cover, the element is occluded.
@@ -100,7 +117,7 @@ function isOccluded(el: HTMLElement, rect: DOMRect): boolean {
   const clampY = (y: number) => Math.min(Math.max(y, 0), window.innerHeight - 1);
 
   const isCover = (cover: HTMLElement): boolean => {
-    if (el.contains(cover) || cover.contains(el)) return false;
+    if (composedContains(el, cover) || composedContains(cover, el)) return false;
     if (isSubtreeRemoved(cover)) return false;
     if (isContentlessOverlay(cover)) return false;
     return true;

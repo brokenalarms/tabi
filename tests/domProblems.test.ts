@@ -2356,3 +2356,41 @@ describe("overlay link gets hint, non-interactive image does not", () => {
     });
 });
 
+// ISSUE: Buttons inside shadow DOM are falsely occluded because
+// document.elementsFromPoint returns the shadow host, and Node.contains()
+// doesn't cross shadow boundaries — the host looks like an unrelated cover.
+// SITE: reddit.com — comment expand/collapse buttons inside <shreddit-comment> web components
+// FIX: Containment check walks up the composed tree (crossing shadow root
+// boundaries) so shadow hosts are recognized as ancestors, not unrelated covers.
+describe("shadow DOM elements not falsely occluded", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("button inside shadow root gets hint when host is the elementsFromPoint result", () => {
+        // Create shadow host (like <shreddit-comment>)
+        const host = makeElement("DIV", { top: 0, left: 0, width: 600, height: 100 });
+
+        // Create button inside shadow root
+        const btn = makeElement("BUTTON", { top: 10, left: 10, width: 24, height: 24 });
+        btn.id = "shadow-btn";
+        const shadow = host.attachShadow({ mode: "open" });
+        shadow.appendChild(btn);
+
+        // Add host to DOM — walker discovers shadow roots via element.shadowRoot
+        loadModules([host]);
+
+        // elementsFromPoint returns the shadow HOST, not the button inside it.
+        // This simulates browser behavior: document.elementsFromPoint doesn't
+        // pierce shadow DOM boundaries.
+        (globalThis as any).document.elementsFromPoint = () => [host];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(),
+            "Button inside shadow root should get a hint — shadow host is an ancestor, not a cover");
+    });
+});
+
