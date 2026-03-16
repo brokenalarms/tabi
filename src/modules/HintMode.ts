@@ -14,8 +14,6 @@ import { Mode } from "../commands";
 
 /** Walk up through inline single-child ancestors to the nearest block-level container.
  *  Returns null if element is already block, has no parent, or a parent has multiple children.
- *  Skips headings (h1–h6) — they are semantic text containers, not layout containers
- *  whose width should determine hint positioning.
  *  Stops at body/documentElement — never returns those. */
 export function findBlockAncestor(el: HTMLElement): HTMLElement | null {
   if (isBlockLevel(el)) return null;
@@ -24,10 +22,7 @@ export function findBlockAncestor(el: HTMLElement): HTMLElement | null {
     const parent = node.parentElement;
     if (parent === document.body || parent === document.documentElement) return null;
     if (parent.children.length !== 1) return null;
-    if (isBlockLevel(parent)) {
-      if (parent.matches(HEADING_SELECTOR)) return null;
-      return parent;
-    }
+    if (isBlockLevel(parent)) return parent;
     node = parent;
   }
   return null;
@@ -261,9 +256,11 @@ export class HintMode {
     // Inline elements in vertical lists: expand to nearest block ancestor's width
     // so hints align. Walks up through inline single-child wrappers (e.g.
     // <li><span><a>text</a></span></li> expands to <li> width).
+    // Skip when getHintTargetElement already redirected (target !== el) — the
+    // redirect chose a narrower element intentionally.
     const tag = target.tagName.toLowerCase();
     const isFormControl = tag === "input" || tag === "textarea" || tag === "select";
-    if (!isFormControl) {
+    if (!isFormControl && target === el) {
       const blockAncestor = findBlockAncestor(target);
       if (blockAncestor) {
         const hasMixedContent = Array.from(blockAncestor.childNodes).some(

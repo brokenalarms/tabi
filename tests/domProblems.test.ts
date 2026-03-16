@@ -1882,9 +1882,10 @@ describe("findBlockAncestor utility", () => {
         assert.ok(result !== env.document.body, "Should not return body element");
     });
 
-    // Fidelity: <h2><a>I Accept</a></h2> — heading is block but should not be
-    // returned as the block ancestor. Headings are semantic text containers.
-    it("returns null when block ancestor is a heading", () => {
+    // Fidelity: <h2><a>I Accept</a></h2> — heading is excluded by isBlockLevel
+    // (semantic text container, not layout container), so findBlockAncestor
+    // walks past it and finds no suitable ancestor.
+    it("walks past heading ancestors", () => {
         const env = createDOM(`
             <h2>
                 <a id="t" href="#">I Accept</a>
@@ -1924,8 +1925,8 @@ describe("findBlockAncestor utility", () => {
     });
 });
 
-// isBlockLevel utility — classifies CSS display values as block-level or not.
-// Only values that generate a block-level box return true.
+// isBlockLevel utility — classifies elements as block-level layout containers.
+// Excludes headings (semantic text containers) and boxless elements.
 describe("isBlockLevel utility", () => {
     let cleanup: () => void;
 
@@ -1965,6 +1966,25 @@ describe("isBlockLevel utility", () => {
         // Delta: none has no box → not block-level
         el.style.display = "none";
         assert.equal(isBlockLevel(el as unknown as HTMLElement), false, "display:none is not block-level");
+    });
+
+    // Fidelity: headings are block in CSS but are semantic text containers,
+    // not layout containers whose width should determine hint positioning.
+    it("headings are not block-level layout containers", () => {
+        const env = createDOM(``);
+        cleanup = env.cleanup;
+
+        // Base: <div> is a layout block
+        const div = env.document.createElement("div");
+        env.document.body.appendChild(div);
+        assert.equal(isBlockLevel(div as unknown as HTMLElement), true,
+            "div is a block-level layout container");
+
+        // Delta: <h2> has block display but is excluded as a heading
+        const h2 = env.document.createElement("h2");
+        env.document.body.appendChild(h2);
+        assert.equal(isBlockLevel(h2 as unknown as HTMLElement), false,
+            "h2 is a semantic text container, not a layout block");
     });
 });
 
