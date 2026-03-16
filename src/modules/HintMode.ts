@@ -247,6 +247,13 @@ export class HintMode {
       }
     }
 
+    // Shrink rect by padding-bottom so the hint pointer touches the content
+    // edge rather than floating below the padding (e.g. MediaWiki sidebar links).
+    const paddingBottom = parseFloat(getComputedStyle(target).paddingBottom) || 0;
+    if (paddingBottom > 0) {
+      rect = new DOMRect(rect.left, rect.top, rect.width, rect.height - paddingBottom);
+    }
+
     const result = { rect, container };
     this.hintInfoCache.set(el, result);
     return result;

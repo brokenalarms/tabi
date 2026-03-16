@@ -780,6 +780,54 @@ describe("inline link in mixed text content", () => {
     });
 });
 
+// ISSUE: Elements with padding-bottom have hints positioned too low — the pointer
+// floats below the visible content because rect.bottom includes padding.
+// SITE: MediaWiki sidebar
+// FIX: Subtract paddingBottom from the bottom edge used for hint positioning so
+// the pointer touches the content edge rather than the padding edge.
+describe("hint positioning accounts for padding-bottom", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("hint without padding-bottom is at rect.bottom", () => {
+        const link = makeElement("A", { href: "#", top: 10, left: 50, width: 100, height: 20, display: "inline" });
+        loadModules([link]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+
+        // Without padding, hint top should be near rect.bottom (30) + 2 = 32
+        const hintTop = parseFloat(hints[0].style.top);
+        assert.ok(hintTop >= 30, `Hint top (${hintTop}) should be at or past rect.bottom (30)`);
+    });
+
+    it("hint is closer to content edge when element has padding-bottom", () => {
+        // Same element but with 20px padding-bottom baked into the rect height
+        // Content ends at top=10 + contentHeight=20 = 30, but rect.bottom = 50 due to padding
+        const link = makeElement("A", { href: "#", top: 10, left: 50, width: 100, height: 40, display: "inline", paddingBottom: "20px" });
+        loadModules([link]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+
+        // With 20px padding-bottom, hint should be near content bottom (30) + 2 = 32,
+        // NOT at rect.bottom (50) + 2 = 52
+        const hintTop = parseFloat(hints[0].style.top);
+        assert.ok(hintTop < 40, `Hint top (${hintTop}) should be near content edge (~32), not at padded bottom (~52)`);
+    });
+});
+
 // X.com trending: div[role="link"] contains a button[role="button"] (the "..." menu).
 // The trend box should get its own hint separate from the button's hint.
 // Previously getHintTargetElement redirected to the inner button, making both hints overlap.
