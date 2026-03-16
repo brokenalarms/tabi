@@ -5,7 +5,7 @@
 
 import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_SELECTOR } from "./constants";
 import {
-  isExcludedByIntent, childrenMightBeVisible, isOnScreen, isVisible,
+  isExcludedByIntent, childrenCannotBeVisible, isOnScreen, isVisible,
   isClippedByOverflow, isOccluded,
 } from "./elementPredicates";
 import { findAssociatedLabel } from "./elementTraversals";
@@ -21,7 +21,7 @@ export function walkerFilter(node: Node): number {
 
   // Developer intent or display:none — prune entire subtree
   if (isExcludedByIntent(el)) return NodeFilter.FILTER_REJECT;
-  if (!childrenMightBeVisible(el)) return NodeFilter.FILTER_REJECT;
+  if (childrenCannotBeVisible(el)) return NodeFilter.FILTER_REJECT;
 
   // Visually-hidden pattern: clip/clip-path reducing visible area to zero
   // (e.g. "skip to content" links, sr-only elements)

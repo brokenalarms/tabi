@@ -16,8 +16,8 @@ export function isOnScreen(rect: DOMRect): boolean {
 /** Can children of this element still be visible?
  *  display:none is the only CSS property that irrecoverably hides all descendants.
  *  visibility:hidden and opacity:0 can be overridden by children. */
-export function childrenMightBeVisible(el: HTMLElement): boolean {
-  return getComputedStyle(el).display !== "none";
+export function childrenCannotBeVisible(el: HTMLElement): boolean {
+  return getComputedStyle(el).display === "none";
 }
 
 /** Stateless visibility check — does this element have a non-zero, on-screen,
