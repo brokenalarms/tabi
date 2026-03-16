@@ -152,6 +152,17 @@ export class HintMode {
       }
     }
 
+    // Block-level links with a heading: redirect to the heading so the hint
+    // centers on the visible text, not the full-width block. Skip links inside
+    // <li> or <tr> — those are part of vertically flowing lists/tables where
+    // hints should stay aligned on the container width.
+    if (el.tagName.toLowerCase() === "a" &&
+        !getComputedStyle(el).display.startsWith("inline") &&
+        !el.closest("li") && !el.closest("tr")) {
+      const heading = el.querySelector("h1, h2, h3, h4, h5, h6");
+      if (heading) return heading as HTMLElement;
+    }
+
     return el;
   }
 
