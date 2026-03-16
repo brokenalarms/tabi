@@ -123,7 +123,9 @@ function isOccluded(el: HTMLElement, rect: DOMRect): boolean {
 /** Is this a contentless overlay link?
  *  True for <a> with no text, no visual children (img, svg, etc.), and a sibling
  *  with visible content — the "stretched-link" card pattern where an empty <a>
- *  is positioned over a card whose visible text lives in a sibling element. */
+ *  is positioned over a card whose visible text lives in a sibling element.
+ *  Used in occlusion checks to exempt these overlays from blocking sibling
+ *  interactive elements (e.g. comment links that poke through via z-index). */
 function isContentlessOverlay(el: HTMLElement): boolean {
   if (el.tagName.toLowerCase() !== "a") return false;
   if ((el.textContent || "").trim()) return false;
@@ -192,14 +194,15 @@ export function walkerFilter(node: Node): number {
   // Outside viewport — SKIP so fixed/sticky children are still visited
   if (!isOnScreen(rect)) return NodeFilter.FILTER_SKIP;
 
-  // Clickability check
-  // cursor:pointer is checked here (not just CLICKABLE_SELECTOR) because many modern
-  // SPAs make elements clickable via JS listeners (React onClick, Vue @click) without
-  // adding ARIA roles or HTML attributes. cursor:pointer is their only discoverable signal.
-  if (!el.matches(CLICKABLE_SELECTOR) && style.cursor !== "pointer") return NodeFilter.FILTER_SKIP;
-
-  // Stretched-link card overlay — empty <a> duplicating visible sibling content
-  if (isContentlessOverlay(el)) return NodeFilter.FILTER_SKIP;
+  // Clickability check — only semantic signals (CLICKABLE_SELECTOR), not visual ones.
+  // We intentionally do NOT use cursor:pointer as a discovery signal. While cursor:pointer
+  // catches some JS-only click handlers (React onClick, Vue @click), it produces far more
+  // false positives: non-interactive images, decorative wrappers, and overlay containers
+  // all inherit or receive cursor:pointer from CSS without being meaningful click targets.
+  // Each false positive required a new dedup rule (wrapper dedup, sibling dedup, cover
+  // occlusion), adding complexity without reliability. SPAs that care about accessibility
+  // should use ARIA roles, tabindex, or semantic HTML — those are the signals we trust.
+  if (!el.matches(CLICKABLE_SELECTOR)) return NodeFilter.FILTER_SKIP;
 
   // Opacity:0 radio/checkbox with visible label — redirect to label
   if (parseFloat(style.opacity) === 0) {
@@ -394,7 +397,7 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
   }
 
   // Sibling dedup: remove generic candidates when a non-generic sibling exists.
-  // Decorative divs (cursor:pointer, tabindex) alongside real interactive elements
+  // Decorative divs (e.g. tabindex) alongside real interactive elements
   // (input, button, link) shouldn't get their own hints.
   for (const el of result) {
     if (toRemove.has(el)) continue;

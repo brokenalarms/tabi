@@ -447,38 +447,6 @@ describe("flex container with zero-size parents", () => {
     });
 });
 
-// Facebook "Create story" card: cursor:pointer wrapper div around an <a> produces
-// duplicate hints because dedup didn't remove generic roots with specific descendants.
-describe("generic cursor:pointer wrapper dedup", () => {
-    afterEach(() => {
-        const { hintMode, keyHandler } = getState();
-        if (hintMode) hintMode.destroy();
-        if (keyHandler) keyHandler.destroy();
-    });
-
-    it("removes generic cursor:pointer wrapper when it contains a link", () => {
-        const link = makeElement("A", { href: "/stories/create/", top: 60, left: 60, width: 200, height: 300 });
-        link.setAttribute("role", "link");
-        link.setAttribute("tabindex", "0");
-
-        const wrapper = makeElement("DIV", { top: 60, left: 60, width: 200, height: 300, cursor: "pointer" });
-        wrapper.appendChild(link);
-
-        loadModules([wrapper, link]);
-
-        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
-            return [link, wrapper];
-        };
-
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(hintMode.isActive());
-        // 1 hint (link only) → single-char label "s"
-        fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
-        assert.ok(!hintMode.isActive(), "Expected 1 hint (link only) — generic wrapper should be removed");
-    });
-});
-
 // Hint target redirect: a wrapper with a single clickable child should position
 // the hint at the child, not the wrapper. This is the common case of a large
 // card/container wrapping one interactive element.
@@ -1001,12 +969,13 @@ describe("overlay occlusion", () => {
     });
 });
 
-// ISSUE: Empty overlay <a> (no text, no children) gets a hint because it's the
-// topmost element. These "stretched-link" overlays duplicate visible sibling content.
-// SITE: theguardian.com — card overlay <a> with aria-label covers entire card
-// FIX: Filter contentless <a> elements — links with no text and no visual children.
+// Overlay <a> elements (stretched-link card pattern) should get hints — they're real
+// navigation targets. Previously these were skipped via isContentlessOverlay(), but
+// that caused hints to land on non-interactive siblings (images) instead. The overlay
+// is exempt from occluding sibling interactive elements (e.g. comment links with
+// higher z-index) so both the overlay and sibling links get hints.
 describe("contentless overlay link", () => {
-    it("filters contentless overlay link, keeps sibling comment link", () => {
+    it("overlay link gets hint alongside sibling comment link", () => {
         const env = createDOM(`
             <div>
                 <a id="overlay" href="/article" aria-label="Article title"></a>
@@ -1022,11 +991,10 @@ describe("contentless overlay link", () => {
         const overlay = env.document.getElementById("overlay") as unknown as HTMLElement;
         const comments = env.document.getElementById("comments") as unknown as HTMLElement;
 
-        // Overlay stretches over entire card via position:absolute
         overlay.getBoundingClientRect = () => ({ top: 0, left: 0, bottom: 300, right: 400, width: 400, height: 300, x: 0, y: 0, toJSON() { return this; } }) as DOMRect;
         comments.getBoundingClientRect = () => ({ top: 260, left: 10, bottom: 280, right: 200, width: 190, height: 20, x: 10, y: 260, toJSON() { return this; } }) as DOMRect;
 
-        // Mock elementsFromPoint — overlay is topmost (position:absolute)
+        // Overlay is topmost (position:absolute); comment link pokes through via z-index
         const allEls = [overlay, comments];
         (env.document as any).elementsFromPoint = (x: number, y: number) => {
             return allEls.filter((el: any) => {
@@ -1037,42 +1005,8 @@ describe("contentless overlay link", () => {
 
         const elems = discoverElements(() => overlay.getBoundingClientRect());
         const ids = elems.map(e => e.id);
-        assert.ok(!ids.includes("overlay"), "Empty overlay <a> should be filtered");
-        assert.ok(ids.includes("comments"), "Sibling comment link should remain");
-
-        env.cleanup();
-    });
-
-    it("keeps link with visible text content", () => {
-        const env = createDOM(`
-            <a id="textlink" href="/page">Click me</a>
-        `);
-
-        const link = env.document.getElementById("textlink") as unknown as HTMLElement;
-        link.getBoundingClientRect = () => ({ top: 10, left: 10, bottom: 30, right: 200, width: 190, height: 20, x: 10, y: 10, toJSON() { return this; } }) as DOMRect;
-
-        (env.document as any).elementsFromPoint = () => [link];
-
-        const elems = discoverElements(() => link.getBoundingClientRect());
-        assert.ok(elems.some(e => e.id === "textlink"), "Link with text should get a hint");
-
-        env.cleanup();
-    });
-
-    it("keeps link with image child", () => {
-        const env = createDOM(`
-            <a id="imglink" href="/page"><img src="logo.png" alt="Logo"></a>
-        `);
-
-        const link = env.document.getElementById("imglink") as unknown as HTMLElement;
-        link.getBoundingClientRect = () => ({ top: 10, left: 10, bottom: 60, right: 110, width: 100, height: 50, x: 10, y: 10, toJSON() { return this; } }) as DOMRect;
-        const img = link.querySelector("img") as unknown as HTMLElement;
-        img.getBoundingClientRect = () => ({ top: 10, left: 10, bottom: 60, right: 110, width: 100, height: 50, x: 10, y: 10, toJSON() { return this; } }) as DOMRect;
-
-        (env.document as any).elementsFromPoint = () => [link];
-
-        const elems = discoverElements(() => link.getBoundingClientRect());
-        assert.ok(elems.some(e => e.id === "imglink"), "Link with img child should get a hint");
+        assert.ok(ids.includes("overlay"), "Overlay <a> should get a hint — it's the article link");
+        assert.ok(ids.includes("comments"), "Sibling comment link should also get a hint");
 
         env.cleanup();
     });
@@ -1124,19 +1058,18 @@ describe("clickable sibling occlusion", () => {
     // ISSUE: Decorative aria-hidden overlays (thread lines, visual chrome) block hints
     // on interactive elements behind them via elementsFromPoint occlusion check.
     // SITE: reddit.com — toggle comment thread button behind aria-hidden thread line
-    // FIX: cursor:pointer covers are interactive — they don't block hints.
+    // FIX: aria-hidden covers are in a removed subtree — they don't block hints.
     it("element behind aria-hidden overlay still gets hint", () => {
         const btn = makeElement("BUTTON", { top: 10, left: 10, width: 24, height: 24 });
         btn.setAttribute("aria-controls", "children");
         btn.setAttribute("aria-expanded", "false");
 
         const threadLine = makeElement("DIV", {
-            top: 0, left: 0, width: 24, height: 500, cursor: "pointer",
+            top: 0, left: 0, width: 24, height: 500,
             attrs: { "aria-hidden": "true" },
         });
 
         loadModules([btn]);
-        // threadLine must be in DOM for getComputedStyle to resolve cursor:pointer
         (globalThis as any).document.body.appendChild(threadLine);
 
         (globalThis as any).document.elementsFromPoint = () => [threadLine, btn];
@@ -1163,12 +1096,11 @@ describe("clickable sibling occlusion", () => {
     });
 });
 
-// ISSUE: Non-interactive cursor:pointer divs (overlays, icon containers) get
+// ISSUE: Non-interactive generic elements (tabindex overlays, icon containers) get
 // separate hints alongside the real interactive sibling (input, button, etc.)
 // SITE: linkedin.com/feed — search bar has overlay div, icon div, and input
-// FIX: During dedup, remove cursor:pointer-only candidates when a sibling
-// matches CLICKABLE_SELECTOR
-describe("cursor:pointer sibling dedup", () => {
+// FIX: During dedup, remove generic candidates when a non-generic sibling exists
+describe("generic sibling dedup", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
@@ -1182,8 +1114,8 @@ describe("cursor:pointer sibling dedup", () => {
             top: 5, left: 5, width: 350, height: 30,
             attrs: { role: "combobox", placeholder: "Search..." },
         });
-        // Decorative divs that match CLICKABLE_SELECTOR via tabindex (or cursor:pointer
-        // in real browsers) but have no semantic role — "generic" interactive type
+        // Decorative divs that match CLICKABLE_SELECTOR via tabindex but have no
+        // semantic role — "generic" interactive type
         const iconContainer = makeElement("DIV", {
             top: 5, left: 5, width: 30, height: 30,
             attrs: { tabindex: "0" },
@@ -1663,7 +1595,7 @@ describe("native interactive elements prune subtrees", () => {
 });
 
 // ISSUE: role="treeitem" not recognized as interactive — treeitems with tabindex="-1"
-// fall through to cursor:pointer path, causing inconsistent hint styles vs tabindex="0" siblings.
+// were not discovered, causing inconsistent hint coverage vs tabindex="0" siblings.
 // SITE: github.com PR file tree — expanded folder gets container hint, collapsed folder gets pill
 // FIX: Add "treeitem" to CLICKABLE_ROLES so all treeitems are treated as interactive regardless of tabindex.
 describe("treeitem discovery", () => {
@@ -1925,50 +1857,6 @@ describe("overflow:scroll/auto clips elements", () => {
     });
 });
 
-// ISSUE: cursor:pointer covers are treated as interactive in occlusion checks, letting
-// elements behind cursor:pointer wrappers (e.g. styled containers) pass through.
-// SITE: facebook.com — carousel cards behind cursor:pointer divs get hints
-// FIX: Only use CLICKABLE_SELECTOR (semantic interactivity) for occlusion cover checks,
-// not cursor:pointer (visual style only).
-describe("cursor:pointer cover occlusion", () => {
-    afterEach(() => {
-        const { hintMode, keyHandler } = getState();
-        if (hintMode) hintMode.destroy();
-        if (keyHandler) keyHandler.destroy();
-    });
-
-    it("without cursor:pointer cover, link gets hint", () => {
-        const link = makeElement("A", { href: "#", top: 50, left: 50, width: 100, height: 20 });
-        loadModules([link]);
-
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(hintMode.isActive(), "Uncovered link should get hint");
-    });
-
-    it("with cursor:pointer cover (non-CLICKABLE_SELECTOR), link is occluded", () => {
-        // A div with cursor:pointer is NOT semantically interactive — it should
-        // act as a blocking overlay, not let elements behind it through.
-        // Cover is smaller than link so it appears first in the elementsFromPoint
-        // mock (which sorts by area ascending, simulating "topmost" element).
-        // Link is wrapped so it's not a sibling of cover (avoids sibling dedup).
-        const wrapper = makeElement("DIV", { top: 50, left: 50, width: 100, height: 20, display: "block" });
-        const link = makeElement("A", { href: "#", top: 50, left: 50, width: 100, height: 20 });
-        wrapper.appendChild(link);
-        const cover = makeElement("DIV", { top: 48, left: 48, width: 60, height: 15, cursor: "pointer" });
-        loadModules([link, cover]);
-
-        const { hintMode } = getState();
-        hintMode.activate(false);
-
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
-        // Should have hints for the cover (cursor:pointer discovery) but NOT the link behind it
-        const hintCount = hints?.length ?? 0;
-        assert.equal(hintCount, 1, "Only the cover div should get a hint, not the occluded link behind it");
-    });
-});
-
 // Container/bar style is determined by content structure, not element type or role.
 // Branching content (multiple children, text alongside elements) → bar.
 // Single-child wrapper chain to text → pill.
@@ -2170,11 +2058,6 @@ describe("wrapping label dedup", () => {
             if (isLabel) top += 80;
         }
 
-        // Labels have cursor:pointer (styled as clickable cards)
-        for (const label of env.document.querySelectorAll("label")) {
-            (label as any).style.cursor = "pointer";
-        }
-
         (env.document as any).elementsFromPoint = (x: number, y: number) => {
             return rects
                 .filter(({ rect: r }) => x >= r.left && x < r.right && y >= r.top && y < r.bottom)
@@ -2189,6 +2072,53 @@ describe("wrapping label dedup", () => {
         assert.ok(!foundIds.includes("label2"), "wrapping label removed (generic container)");
         assert.ok(foundIds.includes("radio1"), "radio kept as the specific form control");
         assert.ok(foundIds.includes("radio2"), "radio kept as the specific form control");
+    });
+});
+
+// ISSUE: Contentless overlay <a> (stretched-link card pattern) is the only navigation
+// path to an article, but gets skipped. Non-interactive images with cursor:pointer
+// get hints instead — clicking them doesn't navigate because the <a> is a sibling.
+// SITE: theguardian.com — carousel cards with overlay <a> + image + comment link
+// FIX: Drop cursor:pointer as a discovery signal; stop skipping overlay <a> elements.
+describe("overlay link gets hint, non-interactive image does not", () => {
+    it("selects overlay link and comment link, not the image", () => {
+        const env = createDOM(`
+            <div>
+                <a id="overlay" href="/article" aria-label="Article title"></a>
+                <div>
+                    <picture><img id="photo" src="photo.jpg" alt=""></picture>
+                    <h3><span>Article title</span></h3>
+                    <footer>
+                        <a id="comments" href="/article#comments">24 comments</a>
+                    </footer>
+                </div>
+            </div>
+        `);
+
+        const overlay = env.document.getElementById("overlay") as unknown as HTMLElement;
+        const photo = env.document.getElementById("photo") as unknown as HTMLElement;
+        const comments = env.document.getElementById("comments") as unknown as HTMLElement;
+
+        overlay.getBoundingClientRect = () => ({ top: 0, left: 0, bottom: 300, right: 400, width: 400, height: 300, x: 0, y: 0, toJSON() { return this; } }) as DOMRect;
+        photo.getBoundingClientRect = () => ({ top: 150, left: 0, bottom: 300, right: 400, width: 400, height: 150, x: 0, y: 150, toJSON() { return this; } }) as DOMRect;
+        comments.getBoundingClientRect = () => ({ top: 130, left: 10, bottom: 148, right: 200, width: 190, height: 18, x: 10, y: 130, toJSON() { return this; } }) as DOMRect;
+
+        // Overlay is topmost via position:absolute; comment link pokes through via z-index
+        (env.document as any).elementsFromPoint = (x: number, y: number) => {
+            const result: unknown[] = [];
+            for (const el of [comments, overlay, photo]) {
+                const r = (el as HTMLElement).getBoundingClientRect();
+                if (x >= r.left && x < r.right && y >= r.top && y < r.bottom) result.push(el);
+            }
+            return result;
+        };
+
+        const found = discoverElements((el) => el.getBoundingClientRect());
+        const ids = found.map(e => e.id);
+
+        assert.ok(ids.includes("overlay"), "Overlay <a> should get a hint — it's the article link");
+        assert.ok(ids.includes("comments"), "Comment link should get a hint");
+        assert.ok(!ids.includes("photo"), "Non-interactive image should not get a hint");
     });
 });
 
