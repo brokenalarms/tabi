@@ -3,7 +3,17 @@
 ## Build & Test
 
 - `npm run build` — esbuild compile
-- `npm test` — node built-in test runner (`node --test tests/*.test.js`)
+- `npm test` — node built-in test runner (`node --test tests/*.test.ts`)
+- `npm run test:integration` — Playwright WebKit layout tests
+- `npm run safari` — full pipeline: build → xcodegen → xcodebuild → restart Safari with tabs restored
+
+### Testing ladder
+
+Use the **cheapest test that covers the behavior**:
+
+1. **Unit tests** (`npm test`, happy-dom) — predicates, element selection, dedup logic. ~1s. Use for anything that doesn't depend on layout.
+2. **Playwright integration** (`npm run test:integration`, real WebKit) — viewport clipping, overflow, `elementsFromPoint`, hint positioning. ~5s. Use when the bug requires a real layout engine (bounding rects, computed styles that happy-dom doesn't model).
+3. **Safari** (`npm run safari`) — only needed for extension messaging, Safari-specific API quirks, or final manual verification. This rebuilds the Xcode project and restarts Safari.
 
 ## Bug Scenario Workflow (DOM PROBLEMS MODE)
 The internet is full of quirks. For every new bug, we want to make sure that we implement a fix in a way that slots in generically into our click selector pipeline and doesn't make the code increasingly complicated. We should be searching for a way to make a fix generic and applicable to new use cases rather than accounting specifically for one. 
@@ -61,7 +71,7 @@ If the user agrees, you may proceed:
 
 - Only then **Implement the fix**.
 
--  **Verify**: `npm run build && npm test` — all tests pass, without you needing to modify the test to fit after the fact unless a new edge case is somehow uncovered.
+-  **Verify**: `npm run build && npm test && npm run test:integration` — all tests pass, without you needing to modify the test to fit after the fact unless a new edge case is somehow uncovered.
  
 - **Review** Is there a better way to integrate this edge test in a generic way so that it not specifically fixing the issue at hand, but a class of issues? It should integrate seamlessly into the existing pipeline, not be a random 'if this unique situation then do something completely different' function call. If it doesn't fit, should we think about refactoring to better generically handle it for future flexibility, so the change is not brittle and liable to break again if the website changes?
 

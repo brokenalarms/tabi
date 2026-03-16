@@ -74,20 +74,21 @@ test("filters element clipped by overflow:hidden ancestor", async ({ page }) => 
   expect(hintCount).toBe(0);
 });
 
-test("detects element behind transparent overlay via elementsFromPoint", async ({ page }) => {
-  // Two stacked links at the same position — both should get hints because
-  // elementsFromPoint returns all elements at a given point
+test("contentless overlay does not occlude sibling interactive elements", async ({ page }) => {
+  // Stretched-link card pattern: empty <a> overlay positioned over a card
+  // with a visible comment link sibling. The overlay is contentless (no text,
+  // no images) so it should be exempt from occluding the real link beneath.
   await page.setViewportSize({ width: 1024, height: 768 });
   await setupPage(page, `
-    <a href="#a" style="position:absolute; top:10px; left:10px; width:200px; height:40px; z-index:1;">
-      Front link
-    </a>
-    <a href="#b" style="position:absolute; top:10px; left:10px; width:200px; height:40px; z-index:0;">
-      Back link
-    </a>
+    <div style="position:relative; width:300px; height:200px;">
+      <a href="/article" style="position:absolute; inset:0; z-index:1;"></a>
+      <p style="padding:10px;">Card content text</p>
+      <a href="/comments" style="position:relative; z-index:2; margin:10px;">3 comments</a>
+    </div>
   `);
 
   const hintCount = await activateHints(page);
+  // Both the overlay link and the comment link should get hints
   expect(hintCount).toBe(2);
 });
 
@@ -122,12 +123,13 @@ test("targets nav text, not aria-hidden badge count", async ({ page }) => {
   expect(hintTop).toBeGreaterThanOrEqual(25);
 });
 
-test("skips visually-hidden 1x1 span inside large button", async ({ page }) => {
-  // Button wraps a 1x1 visually-hidden span — hint should position at the
-  // button, not the tiny span
+test("hint targets button, not visually-hidden 1x1 span inside it", async ({ page }) => {
+  // Button wraps a 1x1 visually-hidden span. The hint should be positioned
+  // relative to the button's bounding rect (pill-below-pointer at bottom + 2),
+  // not the tiny span's position. Button top=0, height=100, so hint ~102px.
   await page.setViewportSize({ width: 1024, height: 768 });
   await setupPage(page, `
-    <button style="position:absolute; top:0; left:0; width:600px; height:600px;">
+    <button style="position:absolute; top:0; left:0; width:200px; height:100px;">
       <span style="position:absolute; top:5px; left:5px; width:1px; height:1px; overflow:hidden;">
         Activate to view larger image
       </span>
@@ -150,6 +152,8 @@ test("skips visually-hidden 1x1 span inside large button", async ({ page }) => {
     return top;
   });
 
-  // Hint should target the button (top: 0), not the 1x1 span (top: 5)
-  expect(hintTop).toBeLessThanOrEqual(2);
+  // Pill-below-pointer: hint is placed at button.bottom + 2 = ~102px.
+  // If hint targeted the span instead, it'd be near 5+1+2 = ~8px.
+  expect(hintTop).toBeGreaterThan(90);
+  expect(hintTop).toBeLessThan(110);
 });
