@@ -90,6 +90,36 @@ function isClippedByOverflow(el: HTMLElement, rect: DOMRect): boolean {
   return false;
 }
 
+/** Is this element occluded at any corner by an unrelated element?
+ *  Tests all 4 corners (+2px inset) via elementsFromPoint. If ANY corner's
+ *  topmost element is an unrelated, non-exempt cover, the element is occluded.
+ *  Covers that are ancestors/descendants, in removed subtrees, or contentless
+ *  overlays are exempt — they won't steal clicks or get their own hints. */
+function isOccluded(el: HTMLElement, rect: DOMRect): boolean {
+  const clampX = (x: number) => Math.min(Math.max(x, 0), window.innerWidth - 1);
+  const clampY = (y: number) => Math.min(Math.max(y, 0), window.innerHeight - 1);
+
+  const isCover = (cover: HTMLElement): boolean => {
+    if (el.contains(cover) || cover.contains(el)) return false;
+    if (isSubtreeRemoved(cover)) return false;
+    if (isContentlessOverlay(cover)) return false;
+    return true;
+  };
+
+  const points = [
+    [rect.left + 2, rect.top + 2],
+    [rect.right - 2, rect.top + 2],
+    [rect.left + 2, rect.bottom - 2],
+    [rect.right - 2, rect.bottom - 2],
+  ];
+
+  for (const [x, y] of points) {
+    const hits = document.elementsFromPoint(clampX(x), clampY(y));
+    if (hits.length > 0 && isCover(hits[0] as HTMLElement)) return true;
+  }
+  return false;
+}
+
 /** Is this a contentless overlay link?
  *  True for <a> with no text, no visual children (img, svg, etc.), and a sibling
  *  with visible content — the "stretched-link" card pattern where an empty <a>
@@ -189,34 +219,8 @@ export function walkerFilter(node: Node): number {
   // Overflow clipping
   if (isClippedByOverflow(el, rect)) return NodeFilter.FILTER_SKIP;
 
-  // Covered by another element (elementsFromPoint)
-  const centerX = rect.left + rect.width / 2;
-  const centerY = rect.top + rect.height / 2;
-  const px = Math.min(Math.max(centerX, 0), window.innerWidth - 1);
-  const py = Math.min(Math.max(centerY, 0), window.innerHeight - 1);
-
-  /** Is the topmost element at a point blocking this element?
-   *  Containment (parent/child = same tree) is fine — a wrapper doesn't occlude its children.
-   *  Elements that won't receive hints themselves shouldn't block hints behind them:
-   *  removed subtrees (aria-hidden, inert) and contentless overlay links.
-   *  Any other unrelated element covering this point = occluded. */
-  const coveredByOverlay = (cover: HTMLElement): boolean => {
-    if (el.contains(cover) || cover.contains(el)) return false;
-    if (isSubtreeRemoved(cover)) return false;
-    if (isContentlessOverlay(cover)) return false;
-    return true;
-  };
-
-  const centerHits = document.elementsFromPoint(px, py);
-  if (centerHits.length > 0 && coveredByOverlay(centerHits[0] as HTMLElement)) {
-    const tlHits = document.elementsFromPoint(
-      Math.min(Math.max(rect.left + 2, 0), window.innerWidth - 1),
-      Math.min(Math.max(rect.top + 2, 0), window.innerHeight - 1)
-    );
-    if (tlHits.length === 0 || coveredByOverlay(tlHits[0] as HTMLElement)) {
-      return NodeFilter.FILTER_SKIP;
-    }
-  }
+  // Covered by another element at any corner
+  if (isOccluded(el, rect)) return NodeFilter.FILTER_SKIP;
 
   return NodeFilter.FILTER_ACCEPT;
 }
