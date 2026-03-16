@@ -1259,7 +1259,7 @@ describe("native interactive elements prune subtrees", () => {
     it("wide summary with mixed content gets container glow", () => {
         // Base: same summary with single child → no glow
         const base = makeElement("SUMMARY", {
-            top: 10, left: 0, width: 300, height: 30,
+            top: 10, left: 0, width: 300, height: 32,
             attrs: { role: "button" },
         });
         base.appendChild(makeElement("SPAN", { top: 15, left: 10, width: 80, height: 16, textContent: "Reviewers" }));
@@ -1275,7 +1275,7 @@ describe("native interactive elements prune subtrees", () => {
 
         // Delta: add second child (icon) → branching content → glow
         const delta = makeElement("SUMMARY", {
-            top: 10, left: 0, width: 300, height: 30,
+            top: 10, left: 0, width: 300, height: 32,
             attrs: { role: "button" },
         });
         delta.appendChild(makeElement("SPAN", { top: 15, left: 270, width: 16, height: 16 }));
@@ -1497,7 +1497,7 @@ describe("native interactive elements prune subtrees", () => {
     // FIX: Walk the single-child chain; if it reaches a leaf, it's not a container.
     it("single descendant chain gets normal hint, not bar", () => {
         // Base: same link with branching content → glow
-        const base = makeElement("A", { href: "#", top: 10, left: 10, width: 400, height: 30,
+        const base = makeElement("A", { href: "#", top: 10, left: 10, width: 400, height: 32,
             attrs: { onclick: "return toggle()" }, display: "block" });
         base.appendChild(makeElement("SPAN", { top: 12, left: 12, width: 180, height: 20, textContent: "Show 24 footnotes" }));
         base.appendChild(makeElement("SPAN", { top: 12, left: 200, width: 16, height: 16, textContent: "▼" }));
@@ -1512,7 +1512,7 @@ describe("native interactive elements prune subtrees", () => {
         hintMode.deactivate();
 
         // Delta: single child chain → no glow
-        const delta = makeElement("A", { href: "#", top: 10, left: 10, width: 400, height: 30,
+        const delta = makeElement("A", { href: "#", top: 10, left: 10, width: 400, height: 32,
             attrs: { onclick: "return toggle()" }, display: "block" });
         delta.appendChild(makeElement("SPAN", { top: 12, left: 12, width: 180, height: 20, textContent: "Show 24 footnotes" }));
 
@@ -2486,6 +2486,53 @@ describe("block link hint positioning", () => {
         assert.equal(hints?.length, 1);
         assert.ok(!hints[0]?.querySelector(".vimium-hint-tail"),
             "Link inside <li> should not get pointer tail");
+    });
+});
+
+// ISSUE: Links in repeating containers (li/tr) don't get container glow because
+// isContainerSized checks the link's dimensions instead of the container's.
+// The glow border is rendered around the container, so the container's size
+// should determine eligibility.
+// SITE: facebook.com/messages — contact list links (avatar + name) inside <li>
+// FIX: When element is in a repeating container, pass the container to isContainerSized.
+describe("repeating container sizing uses container dimensions", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("link sized below threshold gets container glow when <li> is above threshold", () => {
+        // Base: narrow link (width < MINIMUM_CONTAINER_WIDTH) NOT in a
+        // repeating container — too small for container glow on its own.
+        const base = makeElement("A", { href: "/messages/t/123/", top: 10, left: 0, width: 50, height: 52 });
+        base.appendChild(makeElement("DIV", { top: 14, left: 8, width: 36, height: 36 }));
+        base.appendChild(makeElement("SPAN", { top: 18, left: 42, width: 8, height: 20, textContent: "AI" }));
+
+        loadModules([base]);
+        (globalThis as any).document.elementsFromPoint = () => [base];
+        let { hintMode } = getState();
+        hintMode.activate(false);
+        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        assert.ok(!overlay?.querySelector(".vimium-hint-container-glow"),
+            "Base: narrow link without repeating container should not get container glow");
+        hintMode.deactivate();
+
+        // Delta: same narrow link inside <li> that IS container-sized — glow
+        // appears because isContainerSized checks the <li>, not the <a>.
+        const li = makeElement("LI", { top: 0, left: 0, width: 350, height: 80, display: "list-item" });
+        const link = makeElement("A", { href: "/messages/t/123/", top: 10, left: 0, width: 50, height: 52 });
+        link.appendChild(makeElement("DIV", { top: 14, left: 8, width: 36, height: 36 }));
+        link.appendChild(makeElement("SPAN", { top: 18, left: 42, width: 8, height: 20, textContent: "AI" }));
+        li.appendChild(link);
+
+        loadModules([link]);
+        (globalThis as any).document.elementsFromPoint = () => [link];
+        ({ hintMode } = getState());
+        hintMode.activate(false);
+        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+            "Delta: link in <li> should get container glow using container dimensions");
     });
 });
 
