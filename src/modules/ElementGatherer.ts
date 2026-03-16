@@ -257,10 +257,10 @@ export function findBlockAncestor(el: HTMLElement): HTMLElement | null {
 }
 
 /** Block-level display check — treats missing/empty display as inline (browser default).
- *  display:contents elements have no box at all (neither block nor inline) — excluded. */
+ *  display:none and display:contents don't generate a box — excluded. */
 function isBlockLevel(el: HTMLElement): boolean {
   const display = getComputedStyle(el).display;
-  return display !== "" && display !== "contents" && !display.startsWith("inline");
+  return display !== "" && display !== "none" && display !== "contents" && !display.startsWith("inline");
 }
 
 // --- Interactive type ---
