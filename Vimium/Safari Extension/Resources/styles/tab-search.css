@@ -11,14 +11,15 @@
 
 .vimium-tab-search-modal {
     position: fixed;
-    top: 50%;
+    top: 20%;
     left: 50%;
-    transform: translate(-50%, -50%);
+    transform: translateX(-50%);
     width: 420px;
     max-width: 90vw;
     background: var(--vimium-tab-modal-bg);
     border-radius: 10px;
     box-shadow: var(--vimium-tab-modal-shadow);
+    max-height: 60vh;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -37,6 +38,7 @@
     font-family: inherit;
     outline: none;
     box-sizing: border-box;
+    flex-shrink: 0;
 }
 
 .vimium-tab-search-modal input::placeholder {
@@ -44,8 +46,8 @@
 }
 
 .vimium-tab-search-results {
-    max-height: 60vh;
     overflow-y: auto;
+    flex: 1 1 auto;
 }
 
 .vimium-tab-search-item {
