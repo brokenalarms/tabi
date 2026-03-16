@@ -67,6 +67,7 @@ export class HintMode {
   private readonly onScroll: () => void;
   private readonly onResize: () => void;
   private hintInfoCache: Map<HTMLElement, { rect: DOMRect; container: boolean }>;
+  private placementMap: Map<HTMLElement, number | null>;
 
   constructor(keyHandler: KeyHandlerLike) {
     this.keyHandler = keyHandler;
@@ -80,6 +81,7 @@ export class HintMode {
     this.onScroll = this.deactivate.bind(this);
     this.onResize = this.deactivate.bind(this);
     this.hintInfoCache = new Map();
+    this.placementMap = new Map();
   }
 
   // --- Public API ---
@@ -100,6 +102,7 @@ export class HintMode {
       return;
     }
 
+    this.computePlacements(elements);
     const labels = HintMode.generateLabels(elements.length);
     this.createOverlay();
     this.hints = elements.map((el, i) => {
@@ -136,6 +139,7 @@ export class HintMode {
 
     this.hints = [];
     this.hintInfoCache.clear();
+    this.placementMap.clear();
     this.keyHandler.setMode(Mode.NORMAL);
   }
 
@@ -323,10 +327,12 @@ export class HintMode {
   }
 
   /** Can the hint pill fit inside the container at the right end?
-   *  Places inside when the container is wide enough and the pill won't
-   *  overlap text content. Trailing non-text elements (badges, chevrons)
-   *  may be overlapped for visual consistency across sibling rows. */
-  private canPlaceInside(el: HTMLElement, allElements: HTMLElement[]): boolean {
+   *  Returns the right-edge X coordinate for positioning, or null if
+   *  inside placement isn't possible. Places inside when the container
+   *  is wide enough, text doesn't overlap, and no nested interactives
+   *  compete for the right zone. Trailing non-text elements (badges,
+   *  chevrons) may be overlapped for visual consistency across rows. */
+  private canPlaceInside(el: HTMLElement, allElements: HTMLElement[]): number | null {
     const PILL_WIDTH = 30;
     const INSET_MIN = 6;
     const elRect = el.getBoundingClientRect();
@@ -334,7 +340,7 @@ export class HintMode {
     const insetRight = Math.max(INSET_MIN, parseFloat(cs.paddingRight) || 0);
 
     // Container must be row-like (wider than tall) and wide enough
-    if (elRect.width < 200 || elRect.height >= elRect.width) return false;
+    if (elRect.width < 200 || elRect.height >= elRect.width) return null;
 
     // Check primary text content doesn't extend into the pill zone.
     // Only measures text that starts in the left 70% of the container —
@@ -382,18 +388,59 @@ export class HintMode {
       }
     };
     walkText(el);
-    if (textOverlaps) return false;
+    if (textOverlaps) return null;
 
     // Check no other hinted element occupies the right zone
     for (const other of allElements) {
       if (other === el) continue;
       if (el.contains(other)) {
         const otherRect = other.getBoundingClientRect();
-        if (otherRect.right > pillZoneLeft) return false;
+        if (otherRect.right > pillZoneLeft) return null;
       }
     }
 
-    return true;
+    return elRect.right - insetRight;
+  }
+
+  /** Pre-compute inside-end placement for all elements with sibling consistency.
+   *  Groups container elements by parent and promotes all siblings to inside-end
+   *  if any sibling in the group qualifies. */
+  private computePlacements(allElements: HTMLElement[]): void {
+    this.placementMap.clear();
+
+    // Raw per-element computation
+    for (const el of allElements) {
+      const { container } = this.getHintInfo(el);
+      this.placementMap.set(el, container ? this.canPlaceInside(el, allElements) : null);
+    }
+
+    // Sibling consistency: group containers by parent
+    const byParent = new Map<HTMLElement, HTMLElement[]>();
+    for (const el of allElements) {
+      const { container } = this.getHintInfo(el);
+      if (!container) continue;
+      const parent = el.parentElement;
+      if (!parent) continue;
+      let group = byParent.get(parent);
+      if (!group) { group = []; byParent.set(parent, group); }
+      group.push(el);
+    }
+
+    // Promote: if any sibling can place inside, all do
+    for (const [, siblings] of byParent) {
+      if (siblings.length < 2) continue;
+      const canPlace = siblings.filter(el => this.placementMap.get(el) !== null);
+      if (canPlace.length > 0 && canPlace.length < siblings.length) {
+        for (const el of siblings) {
+          if (this.placementMap.get(el) === null) {
+            const elRect = el.getBoundingClientRect();
+            const cs = getComputedStyle(el);
+            const insetRight = Math.max(6, parseFloat(cs.paddingRight) || 0);
+            this.placementMap.set(el, elRect.right - insetRight);
+          }
+        }
+      }
+    }
   }
 
   private createHintDiv(element: HTMLElement, label: string, allElements: HTMLElement[]): HTMLDivElement {
@@ -402,11 +449,12 @@ export class HintMode {
     div.className = "vimium-hint";
     div.textContent = label;
 
-    const placeInside = container && this.canPlaceInside(element, allElements);
+    const insideX = this.placementMap.get(element) ?? null;
 
-    if (placeInside) {
-      // Inside-end: pill inside container, right-aligned, vertically centered.
-      // Glow border shows what the hint targets.
+    // All containers get a glow border — decoupled from inside-end positioning
+    // so containers with nested interactives or text-filled content still
+    // show the glow to indicate the full container is the click target.
+    if (container) {
       const elRect = element.getBoundingClientRect();
       const cs = getComputedStyle(element);
       const padH = Math.max(0, 4 - parseFloat(cs.paddingLeft));
@@ -419,10 +467,13 @@ export class HintMode {
       glow.style.width = (elRect.width + padH * 2) + "px";
       glow.style.height = (elRect.height + padV * 2) + "px";
       if (this.overlay) this.overlay.appendChild(glow);
+    }
 
-      const insetRight = Math.max(6, parseFloat(cs.paddingRight) || 0);
+    if (insideX !== null) {
+      // Inside-end: pill inside container, right-aligned, vertically centered.
+      const elRect = element.getBoundingClientRect();
       const pos = this.viewportToDocument(
-        elRect.right - insetRight,
+        insideX,
         elRect.top + elRect.height / 2
       );
       div.style.left = pos.x + "px";

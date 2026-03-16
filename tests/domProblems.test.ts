@@ -1573,35 +1573,169 @@ describe("native interactive elements prune subtrees", () => {
             "Trailing badge should not block inside-end placement");
     });
 
+    // ISSUE: Container with nested interactive (e.g. "..." button) gets no glow
+    // because the button blocks canPlaceInside, and glow was tied to inside-end.
+    // SITE: x.com — trending topics with "More" button at right
+    // FIX: Decouple glow from inside-end positioning. All containers get glow;
+    // nested interactives block inside-end placement but not the glow itself.
+    it("nested button blocks inside-end but container still gets glow", () => {
+        // Base: container without nested button → glow + inside-end (no tail)
+        const base = makeElement("DIV", { top: 10, left: 10, width: 350, height: 70,
+            attrs: { role: "link", tabindex: "0" } });
+        base.appendChild(makeElement("DIV", { top: 15, left: 15, width: 200, height: 16, textContent: "Trending" }));
+        base.appendChild(makeElement("DIV", { top: 35, left: 15, width: 100, height: 20, textContent: "DOGE" }));
+
+        loadModules([base]);
+        (globalThis as any).document.elementsFromPoint = () => [base];
+        let { hintMode } = getState();
+        hintMode.activate(false);
+        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        let hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+            "Base: container gets glow");
+        assert.ok(!hints[0].querySelector(".vimium-hint-tail"),
+            "Base: inside-end (no tail)");
+        hintMode.deactivate();
+
+        // Delta: nested button → glow still shown, but pill-below (with tail)
+        const delta = makeElement("DIV", { top: 10, left: 10, width: 350, height: 70,
+            attrs: { role: "link", tabindex: "0" } });
+        delta.appendChild(makeElement("DIV", { top: 15, left: 15, width: 200, height: 16, textContent: "Trending" }));
+        delta.appendChild(makeElement("DIV", { top: 35, left: 15, width: 100, height: 20, textContent: "DOGE" }));
+        const btn = makeElement("BUTTON", { top: 15, left: 330, width: 24, height: 24 });
+        delta.appendChild(btn);
+
+        loadModules([delta, btn]);
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            const br = btn.getBoundingClientRect();
+            if (x >= br.left && x < br.right && y >= br.top && y < br.bottom) return [btn, delta];
+            return [delta];
+        };
+        ({ hintMode } = getState());
+        hintMode.activate(false);
+        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+            "Delta: nested button does not prevent glow");
+        hints = overlay?.querySelectorAll(".vimium-hint");
+        const containerHint = Array.from(hints || []).find((h: any) =>
+            !(h as HTMLElement).closest(".vimium-hint-container-glow") &&
+            (h as HTMLElement).querySelector(".vimium-hint-tail"));
+        assert.ok(containerHint, "Delta: container uses pill-below (has tail) to avoid button overlap");
+    });
+
+    // ISSUE: Sibling role="link" containers get inconsistent hints — some get
+    // inside-end, others get pill-below, depending on individual text width.
+    // SITE: x.com — "Today's News" sidebar articles
+    // FIX: Sibling containers share placement — if any qualifies for inside-end,
+    // all siblings in the group are promoted.
+    it("sibling containers get consistent placement via promotion", () => {
+        // Base: all siblings have wide text → all get glow + pill-below (no inside source)
+        const parent1 = makeElement("DIV", { top: 0, left: 0, width: 350, height: 200 });
+        const a1 = makeElement("DIV", { top: 0, left: 0, width: 350, height: 80,
+            attrs: { role: "link", tabindex: "0" } });
+        a1.appendChild(makeElement("DIV", { top: 5, left: 5, width: 340, height: 40, textContent: "Long headline one" }));
+        a1.appendChild(makeElement("DIV", { top: 50, left: 5, width: 200, height: 16, textContent: "metadata" }));
+        const a2 = makeElement("DIV", { top: 90, left: 0, width: 350, height: 80,
+            attrs: { role: "link", tabindex: "0" } });
+        a2.appendChild(makeElement("DIV", { top: 95, left: 5, width: 340, height: 40, textContent: "Long headline two" }));
+        a2.appendChild(makeElement("DIV", { top: 140, left: 5, width: 200, height: 16, textContent: "metadata" }));
+        parent1.appendChild(a1);
+        parent1.appendChild(a2);
+
+        loadModules([a1, a2]);
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            for (const el of [a1, a2]) {
+                const r = el.getBoundingClientRect();
+                if (x >= r.left && x < r.right && y >= r.top && y < r.bottom) return [el];
+            }
+            return [];
+        };
+        let { hintMode } = getState();
+        hintMode.activate(false);
+        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        let glows = overlay?.querySelectorAll(".vimium-hint-container-glow");
+        let tails = overlay?.querySelectorAll(".vimium-hint-tail");
+        assert.equal(glows?.length, 2, "Base: all containers get glow");
+        assert.equal(tails?.length, 2, "Base: all wide-text siblings get pill-below");
+        hintMode.deactivate();
+
+        // Delta: add one short-text sibling → all promoted to inside-end
+        const parent2 = makeElement("DIV", { top: 0, left: 0, width: 350, height: 300 });
+        const b1 = makeElement("DIV", { top: 0, left: 0, width: 350, height: 80,
+            attrs: { role: "link", tabindex: "0" } });
+        b1.appendChild(makeElement("DIV", { top: 5, left: 5, width: 150, height: 20, textContent: "Short" }));
+        b1.appendChild(makeElement("DIV", { top: 30, left: 5, width: 200, height: 16, textContent: "metadata" }));
+        const b2 = makeElement("DIV", { top: 90, left: 0, width: 350, height: 80,
+            attrs: { role: "link", tabindex: "0" } });
+        b2.appendChild(makeElement("DIV", { top: 95, left: 5, width: 340, height: 40, textContent: "Long headline two" }));
+        b2.appendChild(makeElement("DIV", { top: 140, left: 5, width: 200, height: 16, textContent: "metadata" }));
+        const b3 = makeElement("DIV", { top: 180, left: 0, width: 350, height: 80,
+            attrs: { role: "link", tabindex: "0" } });
+        b3.appendChild(makeElement("DIV", { top: 185, left: 5, width: 340, height: 40, textContent: "Long headline three" }));
+        b3.appendChild(makeElement("DIV", { top: 230, left: 5, width: 200, height: 16, textContent: "metadata" }));
+        parent2.appendChild(b1);
+        parent2.appendChild(b2);
+        parent2.appendChild(b3);
+
+        loadModules([b1, b2, b3]);
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            for (const el of [b1, b2, b3]) {
+                const r = el.getBoundingClientRect();
+                if (x >= r.left && x < r.right && y >= r.top && y < r.bottom) return [el];
+            }
+            return [];
+        };
+        ({ hintMode } = getState());
+        hintMode.activate(false);
+        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        glows = overlay?.querySelectorAll(".vimium-hint-container-glow");
+        tails = overlay?.querySelectorAll(".vimium-hint-tail");
+        assert.equal(glows?.length, 3, "Delta: all siblings get glow");
+        assert.equal(tails?.length, 0, "Delta: short-text sibling promotes all to inside-end");
+    });
+
     // ISSUE: Text filling most of a container's width causes ugly overlap
     // when the hint pill is placed inside-end.
     // SITE: linkedin.com news sidebar (truncated headlines fill the row)
     // FIX: Measure text node right edge via Range API; fall back to
-    // container-external when text extends into the pill zone.
-    it("text extending into pill zone prevents inside-end placement", () => {
-        // Container 300px wide, text fills to ~280px (truncated headline)
-        const link = makeElement("DIV", { top: 0, left: 0, width: 300, height: 50,
+    // pill-below when text extends into the pill zone. Glow still shows.
+    it("text width determines inside-end vs pill-below, glow always shows", () => {
+        // Base: short text → glow + inside-end (no tail)
+        const base = makeElement("DIV", { top: 0, left: 0, width: 300, height: 50,
             attrs: { role: "link", tabindex: "0" } });
-        const headline = makeElement("DIV", { top: 5, left: 10, width: 280, height: 20,
-            textContent: "White House to receive $10B for rol." });
-        const meta = makeElement("DIV", { top: 28, left: 10, width: 200, height: 16,
-            textContent: "6m ago · 11,805 readers" });
-        link.appendChild(headline);
-        link.appendChild(meta);
+        base.appendChild(makeElement("DIV", { top: 5, left: 10, width: 100, height: 20, textContent: "Short" }));
+        base.appendChild(makeElement("DIV", { top: 28, left: 10, width: 200, height: 16, textContent: "metadata" }));
 
-        loadModules([link, headline, meta]);
-        (globalThis as any).document.elementsFromPoint = () => [link];
-
-        const { hintMode } = getState();
+        loadModules([base]);
+        (globalThis as any).document.elementsFromPoint = () => [base];
+        let { hintMode } = getState();
         hintMode.activate(false);
-        assert.ok(hintMode.isActive());
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
-        assert.equal(hints?.length, 1);
-        assert.ok(!overlay?.querySelector(".vimium-hint-container-glow"),
-            "Text-filled container should not get glow");
+        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        let hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+            "Base: glow shown");
+        assert.ok(!hints[0].querySelector(".vimium-hint-tail"),
+            "Base: short text allows inside-end (no tail)");
+        hintMode.deactivate();
+
+        // Delta: wide text → glow + pill-below (with tail)
+        const delta = makeElement("DIV", { top: 0, left: 0, width: 300, height: 50,
+            attrs: { role: "link", tabindex: "0" } });
+        delta.appendChild(makeElement("DIV", { top: 5, left: 10, width: 280, height: 20,
+            textContent: "White House to receive $10B for rol." }));
+        delta.appendChild(makeElement("DIV", { top: 28, left: 10, width: 200, height: 16,
+            textContent: "6m ago · 11,805 readers" }));
+
+        loadModules([delta]);
+        (globalThis as any).document.elementsFromPoint = () => [delta];
+        ({ hintMode } = getState());
+        hintMode.activate(false);
+        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+            "Delta: glow still shown despite wide text");
         assert.ok(hints[0].querySelector(".vimium-hint-tail"),
-            "Text overlap should force pill+pointer");
+            "Delta: wide text forces pill-below (tail)");
     });
 
     // Sibling <a> elements each get their own hint position — inline centering
