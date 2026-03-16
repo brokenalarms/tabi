@@ -214,15 +214,17 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   void helpOverlay;
 }
 
-// Read all settings and initialize
-browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme"]).then((result) => {
-  const excluded = (result.excludedDomains as string[]) || [];
-  if (isDomainExcluded(excluded)) {
-    browser.runtime.sendMessage({ command: "extensionInactive" });
-  } else {
-    initialize(resolveSettings(result));
-  }
-}).catch(() => {
-  // If storage read fails, initialize with defaults
-  initialize(resolveSettings({}));
-});
+// Guard against double initialization — Safari may re-inject the content script
+// on tab restore while an old instance is still running.
+if (!window.__vimiumKeyHandler) {
+  browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme"]).then((result) => {
+    const excluded = (result.excludedDomains as string[]) || [];
+    if (isDomainExcluded(excluded)) {
+      browser.runtime.sendMessage({ command: "extensionInactive" });
+    } else {
+      initialize(resolveSettings(result));
+    }
+  }).catch(() => {
+    initialize(resolveSettings({}));
+  });
+}
