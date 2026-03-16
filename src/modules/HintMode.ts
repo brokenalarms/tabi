@@ -67,7 +67,7 @@ export class HintMode {
   private readonly onMouseDown: () => void;
   private readonly onScroll: () => void;
   private readonly onResize: () => void;
-  private hintInfoCache: Map<HTMLElement, { rect: DOMRect; container: boolean }>;
+  private hintInfoCache: Map<HTMLElement, { rect: DOMRect; container: boolean; containerEl: HTMLElement | null }>;
 
   constructor(keyHandler: KeyHandlerLike) {
     this.keyHandler = keyHandler;
@@ -205,7 +205,7 @@ export class HintMode {
     return el;
   }
 
-  private getHintInfo(el: HTMLElement): { rect: DOMRect; container: boolean } {
+  private getHintInfo(el: HTMLElement): { rect: DOMRect; container: boolean; containerEl: HTMLElement | null } {
     const cached = this.hintInfoCache.get(el);
     if (cached) return cached;
     const target = this.getHintTargetElement(el);
@@ -282,7 +282,8 @@ export class HintMode {
       rect = new DOMRect(rect.left, rect.top, rect.width, rect.height - paddingBottom);
     }
 
-    const result = { rect, container };
+    const containerEl = (container && repeatingContainer) ? repeatingContainer : null;
+    const result = { rect, container, containerEl };
     this.hintInfoCache.set(el, result);
     return result;
   }
@@ -347,27 +348,32 @@ export class HintMode {
   }
 
   private createHintDiv(element: HTMLElement, label: string, allElements: HTMLElement[]): HTMLDivElement {
-    const { rect, container } = this.getHintInfo(element);
+    const { rect, container, containerEl } = this.getHintInfo(element);
     const div = document.createElement("div");
     div.className = "vimium-hint";
     div.textContent = label;
 
     if (container) {
-      // Container: glow border + inside-end pill
-      const elRect = element.getBoundingClientRect();
-      const cs = getComputedStyle(element);
-      const padH = Math.max(0, 4 - parseFloat(cs.paddingLeft));
-      const padV = Math.max(0, 4 - parseFloat(cs.paddingTop));
+      // Container: glow border + inside-end pill.
+      // For repeating containers (li, tr), the glow runs along the container's
+      // inner edge — no outward expansion, since adjacent items are flush.
+      const glowTarget = containerEl || element;
+      const glowRect = glowTarget.getBoundingClientRect();
+      const cs = getComputedStyle(glowTarget);
+      const padH = containerEl ? 0 : Math.max(0, 4 - parseFloat(cs.paddingLeft));
+      const padV = containerEl ? 0 : Math.max(0, 4 - parseFloat(cs.paddingTop));
       const glow = document.createElement("div");
       glow.className = "vimium-hint-container-glow";
-      const glowPos = this.viewportToDocument(elRect.left - padH, elRect.top - padV);
+      const glowPos = this.viewportToDocument(glowRect.left - padH, glowRect.top - padV);
       glow.style.left = glowPos.x + "px";
       glow.style.top = glowPos.y + "px";
-      glow.style.width = (elRect.width + padH * 2) + "px";
-      glow.style.height = (elRect.height + padV * 2) + "px";
+      glow.style.width = (glowRect.width + padH * 2) + "px";
+      glow.style.height = (glowRect.height + padV * 2) + "px";
       if (this.overlay) this.overlay.appendChild(glow);
 
-      const insetRight = Math.max(6, parseFloat(cs.paddingRight) || 0);
+      const elRect = containerEl ? glowRect : element.getBoundingClientRect();
+      const elCs = containerEl ? cs : getComputedStyle(element);
+      const insetRight = Math.max(6, parseFloat(elCs.paddingRight) || 0);
       const pos = this.viewportToDocument(
         elRect.right - insetRight,
         elRect.top + elRect.height / 2
