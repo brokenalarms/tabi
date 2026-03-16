@@ -2148,6 +2148,70 @@ describe("wrapping label dedup", () => {
     });
 });
 
+// ISSUE: Block-level <a> with a heading takes full container width, but the heading
+// text is narrower. Hint centers on the full-width block rect instead of the heading.
+// SITE: google.com — search result links with <h3> inside a display:block <a>
+// FIX: In getHintTargetElement, redirect to heading child when the <a> is block-level,
+// contains a heading, and is NOT inside a <li> or <tr> (which indicate list/table
+// layouts where hints should stay centered on the container).
+describe("block link redirects hint to heading", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("standalone block link centers hint on heading, not full-width block", () => {
+        // Block <a> is 800px wide, but heading is only 400px — hint should center on heading
+        const link = makeElement("A", { href: "/page", top: 10, left: 0, width: 800, height: 60, display: "block" });
+        const heading = makeElement("H3", { top: 10, left: 0, width: 400, height: 25, textContent: "Short title" });
+        const cite = makeElement("CITE", { top: 40, left: 0, width: 300, height: 15, textContent: "https://example.com" });
+        link.appendChild(heading);
+        link.appendChild(cite);
+
+        loadModules([link]);
+
+        (globalThis as any).document.elementsFromPoint = () => [link];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        // Hint should be centered on heading (200px), not full link (400px)
+        const hintLeft = parseFloat(hints[0].style.left);
+        assert.ok(hintLeft >= 190 && hintLeft <= 210,
+            `Hint left (${hintLeft}) should center on heading (~200), not full-width link (~400)`);
+    });
+
+    it("link inside <li> keeps hint centered on full container", () => {
+        // Same structure but inside a list item — hint should stay on full <a>
+        const li = makeElement("LI", { top: 10, left: 0, width: 800, height: 60, display: "list-item" });
+        const link = makeElement("A", { href: "/page", top: 10, left: 0, width: 800, height: 60, display: "block" });
+        const heading = makeElement("H3", { top: 10, left: 0, width: 400, height: 25, textContent: "Short title" });
+        link.appendChild(heading);
+        li.appendChild(link);
+
+        loadModules([link]);
+
+        (globalThis as any).document.elementsFromPoint = () => [link];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        // Hint should be centered on full link (400px), NOT redirected to heading (200px)
+        const hintLeft = parseFloat(hints[0].style.left);
+        assert.ok(hintLeft >= 390 && hintLeft <= 410,
+            `Hint left (${hintLeft}) should center on full link (~400), not heading (~200)`);
+    });
+});
+
 // ISSUE: Contentless overlay <a> (stretched-link card pattern) is the only navigation
 // path to an article, but gets skipped. Non-interactive images with cursor:pointer
 // get hints instead — clicking them doesn't navigate because the <a> is a sibling.
