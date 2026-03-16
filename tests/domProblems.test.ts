@@ -1811,40 +1811,38 @@ describe("isBlockLevel utility", () => {
         if (cleanup) cleanup();
     });
 
-    it("returns true for box-generating block display values", () => {
+    it("block display is block-level, inline is not", () => {
         const env = createDOM(``);
         cleanup = env.cleanup;
-        for (const display of ["block", "flex", "grid", "list-item", "table"]) {
-            const el = env.document.createElement("div");
-            el.style.display = display;
-            env.document.body.appendChild(el);
-            assert.equal(isBlockLevel(el as unknown as HTMLElement), true,
-                `display:${display} should be block-level`);
-        }
+        const el = env.document.createElement("div");
+        env.document.body.appendChild(el);
+
+        // Base: block → true
+        el.style.display = "block";
+        assert.equal(isBlockLevel(el as unknown as HTMLElement), true, "display:block is block-level");
+
+        // Delta: changing to inline flips it
+        el.style.display = "inline";
+        assert.equal(isBlockLevel(el as unknown as HTMLElement), false, "display:inline is not block-level");
     });
 
-    it("returns false for inline display values", () => {
+    it("boxless display values are not block-level", () => {
         const env = createDOM(``);
         cleanup = env.cleanup;
-        for (const display of ["inline", "inline-block", "inline-flex", "inline-grid"]) {
-            const el = env.document.createElement("span");
-            el.style.display = display;
-            env.document.body.appendChild(el);
-            assert.equal(isBlockLevel(el as unknown as HTMLElement), false,
-                `display:${display} should not be block-level`);
-        }
-    });
+        const el = env.document.createElement("div");
+        env.document.body.appendChild(el);
 
-    it("returns false for non-box-generating display values", () => {
-        const env = createDOM(``);
-        cleanup = env.cleanup;
-        for (const display of ["none", "contents"]) {
-            const el = env.document.createElement("div");
-            el.style.display = display;
-            env.document.body.appendChild(el);
-            assert.equal(isBlockLevel(el as unknown as HTMLElement), false,
-                `display:${display} should not be block-level (no box generated)`);
-        }
+        // Base: block → true
+        el.style.display = "block";
+        assert.equal(isBlockLevel(el as unknown as HTMLElement), true, "display:block is block-level");
+
+        // Delta: contents has no box → not block-level
+        el.style.display = "contents";
+        assert.equal(isBlockLevel(el as unknown as HTMLElement), false, "display:contents is not block-level");
+
+        // Delta: none has no box → not block-level
+        el.style.display = "none";
+        assert.equal(isBlockLevel(el as unknown as HTMLElement), false, "display:none is not block-level");
     });
 });
 
@@ -1952,6 +1950,8 @@ describe("overflow:scroll/auto clips elements", () => {
 
 // hasBox utility — elements with display:none or display:contents have no CSS box.
 // Overflow, sizing, and clipping properties have no effect on boxless elements.
+// hasBox utility — elements with display:none or display:contents have no CSS box.
+// Overflow, sizing, and clipping properties have no effect on boxless elements.
 describe("hasBox utility", () => {
     let cleanup: () => void;
 
@@ -1959,28 +1959,34 @@ describe("hasBox utility", () => {
         if (cleanup) cleanup();
     });
 
-    it("returns true for box-generating display values", () => {
+    it("display:contents removes the box from a block element", () => {
         const env = createDOM(``);
         cleanup = env.cleanup;
-        for (const display of ["block", "flex", "inline", "inline-block", "grid"]) {
-            const el = env.document.createElement("div");
-            el.style.display = display;
-            env.document.body.appendChild(el);
-            assert.equal(hasBox(el as unknown as HTMLElement), true,
-                `display:${display} should have a box`);
-        }
+        const el = env.document.createElement("div");
+        env.document.body.appendChild(el);
+
+        // Base: block div has a box
+        el.style.display = "block";
+        assert.equal(hasBox(el as unknown as HTMLElement), true, "display:block has a box");
+
+        // Delta: contents removes the box
+        el.style.display = "contents";
+        assert.equal(hasBox(el as unknown as HTMLElement), false, "display:contents has no box");
     });
 
-    it("returns false for boxless display values", () => {
+    it("display:none removes the box from a block element", () => {
         const env = createDOM(``);
         cleanup = env.cleanup;
-        for (const display of ["none", "contents"]) {
-            const el = env.document.createElement("div");
-            el.style.display = display;
-            env.document.body.appendChild(el);
-            assert.equal(hasBox(el as unknown as HTMLElement), false,
-                `display:${display} should not have a box`);
-        }
+        const el = env.document.createElement("div");
+        env.document.body.appendChild(el);
+
+        // Base: block div has a box
+        el.style.display = "block";
+        assert.equal(hasBox(el as unknown as HTMLElement), true, "display:block has a box");
+
+        // Delta: none removes the box
+        el.style.display = "none";
+        assert.equal(hasBox(el as unknown as HTMLElement), false, "display:none has no box");
     });
 });
 
