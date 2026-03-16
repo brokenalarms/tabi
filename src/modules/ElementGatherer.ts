@@ -3,18 +3,8 @@
 // non-clickable nodes, and yield visible clickable elements, then deduplicates
 // via containment analysis.
 
-// Native interactive elements — atomic controls at the lowest level of the DOM.
-// The walker accepts these and prunes their subtrees: children are content/labels,
-// not separate click targets. This prevents duplicate hints inside buttons, links, etc.
-export const NATIVE_INTERACTIVE_ELEMENTS = ["a", "button", "input", "textarea", "select"];
-const CLICKABLE_ROLES = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch", "treeitem"];
-const CLICKABLE_ATTRS = ["label[for]", "[tabindex]:not([tabindex='-1'])", "[onclick]", "[onmousedown]"];
-
-export const CLICKABLE_SELECTOR = [
-  ...NATIVE_INTERACTIVE_ELEMENTS,
-  ...CLICKABLE_ROLES.map(r => `[role='${r}']`),
-  ...CLICKABLE_ATTRS,
-].join(", ");
+import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_SELECTOR, HEADING_SELECTOR } from "./constants";
+export { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_SELECTOR } from "./constants";
 
 // --- Declarative predicates (stateless) ---
 
@@ -261,6 +251,23 @@ export function findBlockAncestor(el: HTMLElement): HTMLElement | null {
 export function isBlockLevel(el: HTMLElement): boolean {
   const display = getComputedStyle(el).display;
   return display !== "" && display !== "none" && display !== "contents" && !display.startsWith("inline");
+}
+
+/** Is this element inside a vertically repeating container (list or table row)?
+ *  Elements inside <li> or <tr> are part of a flowing layout where hints should
+ *  stay centered on the full container width for vertical alignment. */
+export function isInRepeatingContainer(el: HTMLElement): boolean {
+  return el.closest("li") !== null || el.closest("tr") !== null;
+}
+
+/** Does this element contain a heading (h1–h6) as a descendant? */
+export function hasHeadingContent(el: HTMLElement): boolean {
+  return el.querySelector(HEADING_SELECTOR) !== null;
+}
+
+/** Return the first heading descendant, or null. */
+export function getHeading(el: HTMLElement): HTMLElement | null {
+  return el.querySelector(HEADING_SELECTOR) as HTMLElement | null;
 }
 
 // --- Interactive type ---

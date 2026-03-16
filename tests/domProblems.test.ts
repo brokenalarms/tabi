@@ -5,7 +5,7 @@ import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
-import { discoverElements, findBlockAncestor, isBlockLevel, walkerFilter } from "../src/modules/ElementGatherer";
+import { discoverElements, findBlockAncestor, hasHeadingContent, isBlockLevel, isInRepeatingContainer, walkerFilter } from "../src/modules/ElementGatherer";
 
 describe("element discovery", () => {
     afterEach(() => {
@@ -2145,6 +2145,110 @@ describe("wrapping label dedup", () => {
         assert.ok(!foundIds.includes("label2"), "wrapping label removed (generic container)");
         assert.ok(foundIds.includes("radio1"), "radio kept as the specific form control");
         assert.ok(foundIds.includes("radio2"), "radio kept as the specific form control");
+    });
+});
+
+// ISSUE: Block-level <a> with a heading takes full container width, but the heading
+// text is narrower. Hint centers on the full-width block rect instead of the heading.
+// SITE: google.com — search result links with <h3> inside a display:block <a>
+// FIX: Compose hasHeadingContent + isBlockLevel + isInRepeatingContainer predicates
+// so the orchestrator can redirect to the heading for positioning.
+describe("hasHeadingContent", () => {
+    it("returns true when element contains a heading", () => {
+        const env = createDOM(`<a id="t" href="#"><h3>Title</h3></a>`);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.ok(hasHeadingContent(el));
+        env.cleanup();
+    });
+
+    it("returns true for deeply nested heading", () => {
+        const env = createDOM(`<a id="t" href="#"><div><span><h4>Title</h4></span></div></a>`);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.ok(hasHeadingContent(el));
+        env.cleanup();
+    });
+
+    it("returns false when no heading exists", () => {
+        const env = createDOM(`<a id="t" href="#"><span>Title</span></a>`);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.ok(!hasHeadingContent(el));
+        env.cleanup();
+    });
+});
+
+describe("isInRepeatingContainer", () => {
+    it("returns true inside <li>", () => {
+        const env = createDOM(`<li><a id="t" href="#">link</a></li>`);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.ok(isInRepeatingContainer(el));
+        env.cleanup();
+    });
+
+    it("returns true inside <tr>", () => {
+        const env = createDOM(`<table><tr><td><a id="t" href="#">link</a></td></tr></table>`);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.ok(isInRepeatingContainer(el));
+        env.cleanup();
+    });
+
+    it("returns false for standalone element", () => {
+        const env = createDOM(`<div><a id="t" href="#">link</a></div>`);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.ok(!isInRepeatingContainer(el));
+        env.cleanup();
+    });
+});
+
+// Integration: verify hint positioning uses findHeadingTarget
+describe("block link hint positioning", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("standalone block link centers hint on heading, not full-width block", () => {
+        const link = makeElement("A", { href: "/page", top: 10, left: 0, width: 800, height: 60, display: "block" });
+        const heading = makeElement("H3", { top: 10, left: 0, width: 400, height: 25, textContent: "Short title" });
+        const cite = makeElement("CITE", { top: 40, left: 0, width: 300, height: 15, textContent: "https://example.com" });
+        link.appendChild(heading);
+        link.appendChild(cite);
+
+        loadModules([link]);
+        (globalThis as any).document.elementsFromPoint = () => [link];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        const hintLeft = parseFloat(hints[0].style.left);
+        assert.ok(hintLeft >= 190 && hintLeft <= 210,
+            `Hint left (${hintLeft}) should center on heading (~200), not full-width link (~400)`);
+    });
+
+    it("link inside <li> keeps hint centered on full container", () => {
+        const li = makeElement("LI", { top: 10, left: 0, width: 800, height: 60, display: "list-item" });
+        const link = makeElement("A", { href: "/page", top: 10, left: 0, width: 800, height: 60, display: "block" });
+        const heading = makeElement("H3", { top: 10, left: 0, width: 400, height: 25, textContent: "Short title" });
+        link.appendChild(heading);
+        li.appendChild(link);
+
+        loadModules([link]);
+        (globalThis as any).document.elementsFromPoint = () => [link];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        const hintLeft = parseFloat(hints[0].style.left);
+        assert.ok(hintLeft >= 390 && hintLeft <= 410,
+            `Hint left (${hintLeft}) should center on full link (~400), not heading (~200)`);
     });
 });
 

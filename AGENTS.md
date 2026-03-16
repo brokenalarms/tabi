@@ -60,7 +60,13 @@ If the user agrees, you may proceed:
 
 Each pasted scenario = one test. The test is the proof that the bug is fixed and won't regress.
 
-## Architecture Decisions
+## Architecture
+
+### Composable stateless predicates
+
+`ElementGatherer.ts` and `HintMode.ts` are orchestrators — they compose small, stateless, exported predicate functions that each identify a single characteristic of an element (`isBlockLevel`, `isInRepeatingContainer`, `hasHeadingContent`, `isContentlessOverlay`, `isOccluded`, etc.). Each predicate answers one question about the element: "is it visible?", "is it in a repeating container?", "does it contain a heading?". The orchestrator then composes these to make decisions.
+
+This makes the pipeline easy to understand at a glance and easy to unit-test — each predicate can be tested in isolation with a minimal DOM fixture. When adding new logic, extract the element characteristic as a named predicate in `ElementGatherer.ts` rather than adding inline checks inside `walkerFilter`, `discoverElements`, or `getHintTargetElement`. Predicates should identify **what** an element is, not decide **what to do** with it — that's the orchestrator's job.
 
 ### No `cursor:pointer` discovery (removed March 2026)
 

@@ -4,7 +4,8 @@
 
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
-import { discoverElements, findAssociatedLabel, findBlockAncestor, CLICKABLE_SELECTOR } from "./ElementGatherer";
+import { CLICKABLE_SELECTOR } from "./constants";
+import { discoverElements, findAssociatedLabel, findBlockAncestor, getHeading, hasHeadingContent, isBlockLevel, isInRepeatingContainer } from "./ElementGatherer";
 import { Mode } from "../commands";
 
 declare const browser: {
@@ -150,6 +151,14 @@ export class HintMode {
         const cr = (child as HTMLElement).getBoundingClientRect();
         if (cr.width > 0 && cr.height > 0) return child as HTMLElement;
       }
+    }
+
+    // Block-level links with headings: position hint at the heading so it
+    // centers on visible text, not the full-width block. Links in repeating
+    // containers (li, tr) keep full-width hints for vertical alignment.
+    if (el.tagName.toLowerCase() === "a" &&
+        isBlockLevel(el) && hasHeadingContent(el) && !isInRepeatingContainer(el)) {
+      return getHeading(el)!;
     }
 
     return el;
