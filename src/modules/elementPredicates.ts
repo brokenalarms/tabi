@@ -177,21 +177,3 @@ export function isInRepeatingContainer(el: HTMLElement): boolean {
 export function hasHeadingContent(el: HTMLElement): boolean {
   return el.querySelector(HEADING_SELECTOR) !== null;
 }
-
-/** Return the first heading descendant, or null. */
-export function getHeading(el: HTMLElement): HTMLElement | null {
-  return el.querySelector(HEADING_SELECTOR) as HTMLElement | null;
-}
-
-// --- DOM traversal helpers ---
-
-/** Find the label associated with a form control (via for= or ancestor <label>). */
-export function findAssociatedLabel(el: HTMLElement): HTMLElement | null {
-  if (el.id) {
-    const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
-    if (label) return label as HTMLElement;
-  }
-  const parent = el.closest("label");
-  if (parent) return parent as HTMLElement;
-  return null;
-}

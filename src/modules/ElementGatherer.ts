@@ -6,8 +6,9 @@
 import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_SELECTOR } from "./constants";
 import {
   isExcludedByIntent, childrenMightBeVisible, isOnScreen, isVisible,
-  isClippedByOverflow, isOccluded, findAssociatedLabel,
+  isClippedByOverflow, isOccluded,
 } from "./elementPredicates";
+import { findAssociatedLabel } from "./elementTraversals";
 
 // --- Walker filter ---
 // Routes to REJECT/SKIP/ACCEPT by calling predicates.

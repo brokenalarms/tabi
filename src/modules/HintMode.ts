@@ -6,7 +6,11 @@ import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { CLICKABLE_SELECTOR } from "./constants";
 import { discoverElements } from "./ElementGatherer";
-import { findAssociatedLabel, getHeading, hasHeadingContent, isBlockLevel, isInRepeatingContainer } from "./elementPredicates";
+import { hasHeadingContent, isBlockLevel, isInRepeatingContainer } from "./elementPredicates";
+import { findAssociatedLabel } from "./elementTraversals";
+import { HEADING_SELECTOR } from "./constants";
+
+import { Mode } from "../commands";
 
 /** Walk up through inline single-child ancestors to the nearest block-level container.
  *  Returns null if element is already block, has no parent, or a parent has multiple children.
@@ -23,7 +27,11 @@ export function findBlockAncestor(el: HTMLElement): HTMLElement | null {
   }
   return null;
 }
-import { Mode } from "../commands";
+
+/** Return the first heading descendant, or null. */
+export function getHeading(el: HTMLElement): HTMLElement | null {
+  return el.querySelector(HEADING_SELECTOR) as HTMLElement | null;
+}
 
 declare const browser: {
   runtime: {
