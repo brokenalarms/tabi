@@ -1705,12 +1705,11 @@ describe("treeitem discovery", () => {
     });
 });
 
-// ISSUE: Inline link inside a block ancestor expands hint width to the ancestor —
-// but this should only happen inside repeating containers (li, tr) where vertical
-// alignment matters. Outside repeating containers (e.g. <h2><a>text</a></h2>),
-// expansion misplaces the hint to the center of the full-width parent.
-// SITE: fidelity.com — <h2><a>I Accept</a></h2> hint centered in parent div
-// FIX: Gate block ancestor width expansion on isInRepeatingContainer.
+// ISSUE: Inline link inside inline <span> inside block <li> — inline expansion only walks
+// one level up to parent. If parent is also inline, hint stays narrow instead of expanding
+// to the block container width.
+// SITE: amazon.com search filter sidebar — checkbox+text links in <li> items
+// FIX: findBlockAncestor walks up through inline single-child ancestors to the nearest block container.
 describe("inline expansion walks up to block ancestor", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
@@ -1718,12 +1717,11 @@ describe("inline expansion walks up to block ancestor", () => {
         if (keyHandler) keyHandler.destroy();
     });
 
-    it("repeating container is the variable that determines width expansion", () => {
-        // Base: <h2><a>text</a></h2> — block ancestor exists but NOT in a repeating
-        // container. Hint should stay on the <a>'s own rect, not expand to <h2> width.
-        const h2 = makeElement("H2", { top: 10, left: 0, width: 300, height: 25, display: "block" });
-        const a1 = makeElement("A", { href: "/accept", top: 10, left: 50, width: 100, height: 20, display: "inline" });
-        h2.appendChild(a1);
+    it("inline wrapper depth is the variable that determines expansion width", () => {
+        // Without intermediate inline wrapper: <li> > <a> — single parent already block, centers on li
+        const li1 = makeElement("LI", { top: 10, left: 0, width: 300, height: 25, display: "list-item" });
+        const a1 = makeElement("A", { href: "/direct", top: 10, left: 0, width: 150, height: 20, display: "inline" });
+        li1.appendChild(a1);
 
         loadModules([a1]);
         const { hintMode } = getState();
@@ -1731,49 +1729,89 @@ describe("inline expansion walks up to block ancestor", () => {
         assert.ok(hintMode.isActive());
         let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         let hints = overlay?.querySelectorAll(".vimium-hint");
-        const noExpansionLeft = parseFloat(hints[0].style.left);
-        assert.equal(noExpansionLeft, 100, // 50 + 100/2 = centers on <a>
-            `Outside repeating container: hint should center on <a> (100), not <h2>`);
+        const directLeft = parseFloat(hints[0].style.left);
+        assert.equal(directLeft, 150, `Direct child: hint should center on <li> (150)`);
         hintMode.deactivate();
 
-        // Delta: <li><a>text</a></li> — same structure but inside a repeating container.
-        // Hint should expand to <li> width for vertical alignment.
-        const li = makeElement("LI", { top: 10, left: 0, width: 300, height: 25, display: "list-item" });
-        const a2 = makeElement("A", { href: "/item", top: 10, left: 50, width: 100, height: 20, display: "inline" });
-        li.appendChild(a2);
+        // With intermediate inline wrapper: <li> > <span> > <a> — walk-up needed to reach <li>
+        const li2 = makeElement("LI", { top: 10, left: 0, width: 300, height: 25, display: "list-item" });
+        const span = makeElement("SPAN", { top: 10, left: 0, width: 200, height: 20, display: "inline" });
+        const a2 = makeElement("A", { href: "/wrapped", top: 10, left: 0, width: 150, height: 20, display: "inline" });
+        span.appendChild(a2);
+        li2.appendChild(span);
 
         loadModules([a2]);
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
         overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         hints = overlay?.querySelectorAll(".vimium-hint");
-        const expandedLeft = parseFloat(hints[0].style.left);
-        assert.equal(expandedLeft, 150, // 0 + 300/2 = centers on <li>
-            `Inside repeating container: hint should center on <li> (150)`);
+        const wrappedLeft = parseFloat(hints[0].style.left);
+
+        // Both should produce the same result — the walk-up reaches <li> in both cases
+        assert.equal(wrappedLeft, directLeft,
+            `Wrapped (${wrappedLeft}) should match direct (${directLeft}) — walk-up reaches same <li>`);
     });
 
-    it("expansion walks through intermediate inline wrappers", () => {
-        // <li> > <span> > <a> — walk-up reaches <li> through inline wrapper
+    // Fidelity: <h2><a>I Accept</a></h2> — heading is the block ancestor but should
+    // NOT be used for width expansion. Headings are semantic text containers, not layout
+    // containers. The hint should stay on the <a>'s own rect.
+    it("heading ancestor is the variable that prevents expansion", () => {
+        // Base: <li><a> — non-heading block ancestor, hint expands to <li> width
         const li = makeElement("LI", { top: 10, left: 0, width: 300, height: 25, display: "list-item" });
-        const span = makeElement("SPAN", { top: 10, left: 0, width: 200, height: 20, display: "inline" });
-        const a = makeElement("A", { href: "/wrapped", top: 10, left: 0, width: 150, height: 20, display: "inline" });
-        span.appendChild(a);
-        li.appendChild(span);
+        const a1 = makeElement("A", { href: "/item", top: 10, left: 50, width: 100, height: 20, display: "inline" });
+        li.appendChild(a1);
 
-        loadModules([a]);
+        loadModules([a1]);
         const { hintMode } = getState();
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
+        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        let hints = overlay?.querySelectorAll(".vimium-hint");
+        const expandedLeft = parseFloat(hints[0].style.left);
+        assert.equal(expandedLeft, 150, // 0 + 300/2 = centers on <li>
+            `Inside <li>: hint should center on <li> (150)`);
+        hintMode.deactivate();
+
+        // Delta: <h2><a> — heading block ancestor, hint stays on <a>
+        const h2 = makeElement("H2", { top: 10, left: 0, width: 300, height: 25, display: "block" });
+        const a2 = makeElement("A", { href: "/accept", top: 10, left: 50, width: 100, height: 20, display: "inline" });
+        h2.appendChild(a2);
+
+        loadModules([a2]);
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        hints = overlay?.querySelectorAll(".vimium-hint");
+        const noExpansionLeft = parseFloat(hints[0].style.left);
+        assert.equal(noExpansionLeft, 100, // 50 + 100/2 = centers on <a>
+            `Inside <h2>: hint should center on <a> (100), not expand to <h2> (150)`);
+    });
+
+    it("stops walk-up at parent with multiple children", () => {
+        // <div display:block> > <span display:inline>a1</span> + <span display:inline>a2</span>
+        const div = makeElement("DIV", { top: 0, left: 0, width: 400, height: 30, display: "block" });
+        const a1 = makeElement("A", { href: "/one", top: 5, left: 10, width: 80, height: 20, display: "inline" });
+        const a2 = makeElement("A", { href: "/two", top: 5, left: 200, width: 80, height: 20, display: "inline" });
+        div.appendChild(a1);
+        div.appendChild(a2);
+
+        loadModules([a1, a2]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
-        const wrappedLeft = parseFloat(hints[0].style.left);
-        assert.equal(wrappedLeft, 150,
-            `Wrapped in <li>: walk-up through <span> should reach <li> (150)`);
+        assert.equal(hints?.length, 2, "Both links should get hints");
+        const x1 = parseFloat(hints[0].style.left);
+        const x2 = parseFloat(hints[1].style.left);
+        assert.ok(x1 !== x2, `Sibling hints should NOT be expanded to same position: ${x1} vs ${x2}`);
     });
 });
 
-// findBlockAncestor utility — walks up through inline single-child ancestors
-// to the nearest block-level container. Used for hint width expansion.
+// findBlockAncestor utility — walks up through single-child ancestors to the
+// nearest repeating container (li, tr) for hint width expansion.
 describe("findBlockAncestor utility", () => {
     let cleanup: () => void;
 
@@ -1781,7 +1819,7 @@ describe("findBlockAncestor utility", () => {
         if (cleanup) cleanup();
     });
 
-    it("returns block parent when element is inline single child", () => {
+    it("returns repeating container parent", () => {
         const env = createDOM(`
             <li>
                 <a id="t" href="#">link</a>
@@ -1792,7 +1830,7 @@ describe("findBlockAncestor utility", () => {
         assert.equal(findBlockAncestor(a as unknown as HTMLElement), a.parentElement);
     });
 
-    it("walks through multiple inline wrappers", () => {
+    it("walks through intermediate wrappers to reach repeating container", () => {
         const env = createDOM(`
             <li>
                 <span>
@@ -1808,67 +1846,52 @@ describe("findBlockAncestor utility", () => {
 
     it("returns null when parent has multiple children", () => {
         const env = createDOM(`
-            <div>
+            <li>
                 <a id="t" href="#">one</a>
                 <a href="#">two</a>
-            </div>
-        `);
-        cleanup = env.cleanup;
-        const a = env.document.getElementById("t")!;
-        assert.equal(findBlockAncestor(a as unknown as HTMLElement), null);
-    });
-
-    it("returns null when element is already block-level", () => {
-        const env = createDOM(`
-            <div id="t">block</div>
-        `);
-        cleanup = env.cleanup;
-        const div = env.document.getElementById("t")!;
-        assert.equal(findBlockAncestor(div as unknown as HTMLElement), null);
-    });
-
-    it("returns null when no parent exists", () => {
-        const env = createDOM(``);
-        cleanup = env.cleanup;
-        const a = env.document.createElement("a");
-        assert.equal(findBlockAncestor(a as unknown as HTMLElement), null);
-    });
-
-    it("stops at body element", () => {
-        const env = createDOM(`
-            <span id="t">text</span>
-        `);
-        cleanup = env.cleanup;
-        const span = env.document.getElementById("t")!;
-        const result = findBlockAncestor(span as unknown as HTMLElement);
-        assert.ok(result !== env.document.body, "Should not return body element");
-    });
-
-    // Guardian: display:contents wrapper between inline <a> and block <li>.
-    // display:contents elements have no box — they're neither block nor inline.
-    // findBlockAncestor must skip them, not treat them as block ancestors,
-    // otherwise the zero-rect contents element zeroes out the hint position.
-    it("skips display:contents ancestors", () => {
-        const env = createDOM(`
-            <li>
-                <div id="wrapper">
-                    <a id="t" href="#">link</a>
-                </div>
             </li>
         `);
         cleanup = env.cleanup;
         const a = env.document.getElementById("t")!;
-        const wrapper = env.document.getElementById("wrapper")!;
-        const li = wrapper.parentElement!;
+        assert.equal(findBlockAncestor(a as unknown as HTMLElement), null);
+    });
 
-        // Base case: normal block div is returned as the block ancestor
-        assert.equal(findBlockAncestor(a as unknown as HTMLElement), wrapper,
-            "normal block div should be the block ancestor");
+    it("returns null when no repeating container exists", () => {
+        // Fidelity: <h2><a>I Accept</a></h2> — heading is not a repeating
+        // container, so no expansion happens. Hint stays on the <a>.
+        const env = createDOM(`
+            <h2>
+                <a id="t" href="#">I Accept</a>
+            </h2>
+        `);
+        cleanup = env.cleanup;
+        const a = env.document.getElementById("t")!;
+        assert.equal(findBlockAncestor(a as unknown as HTMLElement), null);
+    });
 
-        // With display:contents: div has no box, so findBlockAncestor skips it
-        wrapper.style.display = "contents";
-        assert.equal(findBlockAncestor(a as unknown as HTMLElement), li,
-            "should walk through display:contents to the <li>");
+    it("skips display:contents repeating container", () => {
+        const env = createDOM(`
+            <ul>
+                <li id="boxed">
+                    <a id="link-boxed" href="#">link</a>
+                </li>
+                <li id="contents" style="display: contents;">
+                    <a id="link-contents" href="#">link</a>
+                </li>
+            </ul>
+        `);
+        cleanup = env.cleanup;
+
+        // Base: normal <li> is returned
+        const aBoxed = env.document.getElementById("link-boxed")!;
+        const li = env.document.getElementById("boxed")!;
+        assert.equal(findBlockAncestor(aBoxed as unknown as HTMLElement), li,
+            "box-generating <li> should be returned");
+
+        // Delta: display:contents <li> has no box — skipped
+        const aContents = env.document.getElementById("link-contents")!;
+        assert.equal(findBlockAncestor(aContents as unknown as HTMLElement), null,
+            "display:contents <li> should not be returned");
     });
 });
 

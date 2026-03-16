@@ -172,8 +172,10 @@ export function isContentlessOverlay(el: HTMLElement): boolean {
 
 // --- Element characteristics ---
 
-/** Block-level display check — treats missing/empty display as inline (browser default).
- *  Elements without a box (display:none/contents) are excluded. */
+/** Does this element generate a block-level box?
+ *  Unknown display values default to true — a block box can contain visible
+ *  children even if the element itself has zero dimensions, so it's safer to
+ *  over-count than to miss one.  Only inline and boxless values return false. */
 export function isBlockLevel(el: HTMLElement): boolean {
   if (!hasBox(el)) return false;
   const display = getComputedStyle(el).display;
