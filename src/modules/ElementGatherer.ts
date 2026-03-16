@@ -9,12 +9,6 @@ import {
   isClippedByOverflow, isOccluded, findAssociatedLabel,
 } from "./elementPredicates";
 
-// Re-export predicates so existing consumers (HintMode, tests) don't break
-export {
-  hasBox, isBlockLevel, isInRepeatingContainer, hasHeadingContent, getHeading,
-  findAssociatedLabel,
-} from "./elementPredicates";
-
 // --- Walker filter ---
 // Routes to REJECT/SKIP/ACCEPT by calling predicates.
 // FILTER_REJECT prunes entire subtrees (developer intent, display:none).
