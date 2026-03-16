@@ -4,7 +4,10 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+echo "→ Cleaning build artifacts…"
+
 echo "→ Generating Xcode project…"
+npm run build
 xcodegen generate --spec project.yml
 
 echo "→ Building Xcode project…"

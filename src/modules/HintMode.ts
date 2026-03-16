@@ -215,6 +215,7 @@ export class HintMode {
     let rect = target.getBoundingClientRect();
     let container = false;
     if (target === el && el.children.length > 0 && isContainerSized(el, rect)) {
+      console.log("CONTAINER SIZED:", el.tagName, el.className.slice(0, 40), rect.width, rect.height);
       if (isInRepeatingContainer(el)) {
         // Elements in repeating containers (li, tr) always get container
         // treatment when sized — the list structure provides visual context.
