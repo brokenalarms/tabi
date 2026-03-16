@@ -1773,6 +1773,30 @@ describe("findBlockAncestor utility", () => {
         const result = findBlockAncestor(span as unknown as HTMLElement);
         assert.ok(result !== env.document.body, "Should not return body element");
     });
+
+    // Guardian: display:contents wrapper between inline <a> and block <li>.
+    // display:contents elements have no box — they're neither block nor inline.
+    // findBlockAncestor must skip them, not treat them as block ancestors,
+    // otherwise the zero-rect contents element zeroes out the hint position.
+    it("skips display:contents ancestors", () => {
+        const env = createDOM(`
+            <li>
+                <div id="contents-wrapper" style="display:contents">
+                    <a id="t" href="#">link</a>
+                </div>
+            </li>
+        `);
+        cleanup = env.cleanup;
+        const a = env.document.getElementById("t")!;
+        const contentsDiv = env.document.getElementById("contents-wrapper")!;
+        const li = contentsDiv.parentElement!;
+
+        // Without fix: findBlockAncestor returns the display:contents div (zero rect)
+        // With fix: it skips the contents div and returns the <li>
+        const result = findBlockAncestor(a as unknown as HTMLElement);
+        assert.notEqual(result, contentsDiv, "display:contents element should not be a block ancestor");
+        assert.equal(result, li, "should walk through display:contents to the <li>");
+    });
 });
 
 // ISSUE: Hints drift from their target elements when viewport resizes (e.g. DevTools open).
