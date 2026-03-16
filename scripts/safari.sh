@@ -4,9 +4,6 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-echo "→ Building TypeScript…"
-npm run build
-
 echo "→ Generating Xcode project…"
 xcodegen generate --spec project.yml
 
