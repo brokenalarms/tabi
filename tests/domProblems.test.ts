@@ -980,13 +980,13 @@ describe("overlay occlusion", () => {
         assert.ok(hintMode.isActive(), "Topmost link should get a hint");
     });
 
-    // ISSUE: Facebook Reels page — thin element (loading bar, header border) covers
-    // only the top edge of a nav link, causing a false occlusion.
+    // ISSUE: Facebook Reels page — thin element overlapping the edge of a nav link
+    // causes a false occlusion at the 2px-inset corner check.
     // SITE: facebook.com/reel — Home button hint missing on Reels page
-    // FIX: top-only coverage doesn't count as occlusion; at least one bottom corner
-    // must be covered for an element to be considered occluded.
-    it("top-only cover does not occlude — element is still clickable", () => {
+    // FIX: inset corner checks by 8px so thin edge overlaps are ignored.
+    it("thin edge overlap does not occlude", () => {
         // Link at (10,50)-(210,70). Thin bar covers top edge only (y=48..54).
+        // At 8px inset, top check point is y=58 — well past the bar's bottom at y=54.
         const link = makeElement("A", { href: "/", top: 50, left: 10, width: 200, height: 20 });
         const topBar = makeElement("DIV", { top: 48, left: 0, width: 1024, height: 6 });
 
@@ -1002,13 +1002,13 @@ describe("overlay occlusion", () => {
 
         const { hintMode } = getState();
         hintMode.activate(false);
-        assert.ok(hintMode.isActive(), "Top-only cover should not occlude the link");
+        assert.ok(hintMode.isActive(), "Thin edge overlap should not occlude the link");
     });
 
-    // ISSUE: Element partially occluded — bottom corner covered by an unrelated element.
+    // ISSUE: Element partially occluded — corner covered by an unrelated element.
     // SITE: theguardian.com — card links partially covered by adjacent section
-    // FIX: isOccluded requires at least one bottom corner to be covered.
-    it("filters element when a bottom corner is occluded", () => {
+    // FIX: isOccluded tests all 4 corners (8px inset); ANY covered corner = occluded.
+    it("filters element when a corner is occluded", () => {
         // Link at (10,10)-(210,30). Overlay covers only the bottom-right quadrant.
         const link = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 20 });
         const overlay = makeElement("DIV", { top: 20, left: 150, width: 200, height: 200 });
