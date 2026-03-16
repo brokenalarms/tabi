@@ -5,7 +5,7 @@ import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
-import { discoverElements, findBlockAncestor, hasHeadingContent, isBlockLevel, isInRepeatingContainer, walkerFilter } from "../src/modules/ElementGatherer";
+import { discoverElements, findBlockAncestor, hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, walkerFilter } from "../src/modules/ElementGatherer";
 
 describe("element discovery", () => {
     afterEach(() => {
@@ -1927,6 +1927,60 @@ describe("overflow:scroll/auto clips elements", () => {
         const { hintMode } = getState();
         hintMode.activate(false);
         assert.ok(hintMode.isActive(), "Link inside overflow:scroll container bounds should get hint");
+    });
+
+    // Facebook/Reddit: display:contents wrapper with overflow set between link and
+    // visible container. Boxless elements can't clip — overflow only applies to
+    // elements that generate a CSS box.
+    it("display:contents ancestor with overflow does not clip children", () => {
+        // Base case: normal block container with overflow:hidden clips child outside bounds
+        const container = makeElement("DIV", { top: 0, left: 0, width: 400, height: 300, overflow: "hidden", display: "block" });
+        const link = makeElement("A", { href: "#", top: 50, left: 500, width: 100, height: 20 });
+        container.appendChild(link);
+        loadModules([link]);
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(!hintMode.isActive(), "Base case: block container with overflow:hidden clips child");
+
+        // With display:contents: container has no box, so overflow has no effect
+        container.style.display = "contents";
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(), "display:contents container can't clip — link should get hint");
+    });
+});
+
+// hasBox utility — elements with display:none or display:contents have no CSS box.
+// Overflow, sizing, and clipping properties have no effect on boxless elements.
+describe("hasBox utility", () => {
+    let cleanup: () => void;
+
+    afterEach(() => {
+        if (cleanup) cleanup();
+    });
+
+    it("returns true for box-generating display values", () => {
+        const env = createDOM(``);
+        cleanup = env.cleanup;
+        for (const display of ["block", "flex", "inline", "inline-block", "grid"]) {
+            const el = env.document.createElement("div");
+            el.style.display = display;
+            env.document.body.appendChild(el);
+            assert.equal(hasBox(el as unknown as HTMLElement), true,
+                `display:${display} should have a box`);
+        }
+    });
+
+    it("returns false for boxless display values", () => {
+        const env = createDOM(``);
+        cleanup = env.cleanup;
+        for (const display of ["none", "contents"]) {
+            const el = env.document.createElement("div");
+            el.style.display = display;
+            env.document.body.appendChild(el);
+            assert.equal(hasBox(el as unknown as HTMLElement), false,
+                `display:${display} should not have a box`);
+        }
     });
 });
 

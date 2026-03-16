@@ -55,24 +55,35 @@ function isVisible(el: HTMLElement, rect?: DOMRect): boolean {
   return true;
 }
 
+/** Does this element generate a CSS box?
+ *  display:none and display:contents don't — overflow, sizing, and clipping
+ *  properties have no effect on boxless elements. */
+export function hasBox(el: HTMLElement): boolean {
+  const display = getComputedStyle(el).display;
+  return display !== "none" && display !== "contents";
+}
+
 /** Is this element clipped to an unusable size by an overflow ancestor?
  *  Checks overflowX/overflowY per axis — any value that isn't "visible" clips.
- *  Rejects both fully-outside elements and elements whose visible area within
- *  the clipping ancestor is too small to be a useful click target (< 4px). */
+ *  Skips ancestors that have no box (display:contents/none) — overflow only
+ *  applies to elements that generate a box. Rejects elements whose visible area
+ *  within the clipping ancestor is too small to be a useful click target (< 4px). */
 function isClippedByOverflow(el: HTMLElement, rect: DOMRect): boolean {
   let ancestor = el.parentElement;
   while (ancestor && ancestor !== document.body) {
-    const ancestorStyle = getComputedStyle(ancestor);
-    const overflow = ancestorStyle.overflow;
-    const ox = ancestorStyle.overflowX || overflow;
-    const oy = ancestorStyle.overflowY || overflow;
-    const clipsX = ox !== "" && ox !== "visible";
-    const clipsY = oy !== "" && oy !== "visible";
-    if (clipsX || clipsY) {
-      const ar = ancestor.getBoundingClientRect();
-      const visibleW = clipsX ? Math.max(0, Math.min(rect.right, ar.right) - Math.max(rect.left, ar.left)) : rect.width;
-      const visibleH = clipsY ? Math.max(0, Math.min(rect.bottom, ar.bottom) - Math.max(rect.top, ar.top)) : rect.height;
-      if (visibleW < 4 || visibleH < 4) return true;
+    if (hasBox(ancestor)) {
+      const ancestorStyle = getComputedStyle(ancestor);
+      const overflow = ancestorStyle.overflow;
+      const ox = ancestorStyle.overflowX || overflow;
+      const oy = ancestorStyle.overflowY || overflow;
+      const clipsX = ox !== "" && ox !== "visible";
+      const clipsY = oy !== "" && oy !== "visible";
+      if (clipsX || clipsY) {
+        const ar = ancestor.getBoundingClientRect();
+        const visibleW = clipsX ? Math.max(0, Math.min(rect.right, ar.right) - Math.max(rect.left, ar.left)) : rect.width;
+        const visibleH = clipsY ? Math.max(0, Math.min(rect.bottom, ar.bottom) - Math.max(rect.top, ar.top)) : rect.height;
+        if (visibleW < 4 || visibleH < 4) return true;
+      }
     }
     ancestor = ancestor.parentElement;
   }
@@ -246,10 +257,11 @@ export function findBlockAncestor(el: HTMLElement): HTMLElement | null {
 }
 
 /** Block-level display check — treats missing/empty display as inline (browser default).
- *  display:none and display:contents don't generate a box — excluded. */
+ *  Elements without a box (display:none/contents) are excluded. */
 export function isBlockLevel(el: HTMLElement): boolean {
+  if (!hasBox(el)) return false;
   const display = getComputedStyle(el).display;
-  return display !== "" && display !== "none" && display !== "contents" && !display.startsWith("inline");
+  return display !== "" && !display.startsWith("inline");
 }
 
 /** Is this element inside a vertically repeating container (list or table row)?
