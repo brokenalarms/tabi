@@ -5,8 +5,6 @@
 
 import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_ROLES, CLICKABLE_SELECTOR, HEADING_SELECTOR } from "./constants";
 
-const CLICKABLE_ROLES_SET = new Set(CLICKABLE_ROLES);
-
 // --- Declarative predicates (stateless) ---
 
 /** Is this element in a subtree removed from the interaction tree?
@@ -162,7 +160,7 @@ export function isStructuralTabindex(el: HTMLElement): boolean {
   const role = el.getAttribute("role");
   if (!role) return false;
   if (!el.hasAttribute("tabindex")) return false;
-  return !CLICKABLE_ROLES_SET.has(role.toLowerCase());
+  return !CLICKABLE_ROLES.includes(role.toLowerCase());
 }
 
 // --- Walker filter ---
