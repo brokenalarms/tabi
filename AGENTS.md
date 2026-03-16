@@ -76,14 +76,24 @@ Each pasted scenario = one test. The test is the proof that the bug is fixed and
 
 `ElementGatherer.ts` and `HintMode.ts` are orchestrators — they compose small, stateless, exported predicate functions that each identify a single characteristic of an element (`isBlockLevel`, `isInRepeatingContainer`, `hasHeadingContent`, `isContentlessOverlay`, `isOccluded`, etc.). Each predicate answers one question about the element: "is it visible?", "is it in a repeating container?", "does it contain a heading?". The orchestrator then composes these to make decisions.
 
-This makes the pipeline easy to understand at a glance and easy to unit-test — each predicate can be tested in isolation with a minimal DOM fixture. When adding new logic, extract the element characteristic as a named predicate in `ElementGatherer.ts` rather than adding inline checks inside `walkerFilter`, `discoverElements`, or `getHintTargetElement`. Predicates should identify **what** an element is, not decide **what to do** with it — that's the orchestrator's job.
+This makes the pipeline easy to understand at a glance and easy to unit-test — each predicate can be tested in isolation with a minimal DOM fixture. When adding new logic, extract the element characteristic as a named predicate in `elementPredicates.ts` rather than adding inline checks inside `walkerFilter`, `discoverElements`, or `getHintTargetElement`. Predicates should identify **what** an element is, not decide **what to do** with it — that's the orchestrator's job. Functions that find or traverse to a *different* element (e.g. `findBlockAncestor`) are not predicates — they belong in the orchestrator that uses them.
 
-Shared constants (`NATIVE_INTERACTIVE_ELEMENTS`, `CLICKABLE_SELECTOR`, `HEADING_SELECTOR`, etc.) live in `constants.ts` and are re-exported by `ElementGatherer.ts` for backward compatibility.
+Shared constants (`NATIVE_INTERACTIVE_ELEMENTS`, `CLICKABLE_SELECTOR`, `HEADING_SELECTOR`, etc.) live in `constants.ts`.
+
+When moving functions or types to a new file, update all existing import sites to point to the new location. Do not re-export from the old location as a compatibility shim — that creates dead indirection and hides the real dependency graph.
 
 ### No `cursor:pointer` discovery (removed March 2026)
 
-The element discovery pipeline only uses semantic signals (`CLICKABLE_SELECTOR`: native interactive elements, ARIA roles, `tabindex`, `onclick`, `label[for]`). We intentionally do **not** use `cursor:pointer` as a fallback discovery signal.
+The element discovery pipeline only uses semantic signals (`CLICKABLE_SELECTOR`: native interactive elements, ARIA roles, `onclick`, `label[for]`). We intentionally do **not** use `cursor:pointer` as a fallback discovery signal.
 
 **Why:** `cursor:pointer` was originally added to catch SPA elements that use JS click handlers without ARIA markup. In practice, it produced far more false positives than true positives — non-interactive images, decorative wrappers, and overlay containers all receive `cursor:pointer` from CSS inheritance or card styling. Each false positive required a new dedup rule (wrapper dedup, sibling dedup, cover occlusion exemptions), compounding complexity without improving reliability. The worst case: on card-based layouts (e.g. The Guardian), `cursor:pointer` caused hints to land on images instead of the actual overlay `<a>` link, making cards unclickable.
 
-**Trade-off:** Some JS-only click handlers on unstyled `<div>` elements won't be discovered. This is acceptable because well-built SPAs use ARIA roles, `tabindex`, or semantic HTML, and those signals are already covered. Sites that rely solely on `cursor:pointer` without any accessibility attributes are not accessible to keyboard users either — our coverage aligns with theirs.
+**Trade-off:** Some JS-only click handlers on unstyled `<div>` elements won't be discovered. This is acceptable because well-built SPAs use ARIA roles or semantic HTML, and those signals are already covered. Sites that rely solely on `cursor:pointer` without any accessibility attributes are not accessible to keyboard users either — our coverage aligns with theirs.
+
+### No `tabindex` discovery (removed March 2026)
+
+`tabindex` is **not** in `CLICKABLE_SELECTOR`. `tabindex="0"` means "focusable" (keyboard-navigable), not "clickable". An element that is genuinely interactive will always have another signal that already makes it discoverable: a native interactive tag (`<a>`, `<button>`, etc.), an ARIA role (`role="button"`, `role="link"`, etc.), or an event handler (`onclick`, `onmousedown`).
+
+**Why:** `tabindex` without a role or handler is used by sites for structural keyboard navigation — e.g. Reddit's `<details role="article" tabindex="0">` wrapping comment threads. These containers are focusable so users can arrow through them, but they aren't click targets. The actual interactive elements inside (links, buttons, vote arrows) already get their own hints via semantic signals. Treating `tabindex` as a clickable signal produced false positives on these structural containers.
+
+**Trade-off:** A bare `<div tabindex="0">` with a JS click listener but no role, no `onclick` attribute, and no semantic markup won't be discovered. This is invalid HTML from an accessibility standpoint — such elements are invisible to screen readers and keyboard users. We don't account for it.

@@ -5,7 +5,10 @@ import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
-import { discoverElements, findBlockAncestor, hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, walkerFilter } from "../src/modules/ElementGatherer";
+import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer } from "../src/modules/elementPredicates";
+import { findBlockAncestor } from "../src/modules/HintMode";
+import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
 describe("element discovery", () => {
     afterEach(() => {
@@ -118,18 +121,27 @@ describe("element discovery", () => {
         assert.ok(!hintMode.isActive(), "Hidden element should be filtered");
     });
 
-    // Wrapper div with tabindex containing a textarea — only textarea gets a hint
+    // Wrapper div with onclick containing a textarea — only textarea gets a hint
     it("filters out ancestor wrapper when descendant is also a candidate", () => {
+        // Base: onclick wrapper alone gets a hint (proving it's discoverable)
+        const wrapperAlone = makeElement("DIV", { top: 10, left: 10 });
+        wrapperAlone.setAttribute("onclick", "");
+        loadModules([wrapperAlone]);
+        (globalThis as any).document.elementsFromPoint = () => [wrapperAlone];
+        const { hintMode: base } = getState();
+        base.activate(false);
+        assert.ok(base.isActive(), "onclick wrapper alone should get a hint");
+        base.destroy();
+
+        // Delta: wrapper with textarea child — only textarea gets a hint
         const textarea = makeElement("TEXTAREA", { top: 10, left: 10 });
         const wrapper = makeElement("DIV", { top: 10, left: 10 });
-        wrapper.setAttribute("tabindex", "0");
+        wrapper.setAttribute("onclick", "");
         wrapper.appendChild(textarea);
 
         loadModules([wrapper, textarea]);
 
-        // Need elementFromPoint/elementsFromPoint to return the element itself for visibility
         (globalThis as any).document.elementFromPoint = (x: number, y: number) => {
-            // Return the textarea for any point check (both are at same position)
             return textarea;
         };
         (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
@@ -140,10 +152,7 @@ describe("element discovery", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
         // Only 1 hint (textarea), not 2 (wrapper filtered out)
-        // hintMode._hints is private, so check via label: with 1 element, label is "s"
-        // Type "s" to activate — if there were 2 hints, labels would be "ss","sa" (2-char)
         fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
-        // If only 1 hint, typing "s" activates it and deactivates hint mode
         assert.ok(!hintMode.isActive(), "Expected 1 hint (textarea only), but got more — wrapper was not filtered");
     });
 });
@@ -633,9 +642,22 @@ describe("zero in one dimension filtered", () => {
     });
 
     it("filters out element with zero height but non-zero width", () => {
+        // Base: onclick div with both dimensions → gets a hint
+        const normal = makeElement("DIV", {
+            top: 10, left: 10, width: 1024, height: 50,
+            attrs: { onclick: "" },
+        });
+        loadModules([normal]);
+        (globalThis as any).document.elementsFromPoint = () => [normal];
+        const { hintMode: base } = getState();
+        base.activate(false);
+        assert.ok(base.isActive(), "onclick div with size should get a hint");
+        base.destroy();
+
+        // Delta: zero height → no hint
         const zeroHeight = makeElement("DIV", {
             top: 0, left: 0, width: 1024, height: 0,
-            attrs: { tabindex: "0" },
+            attrs: { onclick: "" },
         });
         loadModules([zeroHeight]);
         const { hintMode } = getState();
@@ -644,9 +666,22 @@ describe("zero in one dimension filtered", () => {
     });
 
     it("filters out element with zero width but non-zero height", () => {
+        // Base: onclick div with both dimensions → gets a hint
+        const normal = makeElement("DIV", {
+            top: 10, left: 10, width: 50, height: 768,
+            attrs: { onclick: "" },
+        });
+        loadModules([normal]);
+        (globalThis as any).document.elementsFromPoint = () => [normal];
+        const { hintMode: base } = getState();
+        base.activate(false);
+        assert.ok(base.isActive(), "onclick div with size should get a hint");
+        base.destroy();
+
+        // Delta: zero width → no hint
         const zeroWidth = makeElement("DIV", {
             top: 0, left: 0, width: 0, height: 768,
-            attrs: { tabindex: "0" },
+            attrs: { onclick: "" },
         });
         loadModules([zeroWidth]);
         const { hintMode } = getState();
@@ -1108,21 +1143,34 @@ describe("generic sibling dedup", () => {
     });
 
     it("removes generic siblings when an interactive sibling exists", () => {
+        // Base: generic onclick div alone gets a hint (proving it's discoverable)
+        const loneDiv = makeElement("DIV", {
+            top: 5, left: 5, width: 30, height: 30,
+            attrs: { onclick: "" },
+        });
+        loadModules([loneDiv]);
+        (globalThis as any).document.elementsFromPoint = () => [loneDiv];
+        const { hintMode: base } = getState();
+        base.activate(false);
+        assert.ok(base.isActive(), "Lone generic onclick div should get a hint");
+        base.destroy();
+
+        // Delta: adding an interactive sibling causes generic divs to be deduped
         const parent = makeElement("DIV", { top: 0, left: 0, width: 400, height: 40 });
 
         const input = makeElement("INPUT", {
             top: 5, left: 5, width: 350, height: 30,
             attrs: { role: "combobox", placeholder: "Search..." },
         });
-        // Decorative divs that match CLICKABLE_SELECTOR via tabindex but have no
+        // Decorative divs that match CLICKABLE_SELECTOR via onclick but have no
         // semantic role — "generic" interactive type
         const iconContainer = makeElement("DIV", {
             top: 5, left: 5, width: 30, height: 30,
-            attrs: { tabindex: "0" },
+            attrs: { onclick: "" },
         });
         const overlay = makeElement("DIV", {
             top: 5, left: 5, width: 350, height: 30,
-            attrs: { tabindex: "0" },
+            attrs: { onclick: "" },
         });
 
         parent.appendChild(input);
@@ -1145,27 +1193,6 @@ describe("generic sibling dedup", () => {
         const hintOverlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = hintOverlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1, "Expected 1 hint (input only) — generic divs should be removed");
-    });
-
-    it("keeps generic element when no interactive sibling exists", () => {
-        const parent = makeElement("DIV", { top: 0, left: 0, width: 400, height: 40 });
-
-        const clickableDiv = makeElement("DIV", {
-            top: 5, left: 5, width: 350, height: 30,
-            attrs: { tabindex: "0" },
-        });
-
-        parent.appendChild(clickableDiv);
-
-        loadModules([clickableDiv]);
-
-        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
-            return [clickableDiv];
-        };
-
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(hintMode.isActive(), "Lone generic div should still get a hint");
     });
 });
 
@@ -1408,11 +1435,11 @@ describe("native interactive elements prune subtrees", () => {
         assert.ok(!overlay?.querySelector(".vimium-hint-container-glow"), "Single descendant chain should not get container glow");
     });
 
-    // Accordion row: div[tabindex] with heading gets bar-style hint (not heading drill-down).
+    // Accordion row: div[role=button] with heading gets bar-style hint (not heading drill-down).
     // Non-<a> interactive elements return directly — bar style comes from getHintInfo.
-    it("accordion div[tabindex] with heading gets bar-style hint", () => {
+    it("accordion div[role=button] with heading gets bar-style hint", () => {
         const row = makeElement("DIV", { top: 10, left: 10, width: 300, height: 50,
-            attrs: { tabindex: "0" } });
+            attrs: { role: "button" } });
         const heading = makeElement("H3", { top: 15, left: 15, width: 200, height: 24, textContent: "Section" });
         const arrow = makeElement("SPAN", { top: 15, left: 270, width: 16, height: 16, textContent: "▸" });
         row.appendChild(heading);
@@ -2397,6 +2424,70 @@ describe("shadow DOM elements not falsely occluded", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive(),
             "Button inside shadow root should get a hint — shadow host is an ancestor, not a cover");
+    });
+});
+
+// ISSUE: display:contents <li> has no box and shouldn't count as a repeating container
+// FIX: isInRepeatingContainer composes hasBox — only box-generating ancestors count
+describe("isInRepeatingContainer with display:contents", () => {
+    it("box-generating <li> is a repeating container, display:contents is not", () => {
+        const env = createDOM(`
+            <ul>
+                <li id="boxed" style="display: list-item;">
+                    <a id="link-boxed" href="#">Link</a>
+                </li>
+                <li id="contents" style="display: contents;">
+                    <a id="link-contents" href="#">Link</a>
+                </li>
+            </ul>
+        `);
+
+        const linkBoxed = env.document.getElementById("link-boxed") as HTMLElement;
+        const linkContents = env.document.getElementById("link-contents") as HTMLElement;
+
+        // Base: link inside a normal <li> IS in a repeating container
+        assert.equal(isInRepeatingContainer(linkBoxed), true,
+            "Link inside box-generating <li> should be in a repeating container");
+
+        // Delta: link inside display:contents <li> is NOT in a repeating container
+        assert.equal(isInRepeatingContainer(linkContents), false,
+            "Link inside display:contents <li> should not be in a repeating container");
+
+        env.cleanup();
+    });
+});
+
+// ISSUE: <details role="article" tabindex="0"> gets a hint — structural container, not a click target
+// SITE: Reddit — shreddit-comment shadow DOM
+// FIX: tabindex alone is not a clickable signal — only semantic signals (roles, native elements,
+// onclick) make an element clickable. tabindex="0" means "focusable", not "clickable".
+describe("tabindex is not a clickable signal", () => {
+    it("onclick makes a div clickable, tabindex alone does not", () => {
+        const env = createDOM(`
+            <div>
+                <div id="with-onclick" onclick="">Click handler</div>
+                <div id="with-tabindex" tabindex="0">Just focusable</div>
+                <div id="with-role" tabindex="0" role="button">Interactive role</div>
+            </div>
+        `);
+
+        const withOnclick = env.document.getElementById("with-onclick") as HTMLElement;
+        const withTabindex = env.document.getElementById("with-tabindex") as HTMLElement;
+        const withRole = env.document.getElementById("with-role") as HTMLElement;
+
+        // Base: onclick makes a div clickable
+        assert.equal(withOnclick.matches(CLICKABLE_SELECTOR), true,
+            "onclick should make element match CLICKABLE_SELECTOR");
+
+        // Delta: tabindex alone does NOT make it clickable
+        assert.equal(withTabindex.matches(CLICKABLE_SELECTOR), false,
+            "tabindex='0' alone should NOT match CLICKABLE_SELECTOR — focusable ≠ clickable");
+
+        // Interactive role makes it clickable regardless of tabindex
+        assert.equal(withRole.matches(CLICKABLE_SELECTOR), true,
+            "role='button' should match via role selector, independent of tabindex");
+
+        env.cleanup();
     });
 });
 

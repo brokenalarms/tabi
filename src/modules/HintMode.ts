@@ -5,8 +5,33 @@
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { CLICKABLE_SELECTOR } from "./constants";
-import { discoverElements, findAssociatedLabel, findBlockAncestor, getHeading, hasHeadingContent, isBlockLevel, isInRepeatingContainer } from "./ElementGatherer";
+import { discoverElements } from "./ElementGatherer";
+import { hasHeadingContent, isBlockLevel, isInRepeatingContainer } from "./elementPredicates";
+import { findAssociatedLabel } from "./elementTraversals";
+import { HEADING_SELECTOR } from "./constants";
+
 import { Mode } from "../commands";
+
+/** Walk up through inline single-child ancestors to the nearest block-level container.
+ *  Returns null if element is already block, has no parent, or a parent has multiple children.
+ *  Stops at body/documentElement — never returns those. */
+export function findBlockAncestor(el: HTMLElement): HTMLElement | null {
+  if (isBlockLevel(el)) return null;
+  let node = el;
+  while (node.parentElement) {
+    const parent = node.parentElement;
+    if (parent === document.body || parent === document.documentElement) return null;
+    if (parent.children.length !== 1) return null;
+    if (isBlockLevel(parent)) return parent;
+    node = parent;
+  }
+  return null;
+}
+
+/** Return the first heading descendant, or null. */
+export function getHeading(el: HTMLElement): HTMLElement | null {
+  return el.querySelector(HEADING_SELECTOR) as HTMLElement | null;
+}
 
 declare const browser: {
   runtime: {

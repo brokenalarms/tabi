@@ -3,154 +3,12 @@
 // non-clickable nodes, and yield visible clickable elements, then deduplicates
 // via containment analysis.
 
-import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_SELECTOR, HEADING_SELECTOR } from "./constants";
-
-// --- Declarative predicates (stateless) ---
-
-/** Is this element in a subtree removed from the interaction tree?
- *  aria-hidden and inert cascade — any ancestor declaring these removes the
- *  entire subtree. The walker already REJECTs at the ancestor, so descendants
- *  are never visited. This predicate exists for elements found via
- *  elementsFromPoint (hit-testing bypasses the walker). */
-function isSubtreeRemoved(el: HTMLElement): boolean {
-  if (el.closest("[aria-hidden='true']")) return true;
-  if (el.closest("[inert]")) return true;
-  return false;
-}
-
-/** Excluded by developer intent: subtree removal (aria-hidden, inert),
- *  element-level hidden attribute, or disabled state. */
-function isExcludedByIntent(el: HTMLElement): boolean {
-  if (isSubtreeRemoved(el)) return true;
-  if (el.hidden) return true;
-  if ((el as HTMLButtonElement).disabled) return true;
-  return false;
-}
-
-/** Is this rect non-zero and within the viewport? */
-function isOnScreen(rect: DOMRect): boolean {
-  if (rect.width === 0 || rect.height === 0) return false;
-  if (rect.bottom < 0 || rect.top > window.innerHeight) return false;
-  if (rect.right < 0 || rect.left > window.innerWidth) return false;
-  return true;
-}
-
-/** Can children of this element still be visible?
- *  display:none is the only CSS property that irrecoverably hides all descendants.
- *  visibility:hidden and opacity:0 can be overridden by children. */
-function childrenMightBeVisible(el: HTMLElement): boolean {
-  return getComputedStyle(el).display !== "none";
-}
-
-/** Stateless visibility check — does this element have a non-zero, on-screen,
- *  non-hidden rect? No clickability or occlusion logic — just geometry + CSS.
- *  Accepts an optional pre-computed rect (e.g. fallback rect for zero-size anchors). */
-function isVisible(el: HTMLElement, rect?: DOMRect): boolean {
-  const r = rect ?? el.getBoundingClientRect();
-  if (!isOnScreen(r)) return false;
-  const style = getComputedStyle(el);
-  if (style.display === "none") return false;
-  if (style.visibility === "hidden") return false;
-  if (parseFloat(style.opacity) === 0) return false;
-  return true;
-}
-
-/** Does this element generate a CSS box?
- *  display:none and display:contents don't — overflow, sizing, and clipping
- *  properties have no effect on boxless elements. */
-export function hasBox(el: HTMLElement): boolean {
-  const display = getComputedStyle(el).display;
-  return display !== "none" && display !== "contents";
-}
-
-/** Is this element clipped to an unusable size by an overflow ancestor?
- *  Checks overflowX/overflowY per axis — any value that isn't "visible" clips.
- *  Skips ancestors that have no box (display:contents/none) — overflow only
- *  applies to elements that generate a box. Rejects elements whose visible area
- *  within the clipping ancestor is too small to be a useful click target (< 4px). */
-function isClippedByOverflow(el: HTMLElement, rect: DOMRect): boolean {
-  let ancestor = el.parentElement;
-  while (ancestor && ancestor !== document.body) {
-    if (hasBox(ancestor)) {
-      const ancestorStyle = getComputedStyle(ancestor);
-      const overflow = ancestorStyle.overflow;
-      const ox = ancestorStyle.overflowX || overflow;
-      const oy = ancestorStyle.overflowY || overflow;
-      const clipsX = ox !== "" && ox !== "visible";
-      const clipsY = oy !== "" && oy !== "visible";
-      if (clipsX || clipsY) {
-        const ar = ancestor.getBoundingClientRect();
-        const visibleW = clipsX ? Math.max(0, Math.min(rect.right, ar.right) - Math.max(rect.left, ar.left)) : rect.width;
-        const visibleH = clipsY ? Math.max(0, Math.min(rect.bottom, ar.bottom) - Math.max(rect.top, ar.top)) : rect.height;
-        if (visibleW < 4 || visibleH < 4) return true;
-      }
-    }
-    ancestor = ancestor.parentElement;
-  }
-  return false;
-}
-
-/** Does the ancestor contain the descendant in the composed tree?
- *  Like Node.contains(), but walks up through shadow root boundaries
- *  so shadow hosts are recognized as ancestors of their shadow DOM content. */
-function composedContains(ancestor: Node, descendant: Node): boolean {
-  let node: Node | null = descendant;
-  while (node) {
-    if (node === ancestor) return true;
-    const root = node.getRootNode();
-    if (root !== node && root !== document && (root as any).host) {
-      node = (root as any).host;
-    } else {
-      node = node.parentNode;
-    }
-  }
-  return false;
-}
-
-/** Is this element occluded at any corner by an unrelated element?
- *  Tests all 4 corners (+2px inset) via elementsFromPoint. If ANY corner's
- *  topmost element is an unrelated, non-exempt cover, the element is occluded.
- *  Covers that are ancestors/descendants, in removed subtrees, or contentless
- *  overlays are exempt — they won't steal clicks or get their own hints. */
-function isOccluded(el: HTMLElement, rect: DOMRect): boolean {
-  const clampX = (x: number) => Math.min(Math.max(x, 0), window.innerWidth - 1);
-  const clampY = (y: number) => Math.min(Math.max(y, 0), window.innerHeight - 1);
-
-  const isCover = (cover: HTMLElement): boolean => {
-    if (composedContains(el, cover) || composedContains(cover, el)) return false;
-    if (isSubtreeRemoved(cover)) return false;
-    if (isContentlessOverlay(cover)) return false;
-    return true;
-  };
-
-  const points = [
-    [rect.left + 2, rect.top + 2],
-    [rect.right - 2, rect.top + 2],
-    [rect.left + 2, rect.bottom - 2],
-    [rect.right - 2, rect.bottom - 2],
-  ];
-
-  for (const [x, y] of points) {
-    const hits = document.elementsFromPoint(clampX(x), clampY(y));
-    if (hits.length > 0 && isCover(hits[0] as HTMLElement)) return true;
-  }
-  return false;
-}
-
-/** Is this a contentless overlay link?
- *  True for <a> with no text, no visual children (img, svg, etc.), and a sibling
- *  with visible content — the "stretched-link" card pattern where an empty <a>
- *  is positioned over a card whose visible text lives in a sibling element.
- *  Used in occlusion checks to exempt these overlays from blocking sibling
- *  interactive elements (e.g. comment links that poke through via z-index). */
-function isContentlessOverlay(el: HTMLElement): boolean {
-  if (el.tagName.toLowerCase() !== "a") return false;
-  if ((el.textContent || "").trim()) return false;
-  if (el.querySelector("img, svg, picture, video, canvas")) return false;
-  const adj = el.nextElementSibling || el.previousElementSibling;
-  return adj !== null && (adj.textContent || "").trim().length > 0;
-}
-
+import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_SELECTOR } from "./constants";
+import {
+  isExcludedByIntent, childrenMightBeVisible, isOnScreen, isVisible,
+  isClippedByOverflow, isOccluded,
+} from "./elementPredicates";
+import { findAssociatedLabel } from "./elementTraversals";
 
 // --- Walker filter ---
 // Routes to REJECT/SKIP/ACCEPT by calling predicates.
@@ -218,7 +76,7 @@ export function walkerFilter(node: Node): number {
   // all inherit or receive cursor:pointer from CSS without being meaningful click targets.
   // Each false positive required a new dedup rule (wrapper dedup, sibling dedup, cover
   // occlusion), adding complexity without reliability. SPAs that care about accessibility
-  // should use ARIA roles, tabindex, or semantic HTML — those are the signals we trust.
+  // should use ARIA roles or semantic HTML — those are the signals we trust.
   if (!el.matches(CLICKABLE_SELECTOR)) return NodeFilter.FILTER_SKIP;
 
   // Opacity:0 radio/checkbox with visible label — redirect to label
@@ -243,59 +101,6 @@ export function walkerFilter(node: Node): number {
   if (isOccluded(el, rect)) return NodeFilter.FILTER_SKIP;
 
   return NodeFilter.FILTER_ACCEPT;
-}
-
-// --- Helpers ---
-
-export function findAssociatedLabel(el: HTMLElement): HTMLElement | null {
-  if (el.id) {
-    const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
-    if (label) return label as HTMLElement;
-  }
-  const parent = el.closest("label");
-  if (parent) return parent as HTMLElement;
-  return null;
-}
-
-/** Walk up through inline single-child ancestors to the nearest block-level container.
- *  Returns null if element is already block, has no parent, or a parent has multiple children.
- *  Stops at body/documentElement — never returns those. */
-export function findBlockAncestor(el: HTMLElement): HTMLElement | null {
-  if (isBlockLevel(el)) return null;
-  let node = el;
-  while (node.parentElement) {
-    const parent = node.parentElement;
-    if (parent === document.body || parent === document.documentElement) return null;
-    if (parent.children.length !== 1) return null;
-    if (isBlockLevel(parent)) return parent;
-    node = parent;
-  }
-  return null;
-}
-
-/** Block-level display check — treats missing/empty display as inline (browser default).
- *  Elements without a box (display:none/contents) are excluded. */
-export function isBlockLevel(el: HTMLElement): boolean {
-  if (!hasBox(el)) return false;
-  const display = getComputedStyle(el).display;
-  return display !== "" && !display.startsWith("inline");
-}
-
-/** Is this element inside a vertically repeating container (list or table row)?
- *  Elements inside <li> or <tr> are part of a flowing layout where hints should
- *  stay centered on the full container width for vertical alignment. */
-export function isInRepeatingContainer(el: HTMLElement): boolean {
-  return el.closest("li") !== null || el.closest("tr") !== null;
-}
-
-/** Does this element contain a heading (h1–h6) as a descendant? */
-export function hasHeadingContent(el: HTMLElement): boolean {
-  return el.querySelector(HEADING_SELECTOR) !== null;
-}
-
-/** Return the first heading descendant, or null. */
-export function getHeading(el: HTMLElement): HTMLElement | null {
-  return el.querySelector(HEADING_SELECTOR) as HTMLElement | null;
 }
 
 // --- Interactive type ---
@@ -433,7 +238,7 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
   }
 
   // Sibling dedup: remove generic candidates when a non-generic sibling exists.
-  // Decorative divs (e.g. tabindex) alongside real interactive elements
+  // Decorative divs (e.g. onclick) alongside real interactive elements
   // (input, button, link) shouldn't get their own hints.
   for (const el of result) {
     if (toRemove.has(el)) continue;
