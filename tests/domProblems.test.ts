@@ -5,7 +5,8 @@ import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
-import { discoverElements, findBlockAncestor, hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, isStructuralTabindex, walkerFilter } from "../src/modules/ElementGatherer";
+import { discoverElements, findBlockAncestor, hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, walkerFilter } from "../src/modules/ElementGatherer";
+import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
 describe("element discovery", () => {
     afterEach(() => {
@@ -118,11 +119,11 @@ describe("element discovery", () => {
         assert.ok(!hintMode.isActive(), "Hidden element should be filtered");
     });
 
-    // Wrapper div with tabindex containing a textarea — only textarea gets a hint
+    // Wrapper div with onclick containing a textarea — only textarea gets a hint
     it("filters out ancestor wrapper when descendant is also a candidate", () => {
         const textarea = makeElement("TEXTAREA", { top: 10, left: 10 });
         const wrapper = makeElement("DIV", { top: 10, left: 10 });
-        wrapper.setAttribute("tabindex", "0");
+        wrapper.setAttribute("onclick", "");
         wrapper.appendChild(textarea);
 
         loadModules([wrapper, textarea]);
@@ -635,7 +636,7 @@ describe("zero in one dimension filtered", () => {
     it("filters out element with zero height but non-zero width", () => {
         const zeroHeight = makeElement("DIV", {
             top: 0, left: 0, width: 1024, height: 0,
-            attrs: { tabindex: "0" },
+            attrs: { onclick: "" },
         });
         loadModules([zeroHeight]);
         const { hintMode } = getState();
@@ -646,7 +647,7 @@ describe("zero in one dimension filtered", () => {
     it("filters out element with zero width but non-zero height", () => {
         const zeroWidth = makeElement("DIV", {
             top: 0, left: 0, width: 0, height: 768,
-            attrs: { tabindex: "0" },
+            attrs: { onclick: "" },
         });
         loadModules([zeroWidth]);
         const { hintMode } = getState();
@@ -1114,15 +1115,15 @@ describe("generic sibling dedup", () => {
             top: 5, left: 5, width: 350, height: 30,
             attrs: { role: "combobox", placeholder: "Search..." },
         });
-        // Decorative divs that match CLICKABLE_SELECTOR via tabindex but have no
+        // Decorative divs that match CLICKABLE_SELECTOR via onclick but have no
         // semantic role — "generic" interactive type
         const iconContainer = makeElement("DIV", {
             top: 5, left: 5, width: 30, height: 30,
-            attrs: { tabindex: "0" },
+            attrs: { onclick: "" },
         });
         const overlay = makeElement("DIV", {
             top: 5, left: 5, width: 350, height: 30,
-            attrs: { tabindex: "0" },
+            attrs: { onclick: "" },
         });
 
         parent.appendChild(input);
@@ -1152,7 +1153,7 @@ describe("generic sibling dedup", () => {
 
         const clickableDiv = makeElement("DIV", {
             top: 5, left: 5, width: 350, height: 30,
-            attrs: { tabindex: "0" },
+            attrs: { onclick: "" },
         });
 
         parent.appendChild(clickableDiv);
@@ -1408,11 +1409,11 @@ describe("native interactive elements prune subtrees", () => {
         assert.ok(!overlay?.querySelector(".vimium-hint-container-glow"), "Single descendant chain should not get container glow");
     });
 
-    // Accordion row: div[tabindex] with heading gets bar-style hint (not heading drill-down).
+    // Accordion row: div[role=button] with heading gets bar-style hint (not heading drill-down).
     // Non-<a> interactive elements return directly — bar style comes from getHintInfo.
-    it("accordion div[tabindex] with heading gets bar-style hint", () => {
+    it("accordion div[role=button] with heading gets bar-style hint", () => {
         const row = makeElement("DIV", { top: 10, left: 10, width: 300, height: 50,
-            attrs: { tabindex: "0" } });
+            attrs: { role: "button" } });
         const heading = makeElement("H3", { top: 15, left: 15, width: 200, height: 24, textContent: "Section" });
         const arrow = makeElement("SPAN", { top: 15, left: 270, width: 16, height: 16, textContent: "▸" });
         row.appendChild(heading);
@@ -2432,38 +2433,33 @@ describe("isInRepeatingContainer with display:contents", () => {
 
 // ISSUE: <details role="article" tabindex="0"> gets a hint — structural container, not a click target
 // SITE: Reddit — shreddit-comment shadow DOM
-// FIX: isStructuralTabindex filters elements with tabindex + non-interactive role in the walker
-describe("structural tabindex filtering", () => {
-    it("tabindex without role is not structural, adding a non-interactive role makes it structural", () => {
+// FIX: tabindex alone is not a clickable signal — only semantic signals (roles, native elements,
+// onclick) make an element clickable. tabindex="0" means "focusable", not "clickable".
+describe("tabindex is not a clickable signal", () => {
+    it("onclick makes a div clickable, tabindex alone does not", () => {
         const env = createDOM(`
             <div>
-                <div id="no-role" tabindex="0">Focusable div</div>
-                <div id="with-article" tabindex="0" role="article">Article container</div>
-                <div id="with-button" tabindex="0" role="button">Button</div>
-                <div id="no-tabindex" role="article">No tabindex</div>
+                <div id="with-onclick" onclick="">Click handler</div>
+                <div id="with-tabindex" tabindex="0">Just focusable</div>
+                <div id="with-role" tabindex="0" role="button">Interactive role</div>
             </div>
         `);
 
-        const noRole = env.document.getElementById("no-role") as HTMLElement;
-        const withArticle = env.document.getElementById("with-article") as HTMLElement;
-        const withButton = env.document.getElementById("with-button") as HTMLElement;
-        const noTabindex = env.document.getElementById("no-tabindex") as HTMLElement;
+        const withOnclick = env.document.getElementById("with-onclick") as HTMLElement;
+        const withTabindex = env.document.getElementById("with-tabindex") as HTMLElement;
+        const withRole = env.document.getElementById("with-role") as HTMLElement;
 
-        // Base: tabindex with no role is NOT structural (it's a click target)
-        assert.equal(isStructuralTabindex(noRole), false,
-            "tabindex='0' with no role is not structural — it's genuinely clickable");
+        // Base: onclick makes a div clickable
+        assert.equal(withOnclick.matches(CLICKABLE_SELECTOR), true,
+            "onclick should make element match CLICKABLE_SELECTOR");
 
-        // Delta: adding role='article' (non-interactive) makes it structural
-        assert.equal(isStructuralTabindex(withArticle), true,
-            "tabindex='0' with role='article' is structural — focusable for navigation, not clicking");
+        // Delta: tabindex alone does NOT make it clickable
+        assert.equal(withTabindex.matches(CLICKABLE_SELECTOR), false,
+            "tabindex='0' alone should NOT match CLICKABLE_SELECTOR — focusable ≠ clickable");
 
-        // Interactive role + tabindex is NOT structural — role declares clickability
-        assert.equal(isStructuralTabindex(withButton), false,
-            "tabindex='0' with role='button' is not structural — button is interactive");
-
-        // No tabindex at all is NOT structural (regardless of role)
-        assert.equal(isStructuralTabindex(noTabindex), false,
-            "No tabindex means not structural — predicate only applies to focusable elements");
+        // Interactive role makes it clickable regardless of tabindex
+        assert.equal(withRole.matches(CLICKABLE_SELECTOR), true,
+            "role='button' should match via role selector, independent of tabindex");
 
         env.cleanup();
     });

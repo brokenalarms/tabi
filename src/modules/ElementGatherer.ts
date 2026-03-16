@@ -3,7 +3,7 @@
 // non-clickable nodes, and yield visible clickable elements, then deduplicates
 // via containment analysis.
 
-import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_ROLES, CLICKABLE_SELECTOR, HEADING_SELECTOR } from "./constants";
+import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_SELECTOR, HEADING_SELECTOR } from "./constants";
 
 // --- Declarative predicates (stateless) ---
 
@@ -151,18 +151,6 @@ function isContentlessOverlay(el: HTMLElement): boolean {
   return adj !== null && (adj.textContent || "").trim().length > 0;
 }
 
-/** Is this element focusable (tabindex) but declaring a non-interactive role?
- *  tabindex="0" means "focusable", not "clickable". When an element also has an
- *  explicit role that isn't interactive (e.g. role="article"), the tabindex is for
- *  keyboard navigation, not click targeting. Interactive roles (button, link, tab,
- *  etc.) already match CLICKABLE_SELECTOR via their own [role='...'] selectors. */
-export function isStructuralTabindex(el: HTMLElement): boolean {
-  const role = el.getAttribute("role");
-  if (!role) return false;
-  if (!el.hasAttribute("tabindex")) return false;
-  return !CLICKABLE_ROLES.includes(role.toLowerCase());
-}
-
 // --- Walker filter ---
 // Routes to REJECT/SKIP/ACCEPT by calling predicates.
 // FILTER_REJECT prunes entire subtrees (developer intent, display:none).
@@ -229,11 +217,8 @@ export function walkerFilter(node: Node): number {
   // all inherit or receive cursor:pointer from CSS without being meaningful click targets.
   // Each false positive required a new dedup rule (wrapper dedup, sibling dedup, cover
   // occlusion), adding complexity without reliability. SPAs that care about accessibility
-  // should use ARIA roles, tabindex, or semantic HTML — those are the signals we trust.
+  // should use ARIA roles or semantic HTML — those are the signals we trust.
   if (!el.matches(CLICKABLE_SELECTOR)) return NodeFilter.FILTER_SKIP;
-
-  // tabindex + non-interactive role = structural focusability, not a click target
-  if (isStructuralTabindex(el)) return NodeFilter.FILTER_SKIP;
 
   // Opacity:0 radio/checkbox with visible label — redirect to label
   if (parseFloat(style.opacity) === 0) {
@@ -450,7 +435,7 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
   }
 
   // Sibling dedup: remove generic candidates when a non-generic sibling exists.
-  // Decorative divs (e.g. tabindex) alongside real interactive elements
+  // Decorative divs (e.g. onclick) alongside real interactive elements
   // (input, button, link) shouldn't get their own hints.
   for (const el of result) {
     if (toRemove.has(el)) continue;
