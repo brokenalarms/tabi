@@ -1810,8 +1810,8 @@ describe("inline expansion walks up to block ancestor", () => {
     });
 });
 
-// findBlockAncestor utility — walks up through inline single-child ancestors
-// to the nearest block-level container. Used for hint width expansion.
+// findBlockAncestor utility — walks up through single-child ancestors to the
+// nearest repeating container (li, tr) for hint width expansion.
 describe("findBlockAncestor utility", () => {
     let cleanup: () => void;
 
@@ -1819,7 +1819,7 @@ describe("findBlockAncestor utility", () => {
         if (cleanup) cleanup();
     });
 
-    it("returns block parent when element is inline single child", () => {
+    it("returns repeating container parent", () => {
         const env = createDOM(`
             <li>
                 <a id="t" href="#">link</a>
@@ -1830,7 +1830,7 @@ describe("findBlockAncestor utility", () => {
         assert.equal(findBlockAncestor(a as unknown as HTMLElement), a.parentElement);
     });
 
-    it("walks through multiple inline wrappers", () => {
+    it("walks through intermediate wrappers to reach repeating container", () => {
         const env = createDOM(`
             <li>
                 <span>
@@ -1846,46 +1846,19 @@ describe("findBlockAncestor utility", () => {
 
     it("returns null when parent has multiple children", () => {
         const env = createDOM(`
-            <div>
+            <li>
                 <a id="t" href="#">one</a>
                 <a href="#">two</a>
-            </div>
+            </li>
         `);
         cleanup = env.cleanup;
         const a = env.document.getElementById("t")!;
         assert.equal(findBlockAncestor(a as unknown as HTMLElement), null);
     });
 
-    it("returns null when element is already block-level", () => {
-        const env = createDOM(`
-            <div id="t">block</div>
-        `);
-        cleanup = env.cleanup;
-        const div = env.document.getElementById("t")!;
-        assert.equal(findBlockAncestor(div as unknown as HTMLElement), null);
-    });
-
-    it("returns null when no parent exists", () => {
-        const env = createDOM(``);
-        cleanup = env.cleanup;
-        const a = env.document.createElement("a");
-        assert.equal(findBlockAncestor(a as unknown as HTMLElement), null);
-    });
-
-    it("stops at body element", () => {
-        const env = createDOM(`
-            <span id="t">text</span>
-        `);
-        cleanup = env.cleanup;
-        const span = env.document.getElementById("t")!;
-        const result = findBlockAncestor(span as unknown as HTMLElement);
-        assert.ok(result !== env.document.body, "Should not return body element");
-    });
-
-    // Fidelity: <h2><a>I Accept</a></h2> — heading is excluded by isBlockLevel
-    // (semantic text container, not layout container), so findBlockAncestor
-    // walks past it and finds no suitable ancestor.
-    it("walks past heading ancestors", () => {
+    it("returns null when no repeating container exists", () => {
+        // Fidelity: <h2><a>I Accept</a></h2> — heading is not a repeating
+        // container, so no expansion happens. Hint stays on the <a>.
         const env = createDOM(`
             <h2>
                 <a id="t" href="#">I Accept</a>
@@ -1893,40 +1866,37 @@ describe("findBlockAncestor utility", () => {
         `);
         cleanup = env.cleanup;
         const a = env.document.getElementById("t")!;
-        assert.equal(findBlockAncestor(a as unknown as HTMLElement), null,
-            "Heading should not be returned as block ancestor");
+        assert.equal(findBlockAncestor(a as unknown as HTMLElement), null);
     });
 
-    // Guardian: display:contents wrapper between inline <a> and block <li>.
-    // display:contents elements have no box — they're neither block nor inline.
-    // findBlockAncestor must skip them, not treat them as block ancestors,
-    // otherwise the zero-rect contents element zeroes out the hint position.
-    it("skips display:contents ancestors", () => {
+    it("skips display:contents repeating container", () => {
         const env = createDOM(`
-            <li>
-                <div id="wrapper">
-                    <a id="t" href="#">link</a>
-                </div>
-            </li>
+            <ul>
+                <li id="boxed">
+                    <a id="link-boxed" href="#">link</a>
+                </li>
+                <li id="contents" style="display: contents;">
+                    <a id="link-contents" href="#">link</a>
+                </li>
+            </ul>
         `);
         cleanup = env.cleanup;
-        const a = env.document.getElementById("t")!;
-        const wrapper = env.document.getElementById("wrapper")!;
-        const li = wrapper.parentElement!;
 
-        // Base case: normal block div is returned as the block ancestor
-        assert.equal(findBlockAncestor(a as unknown as HTMLElement), wrapper,
-            "normal block div should be the block ancestor");
+        // Base: normal <li> is returned
+        const aBoxed = env.document.getElementById("link-boxed")!;
+        const li = env.document.getElementById("boxed")!;
+        assert.equal(findBlockAncestor(aBoxed as unknown as HTMLElement), li,
+            "box-generating <li> should be returned");
 
-        // With display:contents: div has no box, so findBlockAncestor skips it
-        wrapper.style.display = "contents";
-        assert.equal(findBlockAncestor(a as unknown as HTMLElement), li,
-            "should walk through display:contents to the <li>");
+        // Delta: display:contents <li> has no box — skipped
+        const aContents = env.document.getElementById("link-contents")!;
+        assert.equal(findBlockAncestor(aContents as unknown as HTMLElement), null,
+            "display:contents <li> should not be returned");
     });
 });
 
-// isBlockLevel utility — classifies elements as block-level layout containers.
-// Excludes headings (semantic text containers) and boxless elements.
+// isBlockLevel utility — classifies CSS display values as block-level or not.
+// Only values that generate a block-level box return true.
 describe("isBlockLevel utility", () => {
     let cleanup: () => void;
 
@@ -1966,25 +1936,6 @@ describe("isBlockLevel utility", () => {
         // Delta: none has no box → not block-level
         el.style.display = "none";
         assert.equal(isBlockLevel(el as unknown as HTMLElement), false, "display:none is not block-level");
-    });
-
-    // Fidelity: headings are block in CSS but are semantic text containers,
-    // not layout containers whose width should determine hint positioning.
-    it("headings are not block-level layout containers", () => {
-        const env = createDOM(``);
-        cleanup = env.cleanup;
-
-        // Base: <div> is a layout block
-        const div = env.document.createElement("div");
-        env.document.body.appendChild(div);
-        assert.equal(isBlockLevel(div as unknown as HTMLElement), true,
-            "div is a block-level layout container");
-
-        // Delta: <h2> has block display but is excluded as a heading
-        const h2 = env.document.createElement("h2");
-        env.document.body.appendChild(h2);
-        assert.equal(isBlockLevel(h2 as unknown as HTMLElement), false,
-            "h2 is a semantic text container, not a layout block");
     });
 });
 

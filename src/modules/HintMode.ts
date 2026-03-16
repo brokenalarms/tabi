@@ -4,25 +4,26 @@
 
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
-import { CLICKABLE_SELECTOR } from "./constants";
+import { CLICKABLE_SELECTOR, REPEATING_CONTAINER_SELECTOR } from "./constants";
 import { discoverElements } from "./ElementGatherer";
-import { hasHeadingContent, isBlockLevel, isInRepeatingContainer } from "./elementPredicates";
+import { hasHeadingContent, isBlockLevel, isInRepeatingContainer, hasBox } from "./elementPredicates";
 import { findAssociatedLabel } from "./elementTraversals";
 import { HEADING_SELECTOR } from "./constants";
 
 import { Mode } from "../commands";
 
-/** Walk up through inline single-child ancestors to the nearest block-level container.
- *  Returns null if element is already block, has no parent, or a parent has multiple children.
- *  Stops at body/documentElement — never returns those. */
+/** Walk up through single-child ancestors to the nearest repeating container
+ *  (li, tr) for hint width expansion.  Only repeating containers benefit from
+ *  expansion — they create vertical lists where aligned hints aid scanning.
+ *  Skips boxless ancestors (display:contents/none).
+ *  Stops at body/documentElement, or when a parent has multiple children. */
 export function findBlockAncestor(el: HTMLElement): HTMLElement | null {
-  if (isBlockLevel(el)) return null;
   let node = el;
   while (node.parentElement) {
     const parent = node.parentElement;
     if (parent === document.body || parent === document.documentElement) return null;
     if (parent.children.length !== 1) return null;
-    if (isBlockLevel(parent)) return parent;
+    if (parent.matches(REPEATING_CONTAINER_SELECTOR) && hasBox(parent)) return parent;
     node = parent;
   }
   return null;
@@ -253,14 +254,12 @@ export class HintMode {
       }
     }
 
-    // Inline elements in vertical lists: expand to nearest block ancestor's width
-    // so hints align. Walks up through inline single-child wrappers (e.g.
+    // Inline elements in vertical lists: expand to nearest repeating container's
+    // width so hints align. Walks up through single-child wrappers (e.g.
     // <li><span><a>text</a></span></li> expands to <li> width).
-    // Skip when getHintTargetElement already redirected (target !== el) — the
-    // redirect chose a narrower element intentionally.
     const tag = target.tagName.toLowerCase();
     const isFormControl = tag === "input" || tag === "textarea" || tag === "select";
-    if (!isFormControl && target === el) {
+    if (!isFormControl) {
       const blockAncestor = findBlockAncestor(target);
       if (blockAncestor) {
         const hasMixedContent = Array.from(blockAncestor.childNodes).some(

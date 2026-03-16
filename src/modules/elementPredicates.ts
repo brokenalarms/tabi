@@ -172,16 +172,14 @@ export function isContentlessOverlay(el: HTMLElement): boolean {
 
 // --- Element characteristics ---
 
-/** Block-level layout container check.  Returns true for elements that generate
- *  a block box AND act as structural layout containers (div, li, section, etc.).
- *  Excludes headings (h1–h6) — they are block-level in CSS but are semantic text
- *  containers, not layout containers whose width should determine hint positioning.
- *  Also excludes boxless elements (display:none/contents). */
+const BLOCK_DISPLAY_VALUES = ["block", "flex", "grid", "list-item", "table", "flow-root"];
+
+/** Does this element generate a block-level box?
+ *  Only returns true for known block display values — unknown or missing
+ *  values default to false rather than accidentally qualifying. */
 export function isBlockLevel(el: HTMLElement): boolean {
-  if (!hasBox(el)) return false;
-  if (el.matches(HEADING_SELECTOR)) return false;
   const display = getComputedStyle(el).display;
-  return display !== "" && !display.startsWith("inline");
+  return BLOCK_DISPLAY_VALUES.includes(display);
 }
 
 /** Is this element inside a vertically repeating container (list or table row)?
