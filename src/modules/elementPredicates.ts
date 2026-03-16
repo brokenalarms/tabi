@@ -1,7 +1,7 @@
 // Stateless element predicates — each answers one question about an element.
 // Used by walkerFilter (ElementGatherer) and hint positioning (HintMode).
 
-import { HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR } from "./constants";
+import { HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER_HEIGHT, MINIMUM_CONTAINER_WIDTH } from "./constants";
 
 // --- Visibility & geometry ---
 
@@ -196,7 +196,8 @@ export function isInRepeatingContainer(el: HTMLElement): boolean {
  *  Checks minimum width, aspect ratio or viewport fraction, and box generation. */
 export function isContainerSized(el: HTMLElement, rect: DOMRect): boolean {
   if (!hasBox(el)) return false;
-  if (rect.width <= 64) return false;
+  if (rect.width <= MINIMUM_CONTAINER_WIDTH) return false;
+  if (rect.height < MINIMUM_CONTAINER_HEIGHT) return false;
   const isRectangular = rect.width / (rect.height || 1) >= 1.5;
   const isLarge = rect.width > window.innerWidth * 0.25;
   return isRectangular || isLarge;
