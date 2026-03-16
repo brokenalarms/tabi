@@ -980,10 +980,35 @@ describe("overlay occlusion", () => {
         assert.ok(hintMode.isActive(), "Topmost link should get a hint");
     });
 
-    // ISSUE: Element partially occluded — only one corner covered by an unrelated element.
+    // ISSUE: Facebook Reels page — thin element (loading bar, header border) covers
+    // only the top edge of a nav link, causing a false occlusion.
+    // SITE: facebook.com/reel — Home button hint missing on Reels page
+    // FIX: top-only coverage doesn't count as occlusion; at least one bottom corner
+    // must be covered for an element to be considered occluded.
+    it("top-only cover does not occlude — element is still clickable", () => {
+        // Link at (10,50)-(210,70). Thin bar covers top edge only (y=48..54).
+        const link = makeElement("A", { href: "/", top: 50, left: 10, width: 200, height: 20 });
+        const topBar = makeElement("DIV", { top: 48, left: 0, width: 1024, height: 6 });
+
+        loadModules([link]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            const br = topBar.getBoundingClientRect();
+            if (x >= br.left && x < br.right && y >= br.top && y < br.bottom) {
+                return [topBar, link];
+            }
+            return [link];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(), "Top-only cover should not occlude the link");
+    });
+
+    // ISSUE: Element partially occluded — bottom corner covered by an unrelated element.
     // SITE: theguardian.com — card links partially covered by adjacent section
-    // FIX: isOccluded tests all 4 corners; ANY covered corner = occluded.
-    it("filters element when only one corner is occluded", () => {
+    // FIX: isOccluded requires at least one bottom corner to be covered.
+    it("filters element when a bottom corner is occluded", () => {
         // Link at (10,10)-(210,30). Overlay covers only the bottom-right quadrant.
         const link = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 20 });
         const overlay = makeElement("DIV", { top: 20, left: 150, width: 200, height: 200 });
