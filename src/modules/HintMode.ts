@@ -260,7 +260,7 @@ export class HintMode {
     const isFormControl = tag === "input" || tag === "textarea" || tag === "select";
     if (!isFormControl) {
       const blockAncestor = findBlockAncestor(target);
-      if (blockAncestor) {
+      if (blockAncestor && isInRepeatingContainer(blockAncestor)) {
         const hasMixedContent = Array.from(blockAncestor.childNodes).some(
           n => n.nodeType === 3 && (n.textContent || "").trim().length > 0
         );
