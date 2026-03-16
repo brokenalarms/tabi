@@ -3,7 +3,9 @@
 // non-clickable nodes, and yield visible clickable elements, then deduplicates
 // via containment analysis.
 
-import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_SELECTOR, HEADING_SELECTOR } from "./constants";
+import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_ROLES, CLICKABLE_SELECTOR, HEADING_SELECTOR } from "./constants";
+
+const CLICKABLE_ROLES_SET = new Set(CLICKABLE_ROLES);
 
 // --- Declarative predicates (stateless) ---
 
@@ -151,6 +153,17 @@ function isContentlessOverlay(el: HTMLElement): boolean {
   return adj !== null && (adj.textContent || "").trim().length > 0;
 }
 
+/** Is this element focusable (tabindex) but declaring a non-interactive role?
+ *  tabindex="0" means "focusable", not "clickable". When an element also has an
+ *  explicit role that isn't interactive (e.g. role="article"), the tabindex is for
+ *  keyboard navigation, not click targeting. Interactive roles (button, link, tab,
+ *  etc.) already match CLICKABLE_SELECTOR via their own [role='...'] selectors. */
+export function isStructuralTabindex(el: HTMLElement): boolean {
+  const role = el.getAttribute("role");
+  if (!role) return false;
+  if (!el.hasAttribute("tabindex")) return false;
+  return !CLICKABLE_ROLES_SET.has(role.toLowerCase());
+}
 
 // --- Walker filter ---
 // Routes to REJECT/SKIP/ACCEPT by calling predicates.
@@ -220,6 +233,9 @@ export function walkerFilter(node: Node): number {
   // occlusion), adding complexity without reliability. SPAs that care about accessibility
   // should use ARIA roles, tabindex, or semantic HTML — those are the signals we trust.
   if (!el.matches(CLICKABLE_SELECTOR)) return NodeFilter.FILTER_SKIP;
+
+  // tabindex + non-interactive role = structural focusability, not a click target
+  if (isStructuralTabindex(el)) return NodeFilter.FILTER_SKIP;
 
   // Opacity:0 radio/checkbox with visible label — redirect to label
   if (parseFloat(style.opacity) === 0) {

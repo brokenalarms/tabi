@@ -5,8 +5,7 @@ import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
-import { discoverElements, findBlockAncestor, hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, walkerFilter } from "../src/modules/ElementGatherer";
-import { CLICKABLE_SELECTOR } from "../src/modules/constants";
+import { discoverElements, findBlockAncestor, hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, isStructuralTabindex, walkerFilter } from "../src/modules/ElementGatherer";
 
 describe("element discovery", () => {
     afterEach(() => {
@@ -2433,37 +2432,38 @@ describe("isInRepeatingContainer with display:contents", () => {
 
 // ISSUE: <details role="article" tabindex="0"> gets a hint — structural container, not a click target
 // SITE: Reddit — shreddit-comment shadow DOM
-// FIX: tabindex selector excludes elements with explicit roles; interactive roles match via [role='...']
-describe("tabindex with explicit role filtering", () => {
-    it("tabindex without role is clickable, adding a non-interactive role removes it", () => {
+// FIX: isStructuralTabindex filters elements with tabindex + non-interactive role in the walker
+describe("structural tabindex filtering", () => {
+    it("tabindex without role is not structural, adding a non-interactive role makes it structural", () => {
         const env = createDOM(`
             <div>
                 <div id="no-role" tabindex="0">Focusable div</div>
                 <div id="with-article" tabindex="0" role="article">Article container</div>
                 <div id="with-button" tabindex="0" role="button">Button</div>
-                <div id="button-no-tab" role="button">Role-only button</div>
+                <div id="no-tabindex" role="article">No tabindex</div>
             </div>
         `);
 
         const noRole = env.document.getElementById("no-role") as HTMLElement;
         const withArticle = env.document.getElementById("with-article") as HTMLElement;
         const withButton = env.document.getElementById("with-button") as HTMLElement;
-        const buttonNoTab = env.document.getElementById("button-no-tab") as HTMLElement;
+        const noTabindex = env.document.getElementById("no-tabindex") as HTMLElement;
 
-        // Base: tabindex with no role IS clickable
-        assert.equal(noRole.matches(CLICKABLE_SELECTOR), true,
-            "tabindex='0' with no role should match CLICKABLE_SELECTOR");
+        // Base: tabindex with no role is NOT structural (it's a click target)
+        assert.equal(isStructuralTabindex(noRole), false,
+            "tabindex='0' with no role is not structural — it's genuinely clickable");
 
-        // Delta: adding role='article' (non-interactive) removes clickability
-        assert.equal(withArticle.matches(CLICKABLE_SELECTOR), false,
-            "tabindex='0' with role='article' should NOT match CLICKABLE_SELECTOR");
+        // Delta: adding role='article' (non-interactive) makes it structural
+        assert.equal(isStructuralTabindex(withArticle), true,
+            "tabindex='0' with role='article' is structural — focusable for navigation, not clicking");
 
-        // Interactive roles still match via their own [role='...'] selector
-        assert.equal(withButton.matches(CLICKABLE_SELECTOR), true,
-            "role='button' with tabindex should still match via role selector");
+        // Interactive role + tabindex is NOT structural — role declares clickability
+        assert.equal(isStructuralTabindex(withButton), false,
+            "tabindex='0' with role='button' is not structural — button is interactive");
 
-        assert.equal(buttonNoTab.matches(CLICKABLE_SELECTOR), true,
-            "role='button' without tabindex should still match via role selector");
+        // No tabindex at all is NOT structural (regardless of role)
+        assert.equal(isStructuralTabindex(noTabindex), false,
+            "No tabindex means not structural — predicate only applies to focusable elements");
 
         env.cleanup();
     });

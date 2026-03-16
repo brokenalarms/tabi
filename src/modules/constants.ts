@@ -5,8 +5,8 @@
 // not separate click targets. This prevents duplicate hints inside buttons, links, etc.
 export const NATIVE_INTERACTIVE_ELEMENTS = ["a", "button", "input", "textarea", "select"];
 
-const CLICKABLE_ROLES = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch", "treeitem"];
-const CLICKABLE_ATTRS = ["label[for]", "[tabindex]:not([tabindex='-1']):not([role])", "[onclick]", "[onmousedown]"];
+export const CLICKABLE_ROLES = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch", "treeitem"];
+const CLICKABLE_ATTRS = ["label[for]", "[tabindex]:not([tabindex='-1'])", "[onclick]", "[onmousedown]"];
 
 export const CLICKABLE_SELECTOR = [
   ...NATIVE_INTERACTIVE_ELEMENTS,
