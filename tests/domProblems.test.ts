@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
-import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer } from "../src/modules/elementPredicates";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, isSiblingInRepeatingContainer } from "../src/modules/elementPredicates";
 import { findBlockAncestor } from "../src/modules/HintMode";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
@@ -2537,3 +2537,55 @@ describe("tabindex is not a clickable signal", () => {
     });
 });
 
+describe("isSiblingInRepeatingContainer", () => {
+    // Facebook: adjacent sidebar items tile edge-to-edge with overflowing child
+    // content — sibling items in the same repeating container are not real occluders
+
+    it("returns false for elements in separate subtrees", () => {
+        const env = createDOM(`
+            <nav><a id="t" href="#">link</a></nav>
+            <main><div id="cover">content</div></main>
+        `);
+        const t = env.document.getElementById("t") as HTMLElement;
+        const cover = env.document.getElementById("cover") as HTMLElement;
+
+        // Base: unrelated elements are not siblings in a repeating container
+        assert.equal(isSiblingInRepeatingContainer(t, cover), false);
+
+        env.cleanup();
+    });
+
+    it("returns true for elements in sibling list items", () => {
+        const env = createDOM(`
+            <ul>
+                <li id="item1"><a id="t" href="#">link</a></li>
+                <li id="item2"><div id="cover">content</div></li>
+            </ul>
+        `);
+        const t = env.document.getElementById("t") as HTMLElement;
+        const cover = env.document.getElementById("cover") as HTMLElement;
+
+        // Delta: elements in sibling <li> under the same <ul> are siblings
+        assert.equal(isSiblingInRepeatingContainer(t, cover), true);
+
+        env.cleanup();
+    });
+
+    it("returns false for elements in the same list item", () => {
+        const env = createDOM(`
+            <ul>
+                <li>
+                    <a id="t" href="#">link</a>
+                    <div id="cover">content</div>
+                </li>
+            </ul>
+        `);
+        const t = env.document.getElementById("t") as HTMLElement;
+        const cover = env.document.getElementById("cover") as HTMLElement;
+
+        // Same <li> — not siblings, could be a real occluder
+        assert.equal(isSiblingInRepeatingContainer(t, cover), false);
+
+        env.cleanup();
+    });
+});

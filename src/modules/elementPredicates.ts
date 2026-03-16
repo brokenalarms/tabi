@@ -1,7 +1,7 @@
 // Stateless element predicates — each answers one question about an element.
 // Used by walkerFilter (ElementGatherer) and hint positioning (HintMode).
 
-import { HEADING_SELECTOR } from "./constants";
+import { HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR } from "./constants";
 
 // --- Visibility & geometry ---
 
@@ -122,6 +122,7 @@ export function isOccluded(el: HTMLElement, rect: DOMRect): boolean {
     if (composedContains(el, cover) || composedContains(cover, el)) return false;
     if (isSubtreeRemoved(cover)) return false;
     if (isContentlessOverlay(cover)) return false;
+    if (isSiblingInRepeatingContainer(el, cover)) return false;
     return true;
   };
 
@@ -142,6 +143,17 @@ export function isOccluded(el: HTMLElement, rect: DOMRect): boolean {
     }
   }
   return false;
+}
+
+/** Are these two elements in sibling repeating containers (different <li>/<tr>
+ *  sharing the same parent)? Adjacent items' overflowing content is not a real
+ *  occluder — it's just sibling bleed from the same list/table. */
+export function isSiblingInRepeatingContainer(a: HTMLElement, b: HTMLElement): boolean {
+  const aItem = a.closest(REPEATING_CONTAINER_SELECTOR);
+  const bItem = b.closest(REPEATING_CONTAINER_SELECTOR);
+  return aItem !== null && bItem !== null &&
+         aItem !== bItem &&
+         aItem.parentElement === bItem.parentElement;
 }
 
 /** Is this a contentless overlay link?
@@ -174,7 +186,7 @@ export function isBlockLevel(el: HTMLElement): boolean {
  *  Only counts ancestors that have a box — a display:contents <li> isn't a
  *  real container and shouldn't affect hint positioning. */
 export function isInRepeatingContainer(el: HTMLElement): boolean {
-  const container = el.closest("li, tr") as HTMLElement | null;
+  const container = el.closest(REPEATING_CONTAINER_SELECTOR) as HTMLElement | null;
   return container !== null && hasBox(container);
 }
 
