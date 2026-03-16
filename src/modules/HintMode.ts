@@ -5,7 +5,8 @@
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { CLICKABLE_SELECTOR } from "./constants";
-import { discoverElements, findAssociatedLabel, findBlockAncestor, getHeading, hasHeadingContent, isBlockLevel, isInRepeatingContainer } from "./ElementGatherer";
+import { discoverElements } from "./ElementGatherer";
+import { findAssociatedLabel, findBlockAncestor, getHeading, hasHeadingContent, isBlockLevel, isInRepeatingContainer } from "./elementPredicates";
 import { Mode } from "../commands";
 
 declare const browser: {

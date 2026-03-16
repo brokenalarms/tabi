@@ -5,7 +5,8 @@ import { describe, it, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
-import { discoverElements, findBlockAncestor, hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, walkerFilter } from "../src/modules/ElementGatherer";
+import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
+import { findBlockAncestor, hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer } from "../src/modules/elementPredicates";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
 describe("element discovery", () => {
