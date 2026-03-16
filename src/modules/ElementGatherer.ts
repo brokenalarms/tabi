@@ -283,9 +283,12 @@ export function isBlockLevel(el: HTMLElement): boolean {
 
 /** Is this element inside a vertically repeating container (list or table row)?
  *  Elements inside <li> or <tr> are part of a flowing layout where hints should
- *  stay centered on the full container width for vertical alignment. */
+ *  stay centered on the full container width for vertical alignment.
+ *  Only counts ancestors that have a box — a display:contents <li> isn't a
+ *  real container and shouldn't affect hint positioning. */
 export function isInRepeatingContainer(el: HTMLElement): boolean {
-  return el.closest("li") !== null || el.closest("tr") !== null;
+  const container = el.closest("li, tr") as HTMLElement | null;
+  return container !== null && hasBox(container);
 }
 
 /** Does this element contain a heading (h1–h6) as a descendant? */

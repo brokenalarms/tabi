@@ -6,6 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, findBlockAncestor, hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, walkerFilter } from "../src/modules/ElementGatherer";
+import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
 describe("element discovery", () => {
     afterEach(() => {
@@ -2397,6 +2398,74 @@ describe("shadow DOM elements not falsely occluded", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive(),
             "Button inside shadow root should get a hint — shadow host is an ancestor, not a cover");
+    });
+});
+
+// ISSUE: display:contents <li> has no box and shouldn't count as a repeating container
+// FIX: isInRepeatingContainer composes hasBox — only box-generating ancestors count
+describe("isInRepeatingContainer with display:contents", () => {
+    it("box-generating <li> is a repeating container, display:contents is not", () => {
+        const env = createDOM(`
+            <ul>
+                <li id="boxed" style="display: list-item;">
+                    <a id="link-boxed" href="#">Link</a>
+                </li>
+                <li id="contents" style="display: contents;">
+                    <a id="link-contents" href="#">Link</a>
+                </li>
+            </ul>
+        `);
+
+        const linkBoxed = env.document.getElementById("link-boxed") as HTMLElement;
+        const linkContents = env.document.getElementById("link-contents") as HTMLElement;
+
+        // Base: link inside a normal <li> IS in a repeating container
+        assert.equal(isInRepeatingContainer(linkBoxed), true,
+            "Link inside box-generating <li> should be in a repeating container");
+
+        // Delta: link inside display:contents <li> is NOT in a repeating container
+        assert.equal(isInRepeatingContainer(linkContents), false,
+            "Link inside display:contents <li> should not be in a repeating container");
+
+        env.cleanup();
+    });
+});
+
+// ISSUE: <details role="article" tabindex="0"> gets a hint — structural container, not a click target
+// SITE: Reddit — shreddit-comment shadow DOM
+// FIX: tabindex selector excludes elements with explicit roles; interactive roles match via [role='...']
+describe("tabindex with explicit role filtering", () => {
+    it("tabindex without role is clickable, adding a non-interactive role removes it", () => {
+        const env = createDOM(`
+            <div>
+                <div id="no-role" tabindex="0">Focusable div</div>
+                <div id="with-article" tabindex="0" role="article">Article container</div>
+                <div id="with-button" tabindex="0" role="button">Button</div>
+                <div id="button-no-tab" role="button">Role-only button</div>
+            </div>
+        `);
+
+        const noRole = env.document.getElementById("no-role") as HTMLElement;
+        const withArticle = env.document.getElementById("with-article") as HTMLElement;
+        const withButton = env.document.getElementById("with-button") as HTMLElement;
+        const buttonNoTab = env.document.getElementById("button-no-tab") as HTMLElement;
+
+        // Base: tabindex with no role IS clickable
+        assert.equal(noRole.matches(CLICKABLE_SELECTOR), true,
+            "tabindex='0' with no role should match CLICKABLE_SELECTOR");
+
+        // Delta: adding role='article' (non-interactive) removes clickability
+        assert.equal(withArticle.matches(CLICKABLE_SELECTOR), false,
+            "tabindex='0' with role='article' should NOT match CLICKABLE_SELECTOR");
+
+        // Interactive roles still match via their own [role='...'] selector
+        assert.equal(withButton.matches(CLICKABLE_SELECTOR), true,
+            "role='button' with tabindex should still match via role selector");
+
+        assert.equal(buttonNoTab.matches(CLICKABLE_SELECTOR), true,
+            "role='button' without tabindex should still match via role selector");
+
+        env.cleanup();
     });
 });
 
