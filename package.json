@@ -6,7 +6,8 @@
     "build": "node esbuild.config.mjs",
     "typecheck": "tsc --noEmit",
     "test": "tsx --test --test-reporter=dot --test-force-exit tests/*.test.ts",
-    "test:integration": "playwright test"
+    "test:integration": "playwright test",
+    "safari": "bash scripts/safari.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
