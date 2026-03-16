@@ -121,6 +121,17 @@ describe("element discovery", () => {
 
     // Wrapper div with onclick containing a textarea — only textarea gets a hint
     it("filters out ancestor wrapper when descendant is also a candidate", () => {
+        // Base: onclick wrapper alone gets a hint (proving it's discoverable)
+        const wrapperAlone = makeElement("DIV", { top: 10, left: 10 });
+        wrapperAlone.setAttribute("onclick", "");
+        loadModules([wrapperAlone]);
+        (globalThis as any).document.elementsFromPoint = () => [wrapperAlone];
+        const { hintMode: base } = getState();
+        base.activate(false);
+        assert.ok(base.isActive(), "onclick wrapper alone should get a hint");
+        base.destroy();
+
+        // Delta: wrapper with textarea child — only textarea gets a hint
         const textarea = makeElement("TEXTAREA", { top: 10, left: 10 });
         const wrapper = makeElement("DIV", { top: 10, left: 10 });
         wrapper.setAttribute("onclick", "");
@@ -128,9 +139,7 @@ describe("element discovery", () => {
 
         loadModules([wrapper, textarea]);
 
-        // Need elementFromPoint/elementsFromPoint to return the element itself for visibility
         (globalThis as any).document.elementFromPoint = (x: number, y: number) => {
-            // Return the textarea for any point check (both are at same position)
             return textarea;
         };
         (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
@@ -141,10 +150,7 @@ describe("element discovery", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
         // Only 1 hint (textarea), not 2 (wrapper filtered out)
-        // hintMode._hints is private, so check via label: with 1 element, label is "s"
-        // Type "s" to activate — if there were 2 hints, labels would be "ss","sa" (2-char)
         fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
-        // If only 1 hint, typing "s" activates it and deactivates hint mode
         assert.ok(!hintMode.isActive(), "Expected 1 hint (textarea only), but got more — wrapper was not filtered");
     });
 });
@@ -634,6 +640,19 @@ describe("zero in one dimension filtered", () => {
     });
 
     it("filters out element with zero height but non-zero width", () => {
+        // Base: onclick div with both dimensions → gets a hint
+        const normal = makeElement("DIV", {
+            top: 10, left: 10, width: 1024, height: 50,
+            attrs: { onclick: "" },
+        });
+        loadModules([normal]);
+        (globalThis as any).document.elementsFromPoint = () => [normal];
+        const { hintMode: base } = getState();
+        base.activate(false);
+        assert.ok(base.isActive(), "onclick div with size should get a hint");
+        base.destroy();
+
+        // Delta: zero height → no hint
         const zeroHeight = makeElement("DIV", {
             top: 0, left: 0, width: 1024, height: 0,
             attrs: { onclick: "" },
@@ -645,6 +664,19 @@ describe("zero in one dimension filtered", () => {
     });
 
     it("filters out element with zero width but non-zero height", () => {
+        // Base: onclick div with both dimensions → gets a hint
+        const normal = makeElement("DIV", {
+            top: 10, left: 10, width: 50, height: 768,
+            attrs: { onclick: "" },
+        });
+        loadModules([normal]);
+        (globalThis as any).document.elementsFromPoint = () => [normal];
+        const { hintMode: base } = getState();
+        base.activate(false);
+        assert.ok(base.isActive(), "onclick div with size should get a hint");
+        base.destroy();
+
+        // Delta: zero width → no hint
         const zeroWidth = makeElement("DIV", {
             top: 0, left: 0, width: 0, height: 768,
             attrs: { onclick: "" },
@@ -1109,6 +1141,19 @@ describe("generic sibling dedup", () => {
     });
 
     it("removes generic siblings when an interactive sibling exists", () => {
+        // Base: generic onclick div alone gets a hint (proving it's discoverable)
+        const loneDiv = makeElement("DIV", {
+            top: 5, left: 5, width: 30, height: 30,
+            attrs: { onclick: "" },
+        });
+        loadModules([loneDiv]);
+        (globalThis as any).document.elementsFromPoint = () => [loneDiv];
+        const { hintMode: base } = getState();
+        base.activate(false);
+        assert.ok(base.isActive(), "Lone generic onclick div should get a hint");
+        base.destroy();
+
+        // Delta: adding an interactive sibling causes generic divs to be deduped
         const parent = makeElement("DIV", { top: 0, left: 0, width: 400, height: 40 });
 
         const input = makeElement("INPUT", {
@@ -1146,27 +1191,6 @@ describe("generic sibling dedup", () => {
         const hintOverlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = hintOverlay?.querySelectorAll(".vimium-hint");
         assert.equal(hints?.length, 1, "Expected 1 hint (input only) — generic divs should be removed");
-    });
-
-    it("keeps generic element when no interactive sibling exists", () => {
-        const parent = makeElement("DIV", { top: 0, left: 0, width: 400, height: 40 });
-
-        const clickableDiv = makeElement("DIV", {
-            top: 5, left: 5, width: 350, height: 30,
-            attrs: { onclick: "" },
-        });
-
-        parent.appendChild(clickableDiv);
-
-        loadModules([clickableDiv]);
-
-        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
-            return [clickableDiv];
-        };
-
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(hintMode.isActive(), "Lone generic div should still get a hint");
     });
 });
 
