@@ -6,7 +6,7 @@ import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { CLICKABLE_SELECTOR, REPEATING_CONTAINER_SELECTOR } from "./constants";
 import { discoverElements } from "./ElementGatherer";
-import { hasHeadingContent, isBlockLevel, isContainerSized, isInRepeatingContainer, hasBox } from "./elementPredicates";
+import { hasHeadingContent, isBlockLevel, isContainerSized, isInRepeatingContainer, getRepeatingContainer, hasBox } from "./elementPredicates";
 import { findAssociatedLabel } from "./elementTraversals";
 import { HEADING_SELECTOR } from "./constants";
 
@@ -214,32 +214,32 @@ export class HintMode {
     // wrapper nesting — not containers. Inline elements get pill+pointer.
     let rect = target.getBoundingClientRect();
     let container = false;
-    if (target === el && el.children.length > 0 && isContainerSized(el, rect)) {
-      console.log("CONTAINER SIZED:", el.tagName, el.className.slice(0, 40), rect.width, rect.height);
-      if (isInRepeatingContainer(el)) {
-        // Elements in repeating containers (li, tr) always get container
-        // treatment when sized — the list structure provides visual context.
-        container = true;
-      } else {
-        // Walk the single-child chain — if it reaches a leaf with no sibling
-        // text, it's just wrapper nesting (e.g. <a><span>text</span></a>).
-        // But if any level has text nodes alongside the single element child
-        // (e.g. <summary><svg/>Assignees</summary>), it's a real container.
-        let node: HTMLElement = el;
-        let hasTextAlongside = false;
-        while (node.children.length === 1) {
-          for (let i = 0; i < node.childNodes.length; i++) {
-            const child = node.childNodes[i];
-            if (child.nodeType === 3 && (child.textContent || "").trim().length > 0) {
-              hasTextAlongside = true;
-              break;
-            }
+    // For elements in repeating containers (li, tr), the glow border is
+    // rendered around the container — so the container's dimensions determine
+    // whether it qualifies, not the interactive element's own dimensions.
+    const repeatingContainer = (target === el && el.children.length > 0)
+      ? getRepeatingContainer(el) : null;
+    if (repeatingContainer && isContainerSized(repeatingContainer, repeatingContainer.getBoundingClientRect())) {
+      container = true;
+    } else if (target === el && el.children.length > 0 && isContainerSized(el, rect)) {
+      // Walk the single-child chain — if it reaches a leaf with no sibling
+      // text, it's just wrapper nesting (e.g. <a><span>text</span></a>).
+      // But if any level has text nodes alongside the single element child
+      // (e.g. <summary><svg/>Assignees</summary>), it's a real container.
+      let node: HTMLElement = el;
+      let hasTextAlongside = false;
+      while (node.children.length === 1) {
+        for (let i = 0; i < node.childNodes.length; i++) {
+          const child = node.childNodes[i];
+          if (child.nodeType === 3 && (child.textContent || "").trim().length > 0) {
+            hasTextAlongside = true;
+            break;
           }
-          if (hasTextAlongside) break;
-          node = node.children[0] as HTMLElement;
         }
-        container = node.children.length > 0 || hasTextAlongside;
+        if (hasTextAlongside) break;
+        node = node.children[0] as HTMLElement;
       }
+      container = node.children.length > 0 || hasTextAlongside;
     }
 
     if (el !== target && el.getBoundingClientRect().width > window.innerWidth * 0.25) {
