@@ -364,7 +364,7 @@ describe("disclosure trigger dedup", () => {
     it("does not filter regular button without aria-expanded", () => {
         const parent = makeElement("LI", { top: 0, left: 0 });
         const link = makeElement("A", { href: "#", top: 10, left: 0 });
-        const btn = makeElement("BUTTON", { top: 10, left: 50 });
+        const btn = makeElement("BUTTON", { top: 10, left: 110 });
         parent.appendChild(link);
         parent.appendChild(btn);
 
@@ -929,6 +929,28 @@ describe("overlay occlusion", () => {
         assert.ok(hintMode.isActive(), "Topmost link should get a hint");
     });
 
+    // ISSUE: Element partially occluded — only one corner covered by an unrelated element.
+    // SITE: theguardian.com — card links partially covered by adjacent section
+    // FIX: isOccluded tests all 4 corners; ANY covered corner = occluded.
+    it("filters element when only one corner is occluded", () => {
+        // Link at (10,10)-(210,30). Overlay covers only the bottom-right quadrant.
+        const link = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 20 });
+        const overlay = makeElement("DIV", { top: 20, left: 150, width: 200, height: 200 });
+
+        loadModules([link]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            const or = overlay.getBoundingClientRect();
+            if (x >= or.left && x < or.right && y >= or.top && y < or.bottom) {
+                return [overlay, link];
+            }
+            return [link];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(!hintMode.isActive(), "Link with one corner occluded should be filtered");
+    });
 });
 
 // ISSUE: Empty overlay <a> (no text, no children) gets a hint because it's the
