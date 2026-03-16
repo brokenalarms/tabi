@@ -1414,7 +1414,7 @@ describe("native interactive elements prune subtrees", () => {
     // ISSUE: Container links (role="link" divs, wide nav items) with no specific visual anchor
     // get a pointed hint in the middle, which looks arbitrary. Bar style is more appropriate.
     // FIX: When getHintTargetElement returns the element itself and it has children, use bar style.
-    // SITE: x.com (trending topics), github.com (sidebar sections)
+    // SITE: x.com (trending topics), github.com (sidebar sections), facebook.com (top nav)
     it("container link with children gets container glow", () => {
         // Base: same role="link" div with single child → no glow
         const base = makeElement("DIV", { top: 10, left: 10, width: 300, height: 80,
@@ -1430,19 +1430,36 @@ describe("native interactive elements prune subtrees", () => {
             "Base: single child should not get container glow");
         hintMode.deactivate();
 
-        // Delta: add second child → branching content → glow
-        const delta = makeElement("DIV", { top: 10, left: 10, width: 300, height: 80,
+        // Delta 1: add second child → branching content → glow
+        const delta1 = makeElement("DIV", { top: 10, left: 10, width: 300, height: 80,
             attrs: { role: "link", tabindex: "0" } });
-        delta.appendChild(makeElement("DIV", { top: 15, left: 15, width: 200, height: 16, textContent: "Trending" }));
-        delta.appendChild(makeElement("DIV", { top: 35, left: 15, width: 200, height: 20, textContent: "DOGE" }));
+        delta1.appendChild(makeElement("DIV", { top: 15, left: 15, width: 200, height: 16, textContent: "Trending" }));
+        delta1.appendChild(makeElement("DIV", { top: 35, left: 15, width: 200, height: 20, textContent: "DOGE" }));
 
-        loadModules([delta]);
-        (globalThis as any).document.elementsFromPoint = () => [delta];
+        loadModules([delta1]);
+        (globalThis as any).document.elementsFromPoint = () => [delta1];
         ({ hintMode } = getState());
         hintMode.activate(false);
         overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
-            "Delta: branching children should get container glow");
+            "Delta 1: branching children should get container glow");
+        hintMode.deactivate();
+
+        // Delta 2: single child (no branching) but inside <li> → repeating
+        // container forces container treatment regardless of content structure.
+        // facebook.com: <li><a><span><svg/><span/></span></a></li>
+        const li = makeElement("LI", { top: 10, left: 10, width: 200, height: 50, display: "list-item" });
+        const link = makeElement("A", { href: "/", top: 10, left: 10, width: 200, height: 50 });
+        link.appendChild(makeElement("SPAN", { top: 10, left: 10, width: 200, height: 50 }));
+        li.appendChild(link);
+
+        loadModules([link]);
+        (globalThis as any).document.elementsFromPoint = () => [link];
+        ({ hintMode } = getState());
+        hintMode.activate(false);
+        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+            "Delta 2: single child inside <li> should get container glow (repeating container)");
     });
 
     // Heading redirect causes target !== el, which disables container detection.
@@ -2674,51 +2691,3 @@ describe("isSiblingInRepeatingContainer", () => {
     });
 });
 
-describe("repeating container forces container treatment", () => {
-    afterEach(() => {
-        const { hintMode } = getState();
-        if (hintMode.isActive()) hintMode.deactivate();
-    });
-
-    // ISSUE: Sized elements inside repeating containers (<li>, <tr>) should get
-    // container treatment (glow + inside-end pill) not external pointer.
-    // SITE: facebook.com top nav bar — icon links in <li> items
-    // FIX: isInRepeatingContainer + size criteria → container=true, skip
-    // branching content walk.
-    it("sized element inside <li> gets container glow, not pointer", () => {
-        // Base: wide link with single-child chain outside <li> → non-container
-        const baseLink = makeElement("A", { href: "/", top: 0, left: 0, width: 200, height: 50 });
-        const baseSpan = makeElement("SPAN", { top: 0, left: 0, width: 200, height: 50 });
-        baseLink.appendChild(baseSpan);
-
-        loadModules([baseLink]);
-        (globalThis as any).document.elementsFromPoint = () => [baseLink];
-        let { hintMode } = getState();
-        hintMode.activate(false);
-        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        assert.ok(!overlay?.querySelector(".vimium-hint-container-glow"),
-            "Base: link outside <li> with single-child chain should not get glow");
-        let hints = overlay?.querySelectorAll(".vimium-hint");
-        assert.ok(hints[0]?.querySelector(".vimium-hint-tail"),
-            "Base: link outside <li> should get pointer tail");
-        hintMode.deactivate();
-
-        // Delta: same structure inside <li> → container (glow, no tail)
-        const li = makeElement("LI", { top: 0, left: 0, width: 200, height: 50, display: "list-item" });
-        const deltaLink = makeElement("A", { href: "/", top: 0, left: 0, width: 200, height: 50 });
-        const deltaSpan = makeElement("SPAN", { top: 0, left: 0, width: 200, height: 50 });
-        deltaLink.appendChild(deltaSpan);
-        li.appendChild(deltaLink);
-
-        loadModules([deltaLink]);
-        (globalThis as any).document.elementsFromPoint = () => [deltaLink];
-        ({ hintMode } = getState());
-        hintMode.activate(false);
-        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
-            "Delta: sized link inside <li> should get container glow");
-        hints = overlay?.querySelectorAll(".vimium-hint");
-        assert.ok(!hints[0]?.querySelector(".vimium-hint-tail"),
-            "Delta: sized link inside <li> should not get pointer tail");
-    });
-});

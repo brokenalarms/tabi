@@ -333,10 +333,11 @@ export class HintMode {
   }
 
   private createOverlay(): void {
-    // Remove any stale overlay left from a previous activation whose
-    // transitionend didn't fire (e.g. rapid toggle, animations disabled).
-    const stale = document.documentElement.querySelector(".vimium-hint-overlay");
-    if (stale) stale.remove();
+    // Remove ALL stale overlays left from previous activations whose
+    // transitionend didn't fire (e.g. rapid toggle, animations disabled,
+    // or double content-script injection).
+    document.documentElement.querySelectorAll(".vimium-hint-overlay")
+      .forEach(el => el.remove());
 
     this.overlay = document.createElement("div");
     this.overlay.className = `vimium-hint-overlay${DEFAULTS.animate ? " vimium-hint-animate" : ""}`;
