@@ -59,3 +59,13 @@ If the user agrees, you may proceed:
 - **Pull in the latest from origin main, commit and create PR** then we have a history of each fix in Github as well. This is part of completing the fix after I agree, you don't need to ask to create a PR. If there are errors we can update it (updating the description to account for all commits each time).
 
 Each pasted scenario = one test. The test is the proof that the bug is fixed and won't regress.
+
+## Architecture Decisions
+
+### No `cursor:pointer` discovery (removed March 2026)
+
+The element discovery pipeline only uses semantic signals (`CLICKABLE_SELECTOR`: native interactive elements, ARIA roles, `tabindex`, `onclick`, `label[for]`). We intentionally do **not** use `cursor:pointer` as a fallback discovery signal.
+
+**Why:** `cursor:pointer` was originally added to catch SPA elements that use JS click handlers without ARIA markup. In practice, it produced far more false positives than true positives — non-interactive images, decorative wrappers, and overlay containers all receive `cursor:pointer` from CSS inheritance or card styling. Each false positive required a new dedup rule (wrapper dedup, sibling dedup, cover occlusion exemptions), compounding complexity without improving reliability. The worst case: on card-based layouts (e.g. The Guardian), `cursor:pointer` caused hints to land on images instead of the actual overlay `<a>` link, making cards unclickable.
+
+**Trade-off:** Some JS-only click handlers on unstyled `<div>` elements won't be discovered. This is acceptable because well-built SPAs use ARIA roles, `tabindex`, or semantic HTML, and those signals are already covered. Sites that rely solely on `cursor:pointer` without any accessibility attributes are not accessible to keyboard users either — our coverage aligns with theirs.

@@ -152,31 +152,6 @@ export class HintMode {
       }
     }
 
-    /** Elements matching CLICKABLE_SELECTOR are interactive — return directly. */
-    if (el.matches(CLICKABLE_SELECTOR)) return el;
-
-    // Below: generic cursor:pointer wrappers only — find the best visual target.
-
-    const walker = document.createTreeWalker(el, NodeFilter.SHOW_ELEMENT, {
-      acceptNode: (node) =>
-        (node as HTMLElement).getAttribute("aria-hidden") === "true"
-          ? NodeFilter.FILTER_REJECT
-          : NodeFilter.FILTER_ACCEPT,
-    });
-    let node = walker.nextNode() as HTMLElement | null;
-    while (node) {
-      if (node !== el) {
-        for (let i = 0; i < node.childNodes.length; i++) {
-          const child = node.childNodes[i];
-          if (child.nodeType === 3 && (child.textContent || "").trim().length > 0) {
-            const cr = node.getBoundingClientRect();
-            if (cr.width > 4 && cr.height > 4) return node;
-          }
-        }
-      }
-      node = walker.nextNode() as HTMLElement | null;
-    }
-
     return el;
   }
 
