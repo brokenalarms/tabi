@@ -12,7 +12,7 @@ import {
 // Re-export predicates so existing consumers (HintMode, tests) don't break
 export {
   hasBox, isBlockLevel, isInRepeatingContainer, hasHeadingContent, getHeading,
-  findAssociatedLabel, findBlockAncestor,
+  findAssociatedLabel,
 } from "./elementPredicates";
 
 // --- Walker filter ---

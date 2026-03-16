@@ -6,7 +6,23 @@ import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { CLICKABLE_SELECTOR } from "./constants";
 import { discoverElements } from "./ElementGatherer";
-import { findAssociatedLabel, findBlockAncestor, getHeading, hasHeadingContent, isBlockLevel, isInRepeatingContainer } from "./elementPredicates";
+import { findAssociatedLabel, getHeading, hasHeadingContent, isBlockLevel, isInRepeatingContainer } from "./elementPredicates";
+
+/** Walk up through inline single-child ancestors to the nearest block-level container.
+ *  Returns null if element is already block, has no parent, or a parent has multiple children.
+ *  Stops at body/documentElement — never returns those. */
+export function findBlockAncestor(el: HTMLElement): HTMLElement | null {
+  if (isBlockLevel(el)) return null;
+  let node = el;
+  while (node.parentElement) {
+    const parent = node.parentElement;
+    if (parent === document.body || parent === document.documentElement) return null;
+    if (parent.children.length !== 1) return null;
+    if (isBlockLevel(parent)) return parent;
+    node = parent;
+  }
+  return null;
+}
 import { Mode } from "../commands";
 
 declare const browser: {
