@@ -125,16 +125,21 @@ export function isOccluded(el: HTMLElement, rect: DOMRect): boolean {
     return true;
   };
 
-  const points = [
-    [rect.left + 2, rect.top + 2],
-    [rect.right - 2, rect.top + 2],
-    [rect.left + 2, rect.bottom - 2],
-    [rect.right - 2, rect.bottom - 2],
+  // Check all 4 corners but require at least one BOTTOM corner to be covered.
+  // Top-only coverage (e.g. a thin loading bar or header border overlapping the
+  // top edge) doesn't block interaction — the element is still clickable below.
+  const corners: [number, number, boolean][] = [
+    [rect.left + 2, rect.top + 2, false],
+    [rect.right - 2, rect.top + 2, false],
+    [rect.left + 2, rect.bottom - 2, true],
+    [rect.right - 2, rect.bottom - 2, true],
   ];
 
-  for (const [x, y] of points) {
+  for (const [x, y, isBottom] of corners) {
     const hits = document.elementsFromPoint(clampX(x), clampY(y));
-    if (hits.length > 0 && isCover(hits[0] as HTMLElement)) return true;
+    if (hits.length > 0 && isCover(hits[0] as HTMLElement)) {
+      if (isBottom) return true;
+    }
   }
   return false;
 }
