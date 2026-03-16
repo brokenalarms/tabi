@@ -67,7 +67,6 @@ export class HintMode {
   private readonly onScroll: () => void;
   private readonly onResize: () => void;
   private hintInfoCache: Map<HTMLElement, { rect: DOMRect; container: boolean }>;
-  private placementMap: Map<HTMLElement, number | null>;
 
   constructor(keyHandler: KeyHandlerLike) {
     this.keyHandler = keyHandler;
@@ -81,7 +80,6 @@ export class HintMode {
     this.onScroll = this.deactivate.bind(this);
     this.onResize = this.deactivate.bind(this);
     this.hintInfoCache = new Map();
-    this.placementMap = new Map();
   }
 
   // --- Public API ---
@@ -102,7 +100,21 @@ export class HintMode {
       return;
     }
 
-    this.computePlacements(elements);
+    // Downgrade container=true for any element that contains another discovered element.
+    // A container with nested hinted elements isn't a visual container — the nested
+    // elements get their own hints, so the parent should use pill-below.
+    for (const el of elements) {
+      const info = this.hintInfoCache.get(el);
+      if (info && info.container) {
+        for (const other of elements) {
+          if (other !== el && el.contains(other)) {
+            info.container = false;
+            break;
+          }
+        }
+      }
+    }
+
     const labels = HintMode.generateLabels(elements.length);
     this.createOverlay();
     this.hints = elements.map((el, i) => {
@@ -139,7 +151,6 @@ export class HintMode {
 
     this.hints = [];
     this.hintInfoCache.clear();
-    this.placementMap.clear();
     this.keyHandler.setMode(Mode.NORMAL);
   }
 
@@ -326,135 +337,14 @@ export class HintMode {
     this.overlay.classList.add("visible");
   }
 
-  /** Can the hint pill fit inside the container at the right end?
-   *  Returns the right-edge X coordinate for positioning, or null if
-   *  inside placement isn't possible. Places inside when the container
-   *  is wide enough, text doesn't overlap, and no nested interactives
-   *  compete for the right zone. Trailing non-text elements (badges,
-   *  chevrons) may be overlapped for visual consistency across rows. */
-  private canPlaceInside(el: HTMLElement, allElements: HTMLElement[]): number | null {
-    const PILL_WIDTH = 30;
-    const INSET_MIN = 6;
-    const elRect = el.getBoundingClientRect();
-    const cs = getComputedStyle(el);
-    const insetRight = Math.max(INSET_MIN, parseFloat(cs.paddingRight) || 0);
-
-    // Container must be row-like (wider than tall) and wide enough
-    if (elRect.width < 200 || elRect.height >= elRect.width) return null;
-
-    // Check primary text content doesn't extend into the pill zone.
-    // Only measures text that starts in the left 70% of the container —
-    // trailing text (badges, labels) in the right 30% is allowed to be
-    // overlapped for visual consistency across sibling rows.
-    const pillZoneLeft = elRect.right - insetRight - PILL_WIDTH;
-    const trailingThreshold = elRect.left + elRect.width * 0.7;
-    let textOverlaps = false;
-    const walkText = (node: Node): void => {
-      if (textOverlaps) return;
-      for (let i = 0; i < node.childNodes.length; i++) {
-        const child = node.childNodes[i];
-        if (child.nodeType === 3) {
-          const text = (child.textContent || "").trim();
-          if (text.length > 0) {
-            let measured = false;
-            try {
-              const range = document.createRange();
-              range.selectNodeContents(child);
-              const rangeRect = range.getBoundingClientRect();
-              if (rangeRect.width > 0) {
-                measured = true;
-                // Only block if this text starts in the primary content zone
-                if (rangeRect.left < trailingThreshold && rangeRect.right > pillZoneLeft) {
-                  textOverlaps = true;
-                  return;
-                }
-              }
-            } catch (_) { /* Range API unavailable */ }
-            // Fallback: no layout engine (e.g. happy-dom) — use parent bounds
-            if (!measured) {
-              const parent = child.parentElement;
-              if (parent) {
-                const pr = parent.getBoundingClientRect();
-                if (pr.left < trailingThreshold && pr.right > pillZoneLeft) {
-                  textOverlaps = true;
-                  return;
-                }
-              }
-            }
-          }
-        } else if (child.nodeType === 1) {
-          walkText(child);
-        }
-      }
-    };
-    walkText(el);
-    if (textOverlaps) return null;
-
-    // Check no other hinted element occupies the right zone
-    for (const other of allElements) {
-      if (other === el) continue;
-      if (el.contains(other)) {
-        const otherRect = other.getBoundingClientRect();
-        if (otherRect.right > pillZoneLeft) return null;
-      }
-    }
-
-    return elRect.right - insetRight;
-  }
-
-  /** Pre-compute inside-end placement for all elements with sibling consistency.
-   *  Groups container elements by parent and promotes all siblings to inside-end
-   *  if any sibling in the group qualifies. */
-  private computePlacements(allElements: HTMLElement[]): void {
-    this.placementMap.clear();
-
-    // Raw per-element computation
-    for (const el of allElements) {
-      const { container } = this.getHintInfo(el);
-      this.placementMap.set(el, container ? this.canPlaceInside(el, allElements) : null);
-    }
-
-    // Sibling consistency: group containers by parent
-    const byParent = new Map<HTMLElement, HTMLElement[]>();
-    for (const el of allElements) {
-      const { container } = this.getHintInfo(el);
-      if (!container) continue;
-      const parent = el.parentElement;
-      if (!parent) continue;
-      let group = byParent.get(parent);
-      if (!group) { group = []; byParent.set(parent, group); }
-      group.push(el);
-    }
-
-    // Promote: if any sibling can place inside, all do
-    for (const [, siblings] of byParent) {
-      if (siblings.length < 2) continue;
-      const canPlace = siblings.filter(el => this.placementMap.get(el) !== null);
-      if (canPlace.length > 0 && canPlace.length < siblings.length) {
-        for (const el of siblings) {
-          if (this.placementMap.get(el) === null) {
-            const elRect = el.getBoundingClientRect();
-            const cs = getComputedStyle(el);
-            const insetRight = Math.max(6, parseFloat(cs.paddingRight) || 0);
-            this.placementMap.set(el, elRect.right - insetRight);
-          }
-        }
-      }
-    }
-  }
-
   private createHintDiv(element: HTMLElement, label: string, allElements: HTMLElement[]): HTMLDivElement {
     const { rect, container } = this.getHintInfo(element);
     const div = document.createElement("div");
     div.className = "vimium-hint";
     div.textContent = label;
 
-    const insideX = this.placementMap.get(element) ?? null;
-
-    // All containers get a glow border — decoupled from inside-end positioning
-    // so containers with nested interactives or text-filled content still
-    // show the glow to indicate the full container is the click target.
     if (container) {
+      // Container: glow border + inside-end pill
       const elRect = element.getBoundingClientRect();
       const cs = getComputedStyle(element);
       const padH = Math.max(0, 4 - parseFloat(cs.paddingLeft));
@@ -467,21 +357,17 @@ export class HintMode {
       glow.style.width = (elRect.width + padH * 2) + "px";
       glow.style.height = (elRect.height + padV * 2) + "px";
       if (this.overlay) this.overlay.appendChild(glow);
-    }
 
-    if (insideX !== null) {
-      // Inside-end: pill inside container, right-aligned, vertically centered.
-      const elRect = element.getBoundingClientRect();
+      const insetRight = Math.max(6, parseFloat(cs.paddingRight) || 0);
       const pos = this.viewportToDocument(
-        insideX,
+        elRect.right - insetRight,
         elRect.top + elRect.height / 2
       );
       div.style.left = pos.x + "px";
       div.style.top = pos.y + "px";
       div.style.transform = "translate(-100%, -50%)";
     } else {
-      // Pill below with pointer — for non-containers and containers
-      // that can't fit the hint inside (too narrow, tall, or text-filled).
+      // Non-container: pill below with pointer tail
       const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
       div.style.left = Math.max(0, pos.x) + "px";
       div.style.top = Math.max(0, pos.y) + "px";
