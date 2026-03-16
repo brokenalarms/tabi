@@ -192,6 +192,16 @@ export function isInRepeatingContainer(el: HTMLElement): boolean {
   return container !== null && hasBox(container);
 }
 
+/** Is this element large and rectangular enough for container-style hint placement?
+ *  Checks minimum width, aspect ratio or viewport fraction, and box generation. */
+export function isContainerSized(el: HTMLElement, rect: DOMRect): boolean {
+  if (!hasBox(el)) return false;
+  if (rect.width <= 64) return false;
+  const isRectangular = rect.width / (rect.height || 1) >= 1.5;
+  const isLarge = rect.width > window.innerWidth * 0.25;
+  return isRectangular || isLarge;
+}
+
 /** Does this element contain a heading (h1–h6) as a descendant? */
 export function hasHeadingContent(el: HTMLElement): boolean {
   return el.querySelector(HEADING_SELECTOR) !== null;
