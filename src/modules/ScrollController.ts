@@ -92,14 +92,18 @@ export class ScrollController {
   ): void {
     const existing = ScrollController._chaseAnimations.get(target);
     if (existing) {
-      existing.targetX += deltaX;
-      existing.targetY += deltaY;
+      const maxX = target.scrollWidth - target.clientWidth;
+      const maxY = target.scrollHeight - target.clientHeight;
+      existing.targetX = Math.max(0, Math.min(maxX, existing.targetX + deltaX));
+      existing.targetY = Math.max(0, Math.min(maxY, existing.targetY + deltaY));
       return;
     }
 
+    const maxX = target.scrollWidth - target.clientWidth;
+    const maxY = target.scrollHeight - target.clientHeight;
     const anim: ChaseAnimation = {
-      targetX: target.scrollLeft + deltaX,
-      targetY: target.scrollTop + deltaY,
+      targetX: Math.max(0, Math.min(maxX, target.scrollLeft + deltaX)),
+      targetY: Math.max(0, Math.min(maxY, target.scrollTop + deltaY)),
       rafId: 0,
       lastTime: 0, // 0 = first frame not yet recorded
     };
@@ -138,7 +142,7 @@ export class ScrollController {
       target.scrollLeft += remainingX * factor;
       target.scrollTop += remainingY * factor;
 
-      // Browser clamped scroll (boundary or sub-pixel rounding) — snap to target
+      // Sub-pixel rounding prevented movement — snap to close any remaining gap
       if (target.scrollLeft === beforeX && target.scrollTop === beforeY) {
         target.scrollLeft = anim.targetX;
         target.scrollTop = anim.targetY;
@@ -165,6 +169,8 @@ export class ScrollController {
     const target = ScrollController.findScrollTarget(axis);
     const chase = ScrollController._chaseAnimations.get(target);
     if (chase) {
+      // Don't snap — just stop the previous motion where it is and
+      // start the new direction from the current position.
       cancelAnimationFrame(chase.rafId);
       ScrollController._chaseAnimations.delete(target);
     }
