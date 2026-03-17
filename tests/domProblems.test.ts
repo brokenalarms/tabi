@@ -192,6 +192,41 @@ describe("visibility edge cases", () => {
         assert.ok(hintMode.isActive(), "Opacity:0 radio with visible label should get a hint");
     });
 
+    // Xfinity: opacity:0 radio with position:absolute has non-zero dimensions but is invisible.
+    // Hint should be positioned on the visible label, not the invisible input.
+    it("positions hint on label, not on opacity:0 radio", () => {
+        const label = makeElement("LABEL", { top: 10, left: 200, width: 300, height: 40 });
+        (label as any).htmlFor = "role-radio";
+        const radio = makeElement("INPUT", {
+            type: "radio", top: 10, left: 10,
+            width: 16, height: 16, opacity: "0",
+        });
+        (radio as any).id = "role-radio";
+
+        loadModules([radio, label]);
+
+        (globalThis as any).document.querySelector = (sel: string) => {
+            if (sel.includes("role-radio")) return label;
+            return null;
+        };
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            if (x >= 200 && x < 500) return [label];
+            return [radio];
+        };
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(), "Should produce a hint");
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1, "Should have exactly 1 hint");
+
+        // Hint should be near the label (left:200), not the invisible input (left:10)
+        const hintLeft = parseFloat(hints[0].style.left);
+        assert.ok(hintLeft >= 190, `Hint left (${hintLeft}) should be near label (200), not input (10)`);
+    });
+
     // Zero-size radio input redirects visibility to associated label.
     it("redirects visibility of zero-size radio to associated label", () => {
         const label = makeElement("LABEL", { top: 10, left: 30, width: 100, height: 20 });

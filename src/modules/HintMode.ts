@@ -6,7 +6,7 @@ import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { REPEATING_CONTAINER_SELECTOR } from "./constants";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
-import { isContainerSized, getRepeatingContainer, hasBox, isRedirectableControl, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
+import { isContainerSized, getRepeatingContainer, hasBox, isRedirectableControl, isVisible, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
 import { findAssociatedLabel, findVisibleChild, getHeading } from "./elementTraversals";
 
 import { Mode } from "../commands";
@@ -184,7 +184,7 @@ export class HintMode {
   private getHintTargetElement(el: HTMLElement): HTMLElement {
     const rect = el.getBoundingClientRect();
 
-    if (isRedirectableControl(el) && rect.width === 0 && rect.height === 0) {
+    if (isRedirectableControl(el) && !isVisible(el, rect)) {
       const label = findAssociatedLabel(el);
       if (label) return label;
     }
