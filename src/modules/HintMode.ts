@@ -113,10 +113,10 @@ export class HintMode {
 
     // Resolve hint placement. ContainerGlow is all-or-none per container
     // group (siblings sharing the same repeating-container parent).
-    // Disqualified immediately if any container has nested interactive
-    // hints (glow label would clash). Beyond that, size eligibility is
-    // decided by CONTAINER_GLOW_STRATEGY ("any" or "all").
-    type ContainerCandidate = { el: HTMLElement; rect: DOMRect; container: HTMLElement; noNestedHints: boolean; sized: boolean };
+    // Disqualified immediately if any container has nested discovered
+    // links (glow label would clash with their hints). Beyond that,
+    // size eligibility is decided by CONTAINER_GLOW_STRATEGY ("any"/"all").
+    type ContainerCandidate = { el: HTMLElement; rect: DOMRect; container: HTMLElement; noNestedLinks: boolean; sized: boolean };
     const containerGroups = new Map<HTMLElement, ContainerCandidate[]>();
 
     for (const el of elements) {
@@ -125,7 +125,7 @@ export class HintMode {
       const container = target === el ? getRepeatingContainer(el) : null;
 
       if (container && CONTAINER_GLOW_STRATEGY !== "none") {
-        const noNestedHints = !elements.some(other => other !== el && container.contains(other));
+        const noNestedLinks = !elements.some(other => other !== el && container.contains(other));
         const containerRect = container.getBoundingClientRect();
         const sized = isContainerSized(container, containerRect);
         const parent = container.parentElement || container;
@@ -135,14 +135,14 @@ export class HintMode {
           group = [];
           containerGroups.set(parent, group);
         }
-        group.push({ el, rect, container, noNestedHints, sized });
+        group.push({ el, rect, container, noNestedLinks, sized });
       } else {
         this.hintPlacementMap.set(el, { style: HintStyle.Pill, rect });
       }
     }
 
     for (const [, group] of containerGroups) {
-      const allFreeOfNestedHints = group.every(g => g.noNestedHints);
+      const allFreeOfNestedHints = group.every(g => g.noNestedLinks);
       const groupSized = CONTAINER_GLOW_STRATEGY === "any"
         ? group.some(g => g.sized)
         : group.every(g => g.sized);
