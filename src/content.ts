@@ -152,15 +152,34 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   });
 
   // Focus first text input on the page (gi). Tab cycles through inputs.
-  keyHandler.on("focusInput", () => {
-    const inputs = document.querySelectorAll<HTMLElement>(
-      'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="file"]):not([type="image"]):not([type="color"]):not([type="range"]), textarea, [contenteditable="true"]',
-    );
+  // Searches into open shadow roots so inputs inside web components are found.
+  const TEXT_INPUT_SELECTOR = 'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="file"]):not([type="image"]):not([type="color"]):not([type="range"]), textarea, [contenteditable="true"]';
+
+  function findTextInputs(root: Document | ShadowRoot | Element, results: HTMLElement[]): void {
+    const inputs = (root as Document | ShadowRoot).querySelectorAll
+      ? (root as Document | ShadowRoot).querySelectorAll<HTMLElement>(TEXT_INPUT_SELECTOR)
+      : [];
     for (const el of inputs) {
       if (el.offsetWidth > 0 && el.offsetHeight > 0) {
-        el.focus();
-        break;
+        results.push(el);
       }
+    }
+    // Recurse into open shadow roots
+    const hosts = (root as Document | ShadowRoot).querySelectorAll
+      ? (root as Document | ShadowRoot).querySelectorAll("*")
+      : [];
+    for (const el of hosts) {
+      if (el.shadowRoot) {
+        findTextInputs(el.shadowRoot, results);
+      }
+    }
+  }
+
+  keyHandler.on("focusInput", () => {
+    const inputs: HTMLElement[] = [];
+    findTextInputs(document, inputs);
+    if (inputs.length > 0) {
+      inputs[0].focus();
     }
   });
 

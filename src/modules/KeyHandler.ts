@@ -275,13 +275,18 @@ export class KeyHandler {
   }
 
   private handleFocusIn(event: FocusEvent): void {
-    if (this.isInputField(event.target as Element) && this.mode === Mode.NORMAL) {
+    // Use composedPath()[0] to get the actual focused element even when
+    // the event crosses a shadow DOM boundary (event.target is retargeted
+    // to the shadow host, but composedPath preserves the original target).
+    const target = event.composedPath()[0] as Element;
+    if (this.isInputField(target) && this.mode === Mode.NORMAL) {
       this.setMode(Mode.INSERT);
     }
   }
 
   private handleFocusOut(event: FocusEvent): void {
-    if (this.isInputField(event.target as Element) && this.mode === Mode.INSERT) {
+    const target = event.composedPath()[0] as Element;
+    if (this.isInputField(target) && this.mode === Mode.INSERT) {
       this.setMode(Mode.NORMAL);
     }
   }
