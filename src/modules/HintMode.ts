@@ -67,6 +67,7 @@ export class HintMode {
   private readonly onMouseDown: () => void;
   private readonly onScroll: () => void;
   private readonly onResize: () => void;
+  private mutationObserver: MutationObserver | null;
   /** Resolved hint placement for each discovered element. Populated in activate(). */
   private hintPlacementMap: Map<HTMLElement, HintPlacement>;
 
@@ -81,6 +82,7 @@ export class HintMode {
     this.onMouseDown = this.deactivate.bind(this);
     this.onScroll = this.deactivate.bind(this);
     this.onResize = this.deactivate.bind(this);
+    this.mutationObserver = null;
     this.hintPlacementMap = new Map();
   }
 
@@ -133,6 +135,7 @@ export class HintMode {
     document.addEventListener("mousedown", this.onMouseDown, true);
     window.addEventListener("scroll", this.onScroll, true);
     window.addEventListener("resize", this.onResize);
+    this.observeMutations();
   }
 
   deactivate(): void {
@@ -145,6 +148,10 @@ export class HintMode {
     document.removeEventListener("mousedown", this.onMouseDown, true);
     window.removeEventListener("scroll", this.onScroll, true);
     window.removeEventListener("resize", this.onResize);
+    if (this.mutationObserver) {
+      this.mutationObserver.disconnect();
+      this.mutationObserver = null;
+    }
 
     if (this.overlay) {
       this.overlay.classList.remove("visible");
@@ -177,6 +184,26 @@ export class HintMode {
   destroy(): void {
     this.deactivate();
     this.unwireCommands();
+  }
+
+  // --- DOM mutation observation ---
+
+  /** Dismiss hints when the page DOM changes (e.g. lazy-loaded content
+   *  shifts existing elements). Ignores mutations inside our own overlay. */
+  private observeMutations(): void {
+    if (typeof MutationObserver === "undefined") return;
+    const overlay = this.overlay;
+    this.mutationObserver = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (overlay && (m.target === overlay || overlay.contains(m.target as Node))) continue;
+        this.deactivate();
+        return;
+      }
+    });
+    this.mutationObserver.observe(document.documentElement, {
+      childList: true,
+      subtree: true,
+    });
   }
 
   // --- Hint target element ---
