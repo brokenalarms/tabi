@@ -4,13 +4,16 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-echo "→ Cleaning build artifacts and Safari extension cache…"
+echo "→ Cleaning build artifacts…"
 rm -rf build/
-rm -rf ~/Library/Containers/com.brokenalarms.Vimium.Extension
 
 echo "→ Generating Xcode project…"
 npm run build
 xcodegen generate --spec project.yml
+
+echo "→ Cleaning Xcode derived data…"
+xcodebuild -project Vimium.xcodeproj -scheme Vimium -configuration Debug clean 2>&1 | \
+  grep -E '(error:|warning:|CLEAN SUCCEEDED|CLEAN FAILED)' || true
 
 echo "→ Building Xcode project…"
 xcodebuild -project Vimium.xcodeproj -scheme Vimium -configuration Debug build 2>&1 | \
