@@ -113,10 +113,10 @@ export class HintMode {
 
     // Resolve hint placement. ContainerGlow is all-or-none per container
     // group: elements sharing the same repeating-container parent are styled
-    // uniformly based on CONTAINER_GLOW_STRATEGY. If any container in the
-    // group has multiple discovered elements inside it, the entire group is
-    // disqualified — ContainerGlow only makes sense when each container
-    // holds exactly one hint target.
+    // uniformly based on CONTAINER_GLOW_STRATEGY. Size eligibility is a
+    // group decision; sole (no nested interactive hints) is per-element —
+    // a container with another hint inside falls back to Pill because the
+    // glow label would clash, but that doesn't disqualify its siblings.
     type ContainerCandidate = { el: HTMLElement; rect: DOMRect; container: HTMLElement; sole: boolean; sized: boolean };
     const containerGroups = new Map<HTMLElement, ContainerCandidate[]>();
 
@@ -143,13 +143,12 @@ export class HintMode {
     }
 
     for (const [, group] of containerGroups) {
-      const allSole = group.every(g => g.sole);
-      const useGlow = allSole && (CONTAINER_GLOW_STRATEGY === "any"
+      const groupSized = CONTAINER_GLOW_STRATEGY === "any"
         ? group.some(g => g.sized)
-        : group.every(g => g.sized));
+        : group.every(g => g.sized);
 
-      for (const { el, rect, container } of group) {
-        if (useGlow) {
+      for (const { el, rect, container, sole } of group) {
+        if (groupSized && sole) {
           this.hintPlacementMap.set(el, { style: HintStyle.ContainerGlow, rect, container });
         } else {
           this.hintPlacementMap.set(el, { style: HintStyle.Pill, rect });
