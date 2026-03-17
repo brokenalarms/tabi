@@ -172,6 +172,8 @@ export function isSiblingInRepeatingContainer(a: HTMLElement, b: HTMLElement): b
  *  effect layers — anything with no visible DOM content is transparent to
  *  the user regardless of tag or role. */
 export function isContentlessOverlay(el: HTMLElement): boolean {
+  const tag = el.tagName.toLowerCase();
+  if (tag === "iframe" || tag === "object" || tag === "embed") return false;
   if ((el.textContent || "").trim()) return false;
   if (el.querySelector("img, svg, picture, video, canvas")) return false;
   return true;
