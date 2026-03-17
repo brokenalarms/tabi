@@ -54,6 +54,13 @@ type HintPlacement =
   | { style: HintStyle.Pill; rect: DOMRect }
   | { style: HintStyle.ContainerGlow; rect: DOMRect; container: HTMLElement };
 
+/** Strategy for applying ContainerGlow to elements sharing a repeating container parent.
+ *  - "any": at least one container qualifies → all siblings get ContainerGlow
+ *  - "all": every container must qualify for any to get ContainerGlow
+ *  - "none": never use ContainerGlow (always Pill) */
+type ContainerGlowStrategy = "any" | "all" | "none";
+const CONTAINER_GLOW_STRATEGY: ContainerGlowStrategy = "any";
+
 const HINT_CHARS = "sadgjklewcmpoh";
 
 export class HintMode {
@@ -104,22 +111,46 @@ export class HintMode {
       return;
     }
 
-    // Resolve hint placement for each element. Container glow requires a
-    // repeating container that is large enough and contains no other
-    // discovered elements. Everything else gets a pill.
+    // Resolve hint placement. ContainerGlow is all-or-none per container
+    // group: elements sharing the same repeating-container parent are styled
+    // uniformly based on CONTAINER_GLOW_STRATEGY.
+    type ContainerCandidate = { el: HTMLElement; rect: DOMRect; container: HTMLElement; qualified: boolean };
+    const containerGroups = new Map<HTMLElement, ContainerCandidate[]>();
+
     for (const el of elements) {
       const rect = this.getHintRect(el);
       const target = this.getHintTargetElement(el);
-      const repeatingContainer = target === el ? getRepeatingContainer(el) : null;
-      if (repeatingContainer) {
-        const containerRect = repeatingContainer.getBoundingClientRect();
-        const sole = !elements.some(other => other !== el && repeatingContainer.contains(other));
-        if (isContainerSized(repeatingContainer, containerRect) && sole) {
-          this.hintPlacementMap.set(el, { style: HintStyle.ContainerGlow, rect, container: repeatingContainer });
-          continue;
+      const container = target === el ? getRepeatingContainer(el) : null;
+
+      if (container && CONTAINER_GLOW_STRATEGY !== "none") {
+        const sole = !elements.some(other => other !== el && container.contains(other));
+        const containerRect = container.getBoundingClientRect();
+        const qualified = isContainerSized(container, containerRect) && sole;
+        const parent = container.parentElement || container;
+
+        let group = containerGroups.get(parent);
+        if (!group) {
+          group = [];
+          containerGroups.set(parent, group);
+        }
+        group.push({ el, rect, container, qualified });
+      } else {
+        this.hintPlacementMap.set(el, { style: HintStyle.Pill, rect });
+      }
+    }
+
+    for (const [, group] of containerGroups) {
+      const useGlow = CONTAINER_GLOW_STRATEGY === "any"
+        ? group.some(g => g.qualified)
+        : group.every(g => g.qualified);
+
+      for (const { el, rect, container } of group) {
+        if (useGlow) {
+          this.hintPlacementMap.set(el, { style: HintStyle.ContainerGlow, rect, container });
+        } else {
+          this.hintPlacementMap.set(el, { style: HintStyle.Pill, rect });
         }
       }
-      this.hintPlacementMap.set(el, { style: HintStyle.Pill, rect });
     }
 
     const labels = HintMode.generateLabels(elements.length);
@@ -228,7 +259,6 @@ export class HintMode {
   private getHintRect(el: HTMLElement): DOMRect {
     const target = this.getHintTargetElement(el);
     let rect = target.getBoundingClientRect();
-    const inRepeatingContainer = target === el && getRepeatingContainer(el) !== null;
 
     // Inline elements in vertical lists: expand to nearest repeating container's
     // width so hints align. Walks up through single-child wrappers (e.g.
@@ -252,7 +282,7 @@ export class HintMode {
     // centers on visible content, not an empty stretched box (e.g. Reddit's
     // flex <a> grid items that are wider than their SVG+text content).
     // Only for <a> links — buttons and role-based elements define their own area.
-    if (!inRepeatingContainer && target.tagName.toLowerCase() === "a" && target.children.length > 0) {
+    if (target.tagName.toLowerCase() === "a" && target.children.length > 0) {
       let contentLeft = Infinity, contentRight = -Infinity;
       for (const child of target.children) {
         const cr = (child as HTMLElement).getBoundingClientRect();
@@ -268,9 +298,9 @@ export class HintMode {
 
     // Shrink rect by padding-bottom so the hint pointer touches the content
     // edge rather than floating below the padding (e.g. MediaWiki sidebar links).
-    // Only for <a> pill hints — buttons use padding as part of their visual area.
+    // Only for <a> elements — buttons use padding as part of their visual area.
     // Redirected targets (heading, label) use their full bounding rect.
-    if (el === target && !inRepeatingContainer && el.tagName.toLowerCase() === "a") {
+    if (el === target && el.tagName.toLowerCase() === "a") {
       const paddingBottom = parseFloat(getComputedStyle(target).paddingBottom) || 0;
       if (paddingBottom > 0) {
         rect = new DOMRect(rect.left, rect.top, rect.width, rect.height - paddingBottom);
