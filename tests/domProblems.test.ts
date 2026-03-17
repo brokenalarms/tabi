@@ -764,6 +764,91 @@ describe("checkbox/radio hint positioning", () => {
         const hintLeft = parseFloat(hints[0].style.left);
         assert.ok(hintLeft < 50, `Radio hint left (${hintLeft}) should be near the control (~18), not centered on parent (~300)`);
     });
+
+    // AAA: visible checkbox inside a container-style <label> with heading + description.
+    // The checkbox redirect moved the hint to the label (far from the control).
+    // Visible checkboxes should keep their own hint; the label gets its own via label[for].
+    it("visible checkbox inside label keeps hint on control, not label", () => {
+        const label = makeElement("LABEL", { top: 0, left: 0, width: 800, height: 100, display: "block" });
+        label.setAttribute("for", "cb1");
+        const heading = makeElement("H3", { top: 0, left: 0, width: 400, height: 25, textContent: "New Offers" });
+        const checkbox = makeElement("INPUT", { type: "checkbox", top: 10, left: 700, width: 20, height: 20, display: "inline" });
+        checkbox.id = "cb1";
+        label.appendChild(heading);
+        label.appendChild(checkbox);
+
+        loadModules([checkbox]);
+        (globalThis as any).document.elementsFromPoint = () => [checkbox];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        const hintLeft = parseFloat(hints[0].style.left);
+        // Checkbox is at left:700, width:20 — center is 710.
+        // If redirected to label, center would be ~400 (center of 800px label).
+        assert.ok(hintLeft >= 700 && hintLeft <= 720,
+            `Hint left (${hintLeft}) should be near checkbox (~710), not label center (~400)`);
+    });
+
+    // Prism web component: visible <input> is sibling of <label>, not inside it.
+    // The checkbox redirect moved the hint to the label text.
+    // Visible checkboxes should keep their own hint.
+    it("visible checkbox sibling of label keeps hint on control", () => {
+        const wrapper = makeElement("DIV", { top: 0, left: 0, width: 400, height: 30, display: "block" });
+        const checkbox = makeElement("INPUT", { type: "checkbox", top: 5, left: 10, width: 20, height: 20, display: "inline" });
+        checkbox.id = "cb2";
+        const label = makeElement("LABEL", { top: 0, left: 40, width: 200, height: 30, display: "inline", textContent: "Keep me signed in" });
+        label.setAttribute("for", "cb2");
+        wrapper.appendChild(checkbox);
+        wrapper.appendChild(label);
+
+        loadModules([checkbox]);
+        (globalThis as any).document.elementsFromPoint = () => [checkbox];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        const hintLeft = parseFloat(hints[0].style.left);
+        // Checkbox is at left:10, width:20 — center is 20.
+        // If redirected to label, center would be ~140 (center of label at left:40, width:200).
+        assert.ok(hintLeft >= 10 && hintLeft <= 30,
+            `Hint left (${hintLeft}) should be near checkbox (~20), not label center (~140)`);
+    });
+
+    // Zero-size checkbox (web component pattern: native input hidden, custom visual shown).
+    // Must still redirect to label since there's no visible position for the input.
+    it("zero-size checkbox redirects to label as fallback", () => {
+        const wrapper = makeElement("DIV", { top: 0, left: 0, width: 400, height: 30, display: "block" });
+        const checkbox = makeElement("INPUT", { type: "checkbox", top: 0, left: 0, width: 0, height: 0, display: "inline" });
+        checkbox.id = "cb3";
+        const label = makeElement("LABEL", { top: 0, left: 40, width: 200, height: 30, display: "inline", textContent: "Hidden input label" });
+        label.setAttribute("for", "cb3");
+        wrapper.appendChild(checkbox);
+        wrapper.appendChild(label);
+
+        loadModules([checkbox]);
+        (globalThis as any).document.elementsFromPoint = () => [checkbox];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        const hintLeft = parseFloat(hints[0].style.left);
+        // Zero-size input — hint should redirect to label, center at ~140.
+        assert.ok(hintLeft >= 130 && hintLeft <= 150,
+            `Hint left (${hintLeft}) should be on label (~140) since checkbox is zero-size`);
+    });
 });
 
 // ISSUE: Inline centering logic widens hint to full parent <p> width for an <a> that's
