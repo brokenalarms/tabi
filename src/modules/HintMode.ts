@@ -4,9 +4,9 @@
 
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
-import { CLICKABLE_SELECTOR, REPEATING_CONTAINER_SELECTOR } from "./constants";
+import { REPEATING_CONTAINER_SELECTOR } from "./constants";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
-import { isContainerSized, isInRepeatingContainer, getRepeatingContainer, hasBox, isRedirectableControl, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
+import { isContainerSized, getRepeatingContainer, hasBox, isRedirectableControl, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
 import { findAssociatedLabel, findVisibleChild, getHeading } from "./elementTraversals";
 
 import { Mode } from "../commands";
@@ -61,7 +61,9 @@ export class HintMode {
   private readonly onMouseDown: () => void;
   private readonly onScroll: () => void;
   private readonly onResize: () => void;
-  private hintInfoCache: Map<HTMLElement, { rect: DOMRect; container: boolean; containerEl: HTMLElement | null }>;
+  /** Elements that should get container styling (glow + inside-end pill).
+   *  Maps element → its repeating container. Populated in activate(). */
+  private containerStylingMap: Map<HTMLElement, HTMLElement>;
 
   constructor(keyHandler: KeyHandlerLike) {
     this.keyHandler = keyHandler;
@@ -74,7 +76,7 @@ export class HintMode {
     this.onMouseDown = this.deactivate.bind(this);
     this.onScroll = this.deactivate.bind(this);
     this.onResize = this.deactivate.bind(this);
-    this.hintInfoCache = new Map();
+    this.containerStylingMap = new Map();
   }
 
   // --- Public API ---
@@ -89,24 +91,23 @@ export class HintMode {
     this.typed = "";
     this.keyHandler.setMode(Mode.HINTS);
 
-    const elements = discoverElements((el: HTMLElement) => this.getHintInfo(el).rect);
+    const elements = discoverElements((el: HTMLElement) => this.getHintRect(el));
     if (elements.length === 0) {
       this.deactivate();
       return;
     }
 
-    // Downgrade container=true for any element that contains another discovered element.
-    // A container with nested hinted elements isn't a visual container — the nested
-    // elements get their own hints, so the parent should use pill-below.
+    // Decide container styling once, with full context: the repeating
+    // container must be large enough AND the element must be the sole
+    // interactive element inside it.
     for (const el of elements) {
-      const info = this.hintInfoCache.get(el);
-      if (info && info.container) {
-        for (const other of elements) {
-          if (other !== el && el.contains(other)) {
-            info.container = false;
-            break;
-          }
-        }
+      const target = this.getHintTargetElement(el);
+      const rc = target === el ? getRepeatingContainer(el) : null;
+      if (!rc) continue;
+      const rcRect = rc.getBoundingClientRect();
+      const sole = !elements.some(other => other !== el && rc.contains(other));
+      if (isContainerSized(rc, rcRect) && sole) {
+        this.containerStylingMap.set(el, rc);
       }
     }
 
@@ -146,7 +147,7 @@ export class HintMode {
     }
 
     this.hints = [];
-    this.hintInfoCache.clear();
+    this.containerStylingMap.clear();
     this.keyHandler.setMode(Mode.NORMAL);
   }
 
@@ -188,42 +189,10 @@ export class HintMode {
     return el;
   }
 
-  private getHintInfo(el: HTMLElement): { rect: DOMRect; container: boolean; containerEl: HTMLElement | null } {
-    const cached = this.hintInfoCache.get(el);
-    if (cached) return cached;
+  private getHintRect(el: HTMLElement): DOMRect {
     const target = this.getHintTargetElement(el);
-    // Bar style: for block-level containers with branching content.
-    // Single descendant chains (e.g. <a><span>text</span></a>) are just
-    // wrapper nesting — not containers. Inline elements get pill+pointer.
     let rect = target.getBoundingClientRect();
-    let container = false;
-    // For elements in repeating containers (li, tr), the glow border is
-    // rendered around the container — so the container's dimensions determine
-    // whether it qualifies, not the interactive element's own dimensions.
-    const repeatingContainer = (target === el && el.children.length > 0)
-      ? getRepeatingContainer(el) : null;
-    if (repeatingContainer && isContainerSized(repeatingContainer, repeatingContainer.getBoundingClientRect())) {
-      container = true;
-    } else if (target === el && el.children.length > 0 && isContainerSized(el, rect)) {
-      // Walk the single-child chain — if it reaches a leaf with no sibling
-      // text, it's just wrapper nesting (e.g. <a><span>text</span></a>).
-      // But if any level has text nodes alongside the single element child
-      // (e.g. <summary><svg/>Assignees</summary>), it's a real container.
-      let node: HTMLElement = el;
-      let hasTextAlongside = false;
-      while (node.children.length === 1) {
-        for (let i = 0; i < node.childNodes.length; i++) {
-          const child = node.childNodes[i];
-          if (child.nodeType === 3 && (child.textContent || "").trim().length > 0) {
-            hasTextAlongside = true;
-            break;
-          }
-        }
-        if (hasTextAlongside) break;
-        node = node.children[0] as HTMLElement;
-      }
-      container = node.children.length > 0 || hasTextAlongside;
-    }
+    const inRepeatingContainer = target === el && getRepeatingContainer(el) !== null;
 
     // Inline elements in vertical lists: expand to nearest repeating container's
     // width so hints align. Walks up through single-child wrappers (e.g.
@@ -247,7 +216,7 @@ export class HintMode {
     // centers on visible content, not an empty stretched box (e.g. Reddit's
     // flex <a> grid items that are wider than their SVG+text content).
     // Only for <a> links — buttons and role-based elements define their own area.
-    if (!container && target.tagName.toLowerCase() === "a" && target.children.length > 0) {
+    if (!inRepeatingContainer && target.tagName.toLowerCase() === "a" && target.children.length > 0) {
       let contentLeft = Infinity, contentRight = -Infinity;
       for (const child of target.children) {
         const cr = (child as HTMLElement).getBoundingClientRect();
@@ -265,17 +234,14 @@ export class HintMode {
     // edge rather than floating below the padding (e.g. MediaWiki sidebar links).
     // Only for <a> pill hints — buttons use padding as part of their visual area.
     // Redirected targets (heading, label) use their full bounding rect.
-    if (el === target && !container && el.tagName.toLowerCase() === "a") {
+    if (el === target && !inRepeatingContainer && el.tagName.toLowerCase() === "a") {
       const paddingBottom = parseFloat(getComputedStyle(target).paddingBottom) || 0;
       if (paddingBottom > 0) {
         rect = new DOMRect(rect.left, rect.top, rect.width, rect.height - paddingBottom);
       }
     }
 
-    const containerEl = (container && repeatingContainer) ? repeatingContainer : null;
-    const result = { rect, container, containerEl };
-    this.hintInfoCache.set(el, result);
-    return result;
+    return rect;
   }
 
   // --- Label generation ---
@@ -338,35 +304,31 @@ export class HintMode {
   }
 
   private createHintDiv(element: HTMLElement, label: string, allElements: HTMLElement[]): HTMLDivElement {
-    const { rect, container, containerEl } = this.getHintInfo(element);
+    const rect = this.getHintRect(element);
+    const containerEl = this.containerStylingMap.get(element);
     const div = document.createElement("div");
     div.className = "vimium-hint";
     div.textContent = label;
 
-    if (container) {
+    if (containerEl) {
       // Container: glow border + inside-end pill.
-      // For repeating containers (li, tr), the glow runs along the container's
-      // inner edge — no outward expansion, since adjacent items are flush.
-      const glowTarget = containerEl || element;
-      const glowRect = glowTarget.getBoundingClientRect();
-      const cs = getComputedStyle(glowTarget);
-      const padH = containerEl ? 0 : Math.max(0, 4 - parseFloat(cs.paddingLeft));
-      const padV = containerEl ? 0 : Math.max(0, 4 - parseFloat(cs.paddingTop));
+      // The glow runs along the repeating container's (li, tr) inner edge —
+      // no outward expansion, since adjacent items are flush.
+      const glowRect = containerEl.getBoundingClientRect();
+      const cs = getComputedStyle(containerEl);
       const glow = document.createElement("div");
       glow.className = "vimium-hint-container-glow";
-      const glowPos = this.viewportToDocument(glowRect.left - padH, glowRect.top - padV);
+      const glowPos = this.viewportToDocument(glowRect.left, glowRect.top);
       glow.style.left = glowPos.x + "px";
       glow.style.top = glowPos.y + "px";
-      glow.style.width = (glowRect.width + padH * 2) + "px";
-      glow.style.height = (glowRect.height + padV * 2) + "px";
+      glow.style.width = glowRect.width + "px";
+      glow.style.height = glowRect.height + "px";
       if (this.overlay) this.overlay.appendChild(glow);
 
-      const elRect = containerEl ? glowRect : element.getBoundingClientRect();
-      const elCs = containerEl ? cs : getComputedStyle(element);
-      const insetRight = Math.max(6, parseFloat(elCs.paddingRight) || 0);
+      const insetRight = Math.max(6, parseFloat(cs.paddingRight) || 0);
       const pos = this.viewportToDocument(
-        elRect.right - insetRight,
-        elRect.top + elRect.height / 2
+        glowRect.right - insetRight,
+        glowRect.top + glowRect.height / 2
       );
       div.style.left = pos.x + "px";
       div.style.top = pos.y + "px";
@@ -469,7 +431,7 @@ export class HintMode {
       if (h !== hint) h.div.style.display = "none";
     }
 
-    const targetRect = this.getHintInfo(element).rect;
+    const targetRect = this.getHintRect(element);
     const tagRect = hint.div.getBoundingClientRect();
     if (tagRect.width > 0) {
       const dx = (targetRect.left + targetRect.width / 2) - (tagRect.left + tagRect.width / 2);
