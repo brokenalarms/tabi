@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
-import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget } from "../src/modules/elementPredicates";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel } from "../src/modules/elementPredicates";
 import { findBlockAncestor } from "../src/modules/HintMode";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
@@ -2757,6 +2757,60 @@ describe("isSiblingInRepeatingContainer", () => {
 
         // Same <li> — not siblings, could be a real occluder
         assert.equal(isSiblingInRepeatingContainer(t, cover), false);
+
+        env.cleanup();
+    });
+});
+
+// ISSUE: Custom checkbox uses an SVG sibling inside <label> to render the
+// visual affordance; the SVG covers the <input> and isOccluded filters it out.
+// SITE: lemonade.com
+// FIX: elements sharing a common <label> ancestor are part of the same form
+// control — decorative siblings should not occlude the actual input.
+describe("isInSameLabel", () => {
+    it("returns true for siblings inside the same label", () => {
+        const env = createDOM(`
+            <label>
+                <input id="t" type="checkbox">
+                <svg id="cover" width="22" height="22" viewBox="0 0 22 22">
+                    <polyline points="6 10 9 14 16 8" stroke="#fff" />
+                </svg>
+            </label>
+        `);
+        const t = env.document.getElementById("t") as HTMLElement;
+        const cover = env.document.getElementById("cover") as HTMLElement;
+
+        // Base: elements NOT in a label are not in the same label
+        const env2 = createDOM(`
+            <div>
+                <input id="t2" type="checkbox">
+                <svg id="cover2" width="22" height="22"></svg>
+            </div>
+        `);
+        const t2 = env2.document.getElementById("t2") as HTMLElement;
+        const cover2 = env2.document.getElementById("cover2") as HTMLElement;
+        assert.equal(isInSameLabel(t2, cover2), false,
+            "siblings outside a label are not in the same label");
+        env2.cleanup();
+
+        // Delta: wrapping in <label> makes them part of the same control
+        assert.equal(isInSameLabel(t, cover), true,
+            "input and sibling SVG inside the same label");
+
+        env.cleanup();
+    });
+
+    it("returns false for elements in different labels", () => {
+        const env = createDOM(`
+            <div>
+                <label><input id="t" type="checkbox"></label>
+                <label><svg id="cover" width="22" height="22"></svg></label>
+            </div>
+        `);
+        const t = env.document.getElementById("t") as HTMLElement;
+        const cover = env.document.getElementById("cover") as HTMLElement;
+
+        assert.equal(isInSameLabel(t, cover), false);
 
         env.cleanup();
     });

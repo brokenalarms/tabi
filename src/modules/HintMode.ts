@@ -5,7 +5,7 @@
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { CLICKABLE_SELECTOR, REPEATING_CONTAINER_SELECTOR } from "./constants";
-import { discoverElements } from "./ElementGatherer";
+import { discoverElements, renderDebugDots } from "./ElementGatherer";
 import { isContainerSized, isInRepeatingContainer, getRepeatingContainer, hasBox, isRedirectableControl, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
 import { findAssociatedLabel, findVisibleChild, getHeading } from "./elementTraversals";
 
@@ -112,6 +112,7 @@ export class HintMode {
 
     const labels = HintMode.generateLabels(elements.length);
     this.createOverlay();
+    if (this.overlay) renderDebugDots(this.overlay, elements);
     this.hints = elements.map((el, i) => {
       const label = labels[i];
       const div = this.createHintDiv(el, label, elements);

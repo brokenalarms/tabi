@@ -123,6 +123,7 @@ export function isOccluded(el: HTMLElement, rect: DOMRect): boolean {
     if (isSubtreeRemoved(cover)) return false;
     if (isContentlessOverlay(cover)) return false;
     if (isSiblingInRepeatingContainer(el, cover)) return false;
+    if (isInSameLabel(el, cover)) return false;
     return true;
   };
 
@@ -143,6 +144,15 @@ export function isOccluded(el: HTMLElement, rect: DOMRect): boolean {
     }
   }
   return false;
+}
+
+/** Are both elements inside the same <label>?
+ *  Elements under the same label are part of the same form control —
+ *  decorative siblings (SVG checkbox icons, custom radio visuals) are not
+ *  real occluders of the underlying input. */
+export function isInSameLabel(a: HTMLElement, b: HTMLElement): boolean {
+  const label = a.closest("label");
+  return label !== null && label.contains(b);
 }
 
 /** Are these two elements in sibling repeating containers (different <li>/<tr>
