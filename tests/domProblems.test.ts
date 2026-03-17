@@ -2316,3 +2316,48 @@ describe("isInSameLabel", () => {
     });
 });
 
+describe("jsaction click discovery", () => {
+    // Google Drive: <tr jsaction="click:h5M12e" role="row"> rows are interactive
+    // but have no onclick, no clickable ARIA role — only Google Closure's jsaction
+    // attribute declares the click handler. Without detecting jsaction, these rows
+    // get no hint and the user can't navigate Drive folders.
+    // FIX: treat jsaction containing "click:" as a clickable signal, like [onclick].
+
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("jsaction containing click: makes an element discoverable", () => {
+        loadModules([]);
+        const noJsaction = makeElement("TR", {
+            top: 10, left: 0, width: 800, height: 40,
+            attrs: { role: "row" },
+            textContent: "No handler",
+        });
+        const withJsaction = makeElement("TR", {
+            top: 60, left: 0, width: 800, height: 40,
+            attrs: { role: "row", jsaction: "contextmenu:mg9Pef; click:h5M12e; dblclick:Hq2DWe" },
+            textContent: "Resources",
+        });
+
+        // Base: role="row" alone is not clickable
+        assert.equal(walkerFilter(noJsaction), NodeFilter.FILTER_SKIP);
+
+        // Delta: jsaction with click: makes it discoverable
+        assert.equal(walkerFilter(withJsaction), NodeFilter.FILTER_ACCEPT);
+    });
+
+    it("jsaction without click: is not discoverable", () => {
+        loadModules([]);
+        const el = makeElement("DIV", {
+            top: 10, left: 0, width: 100, height: 40,
+            attrs: { jsaction: "mouseover:UI3Kjd; mouseleave:Tx5Rb" },
+            textContent: "Hover only",
+        });
+
+        // jsaction without click: — not a click target
+        assert.equal(walkerFilter(el), NodeFilter.FILTER_SKIP);
+    });
+});
