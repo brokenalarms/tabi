@@ -5,7 +5,7 @@
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
-import { isContainerSized, getRepeatingContainer, isRedirectableControl, isVisible, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
+import { isContainerSized, isFormControl, getRepeatingContainer, isRedirectableControl, isVisible, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
 import { findAssociatedLabel, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect } from "./elementTraversals";
 
 import { Mode } from "../commands";
@@ -262,8 +262,7 @@ export class HintMode {
     }
 
     // Expand width to repeating container ancestor for aligned hints in lists.
-    const tag = target.tagName.toLowerCase();
-    if (tag !== "input" && tag !== "textarea" && tag !== "select") {
+    if (!isFormControl(target)) {
       rect = getBlockAncestorRect(target, rect) ?? rect;
     }
 
