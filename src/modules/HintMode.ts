@@ -236,15 +236,30 @@ export class HintMode {
   // --- Layout drift detection ---
 
   /** Periodically check whether hinted elements have shifted from their
-   *  original positions. Dismisses hints if drift exceeds the threshold.
-   *  Only checks the first element — a layout shift moves everything. */
+   *  original positions. Dismisses hints when a majority of sampled
+   *  elements have drifted, indicating a real layout shift rather than
+   *  a single animated element (e.g. Amazon carousel). */
   private startDriftCheck(): void {
-    const [el, placement] = this.hintPlacementMap.entries().next().value!;
-    const original = placement.rect;
+    const MAX_SAMPLE = 5;
+    const entries = [...this.hintPlacementMap.entries()];
+    // Evenly spaced sample so we don't just check the first few
+    const step = Math.max(1, Math.floor(entries.length / MAX_SAMPLE));
+    const sample: Array<[HTMLElement, DOMRect]> = [];
+    for (let i = 0; i < entries.length && sample.length < MAX_SAMPLE; i += step) {
+      sample.push([entries[i][0], entries[i][1].rect]);
+    }
+
     this.driftTimer = setInterval(() => {
-      const current = el.getBoundingClientRect();
-      if (Math.abs(current.top - original.top) > DRIFT_THRESHOLD ||
-          Math.abs(current.left - original.left) > DRIFT_THRESHOLD) {
+      let drifted = 0;
+      for (const [el, original] of sample) {
+        const current = el.getBoundingClientRect();
+        if (Math.abs(current.top - original.top) > DRIFT_THRESHOLD ||
+            Math.abs(current.left - original.left) > DRIFT_THRESHOLD) {
+          drifted++;
+        }
+      }
+      // Majority of sampled elements must have drifted
+      if (drifted > sample.length / 2) {
         this.deactivate();
       }
     }, DRIFT_CHECK_INTERVAL);
