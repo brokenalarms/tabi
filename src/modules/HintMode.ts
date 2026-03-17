@@ -6,9 +6,8 @@ import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { CLICKABLE_SELECTOR, REPEATING_CONTAINER_SELECTOR } from "./constants";
 import { discoverElements } from "./ElementGatherer";
-import { hasHeadingContent, isBlockLevel, isContainerSized, isInRepeatingContainer, getRepeatingContainer, hasBox } from "./elementPredicates";
-import { findAssociatedLabel } from "./elementTraversals";
-import { HEADING_SELECTOR } from "./constants";
+import { isContainerSized, isInRepeatingContainer, getRepeatingContainer, hasBox, isRedirectableControl, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
+import { findAssociatedLabel, findVisibleChild, getHeading } from "./elementTraversals";
 
 import { Mode } from "../commands";
 
@@ -27,11 +26,6 @@ export function findBlockAncestor(el: HTMLElement): HTMLElement | null {
     node = parent;
   }
   return null;
-}
-
-/** Return the first heading descendant, or null. */
-export function getHeading(el: HTMLElement): HTMLElement | null {
-  return el.querySelector(HEADING_SELECTOR) as HTMLElement | null;
 }
 
 declare const browser: {
@@ -179,29 +173,17 @@ export class HintMode {
   private getHintTargetElement(el: HTMLElement): HTMLElement {
     const rect = el.getBoundingClientRect();
 
-    if (el.tagName.toLowerCase() === "input") {
-      const type = ((el as HTMLInputElement).type || "").toLowerCase();
-      if (type === "radio" || type === "checkbox") {
-        const label = findAssociatedLabel(el);
-        if (label) return label;
-      }
+    if (isRedirectableControl(el)) {
+      const label = findAssociatedLabel(el);
+      if (label) return label;
     }
-
-    if (el.tagName.toLowerCase() === "a" && rect.width === 0 && rect.height === 0) {
-      for (const child of el.children) {
-        const cr = (child as HTMLElement).getBoundingClientRect();
-        if (cr.width > 0 && cr.height > 0) return child as HTMLElement;
-      }
+    if (isZeroSizeAnchor(el, rect)) {
+      const child = findVisibleChild(el);
+      if (child) return child;
     }
-
-    // Block-level links with headings: position hint at the heading so it
-    // centers on visible text, not the full-width block. Links in repeating
-    // containers (li, tr) keep full-width hints for vertical alignment.
-    if (el.tagName.toLowerCase() === "a" &&
-        isBlockLevel(el) && hasHeadingContent(el) && !isInRepeatingContainer(el)) {
+    if (shouldRedirectToHeading(el)) {
       return getHeading(el)!;
     }
-
     return el;
   }
 
@@ -242,21 +224,6 @@ export class HintMode {
       container = node.children.length > 0 || hasTextAlongside;
     }
 
-    if (el !== target && el.getBoundingClientRect().width > window.innerWidth * 0.25) {
-      const paddingTop = parseFloat(getComputedStyle(target).paddingTop) || 0;
-      if (paddingTop > 0) {
-        rect = new DOMRect(rect.left, rect.top + paddingTop, rect.width, rect.height - paddingTop);
-      }
-    }
-
-    if (el.tagName.toLowerCase() === "a") {
-      const clientRects = (el === target ? el : target).getClientRects();
-      for (let i = 0; i < clientRects.length; i++) {
-        const cr = clientRects[i];
-        if (cr.width > 1 && cr.height > 1) { rect = cr; break; }
-      }
-    }
-
     // Inline elements in vertical lists: expand to nearest repeating container's
     // width so hints align. Walks up through single-child wrappers (e.g.
     // <li><span><a>text</a></span></li> expands to <li> width).
@@ -275,11 +242,33 @@ export class HintMode {
       }
     }
 
+    // Narrow rect horizontally to the children's content extent so the hint
+    // centers on visible content, not an empty stretched box (e.g. Reddit's
+    // flex <a> grid items that are wider than their SVG+text content).
+    // Only for <a> links — buttons and role-based elements define their own area.
+    if (!container && target.tagName.toLowerCase() === "a" && target.children.length > 0) {
+      let contentLeft = Infinity, contentRight = -Infinity;
+      for (const child of target.children) {
+        const cr = (child as HTMLElement).getBoundingClientRect();
+        if (cr.width > 0 && cr.height > 0) {
+          contentLeft = Math.min(contentLeft, cr.left);
+          contentRight = Math.max(contentRight, cr.right);
+        }
+      }
+      if (contentLeft < contentRight) {
+        rect = new DOMRect(contentLeft, rect.top, contentRight - contentLeft, rect.height);
+      }
+    }
+
     // Shrink rect by padding-bottom so the hint pointer touches the content
     // edge rather than floating below the padding (e.g. MediaWiki sidebar links).
-    const paddingBottom = parseFloat(getComputedStyle(target).paddingBottom) || 0;
-    if (paddingBottom > 0) {
-      rect = new DOMRect(rect.left, rect.top, rect.width, rect.height - paddingBottom);
+    // Only for <a> pill hints — buttons use padding as part of their visual area.
+    // Redirected targets (heading, label) use their full bounding rect.
+    if (el === target && !container && el.tagName.toLowerCase() === "a") {
+      const paddingBottom = parseFloat(getComputedStyle(target).paddingBottom) || 0;
+      if (paddingBottom > 0) {
+        rect = new DOMRect(rect.left, rect.top, rect.width, rect.height - paddingBottom);
+      }
     }
 
     const containerEl = (container && repeatingContainer) ? repeatingContainer : null;

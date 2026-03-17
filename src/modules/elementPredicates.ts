@@ -213,3 +213,25 @@ export function isContainerSized(el: HTMLElement, rect: DOMRect): boolean {
 export function hasHeadingContent(el: HTMLElement): boolean {
   return el.querySelector(HEADING_SELECTOR) !== null;
 }
+
+// --- Hint target redirect predicates ---
+
+/** Is this a radio or checkbox input whose hint should redirect to its label? */
+export function isRedirectableControl(el: HTMLElement): boolean {
+  if (el.tagName.toLowerCase() !== "input") return false;
+  const type = ((el as HTMLInputElement).type || "").toLowerCase();
+  return type === "radio" || type === "checkbox";
+}
+
+/** Is this an anchor with zero dimensions whose hint should redirect to a visible child? */
+export function isZeroSizeAnchor(el: HTMLElement, rect: DOMRect): boolean {
+  return el.tagName.toLowerCase() === "a" && rect.width === 0 && rect.height === 0;
+}
+
+/** Should this element's hint redirect to its heading descendant?
+ *  True for block-level <a> with heading content outside repeating containers.
+ *  Positions the hint on the heading text rather than the full-width block. */
+export function shouldRedirectToHeading(el: HTMLElement): boolean {
+  return el.tagName.toLowerCase() === "a" &&
+    isBlockLevel(el) && hasHeadingContent(el) && !isInRepeatingContainer(el);
+}
