@@ -513,3 +513,60 @@ test("clip on non-positioned ancestor does not prune visible links", async ({ pa
   expect(hintCount).toBe(1);
 });
 
+// Clicking a hint dispatches a click to the target element only after the
+// collapse animation finishes. If deactivation interrupts the animation
+// (e.g. from a layout shift), the click must NOT be dispatched.
+test("hint click dispatches after collapse animation completes", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await setupPage(page, `
+    <a id="target" href="#" style="position:absolute; top:50px; left:50px; width:100px; height:30px;">Link</a>
+  `);
+
+  // Inject the hint animation CSS so animationend fires in WebKit
+  await page.addStyleTag({ content: `
+    .vimium-hint-active {
+      --poof-x: 0px; --poof-y: 0px;
+      animation: vimium-hint-collapse 150ms ease-in forwards;
+    }
+    @keyframes vimium-hint-collapse {
+      0%   { opacity: 1; transform: scale(1) translate(0,0); }
+      100% { opacity: 0; transform: scale(0.3) translate(var(--poof-x), var(--poof-y)); }
+    }
+  `});
+
+  const clicked = await page.evaluate(() => {
+    return new Promise<boolean>((resolve) => {
+      const target = document.getElementById("target")!;
+      let wasClicked = false;
+      target.addEventListener("click", () => { wasClicked = true; });
+
+      const { KeyHandler, HintMode, Mode } = window.TestHarness;
+      const kh = new KeyHandler();
+      const hm = new HintMode(kh);
+      hm.wireCommands();
+      kh.on("exitToNormal", () => {
+        if (hm.isActive()) hm.deactivate();
+        kh.setMode(Mode.NORMAL);
+      });
+      hm.activate(false);
+
+      // With a single element, the label is the first hint char "s".
+      // Simulate typing it to trigger activateHint.
+      const event = new KeyboardEvent("keydown", {
+        key: "s", code: "KeyS", bubbles: true,
+      });
+      document.dispatchEvent(event);
+
+      // Click should not have happened yet (animation is 150ms)
+      const clickedBeforeAnimation = wasClicked;
+
+      // Wait for animation to complete + buffer
+      setTimeout(() => {
+        resolve(!clickedBeforeAnimation && wasClicked);
+      }, 300);
+    });
+  });
+
+  expect(clicked).toBe(true);
+});
+
