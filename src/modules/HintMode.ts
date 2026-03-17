@@ -200,19 +200,17 @@ export class HintMode {
 
   // --- Layout drift detection ---
 
-  /** Periodically sample a few hinted elements and dismiss if any have
-   *  moved more than DRIFT_THRESHOLD pixels from their original position.
-   *  Catches layout shifts from lazy-loaded content, ad injection, etc. */
+  /** Periodically check whether hinted elements have shifted from their
+   *  original positions. Dismisses hints if drift exceeds the threshold.
+   *  Only checks the first element — a layout shift moves everything. */
   private startDriftCheck(): void {
+    const [el, placement] = this.hintPlacementMap.entries().next().value!;
+    const original = placement.rect;
     this.driftTimer = setInterval(() => {
-      for (const [el, placement] of this.hintPlacementMap) {
-        const current = el.getBoundingClientRect();
-        const original = placement.rect;
-        if (Math.abs(current.top - original.top) > DRIFT_THRESHOLD ||
-            Math.abs(current.left - original.left) > DRIFT_THRESHOLD) {
-          this.deactivate();
-          return;
-        }
+      const current = el.getBoundingClientRect();
+      if (Math.abs(current.top - original.top) > DRIFT_THRESHOLD ||
+          Math.abs(current.left - original.left) > DRIFT_THRESHOLD) {
+        this.deactivate();
       }
     }, DRIFT_CHECK_INTERVAL);
   }
