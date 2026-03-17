@@ -223,12 +223,16 @@ export class HintMode {
    *  a single animated element (e.g. Amazon carousel). */
   private startDriftCheck(): void {
     const MAX_SAMPLE = 5;
-    const entries = [...this.hintPlacementMap.entries()];
+    const entries = [...this.hintPlacementMap.keys()];
     // Evenly spaced sample so we don't just check the first few
     const step = Math.max(1, Math.floor(entries.length / MAX_SAMPLE));
+    // Snapshot rects NOW (post-render) rather than using the pre-render rects
+    // from hintPlacementMap. Inserting the overlay and hint divs can cause
+    // minor layout shifts, especially on large/zoomed viewports — using
+    // pre-render rects as the baseline would falsely trigger drift dismissal.
     const sample: Array<[HTMLElement, DOMRect]> = [];
     for (let i = 0; i < entries.length && sample.length < MAX_SAMPLE; i += step) {
-      sample.push([entries[i][0], entries[i][1].rect]);
+      sample.push([entries[i], entries[i].getBoundingClientRect()]);
     }
 
     this.driftTimer = setInterval(() => {
