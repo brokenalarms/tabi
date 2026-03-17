@@ -166,18 +166,15 @@ export function isSiblingInRepeatingContainer(a: HTMLElement, b: HTMLElement): b
          aItem.parentElement === bItem.parentElement;
 }
 
-/** Is this a contentless overlay link?
- *  True for <a> with no text, no visual children (img, svg, etc.), and a sibling
- *  with visible content — the "stretched-link" card pattern where an empty <a>
- *  is positioned over a card whose visible text lives in a sibling element.
- *  Used in occlusion checks to exempt these overlays from blocking sibling
- *  interactive elements (e.g. comment links that poke through via z-index). */
+/** Is this element a contentless overlay that can't visually block anything?
+ *  True for elements with no text and no visual children (img, svg, etc.).
+ *  Covers stretched-link card overlays, custom scrollbar tracks, and hover
+ *  effect layers — anything with no visible DOM content is transparent to
+ *  the user regardless of tag or role. */
 export function isContentlessOverlay(el: HTMLElement): boolean {
-  if (el.tagName.toLowerCase() !== "a") return false;
   if ((el.textContent || "").trim()) return false;
   if (el.querySelector("img, svg, picture, video, canvas")) return false;
-  const adj = el.nextElementSibling || el.previousElementSibling;
-  return adj !== null && (adj.textContent || "").trim().length > 0;
+  return true;
 }
 
 // --- Element characteristics ---

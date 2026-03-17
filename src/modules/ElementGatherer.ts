@@ -37,6 +37,29 @@ export function renderDebugDots(overlay: HTMLElement, result: HTMLElement[]): vo
   }
 }
 
+// --- Debug logging (gated behind DEFAULTS.debug) ---
+
+function elId(el: HTMLElement): string {
+  const href = (el.getAttribute("href") || "").slice(0, 40);
+  const text = (el.textContent || "").trim().slice(0, 20);
+  return el.tagName + (href ? " " + href : "") + (text ? " " + text : "");
+}
+
+function logSkip(el: HTMLElement, reason: string): void {
+  console.log("SKIP", reason, elId(el));
+}
+
+function logOccluded(el: HTMLElement, rect: DOMRect): void {
+  const corners: [number, number][] = [[rect.left + 2, rect.bottom - 2], [rect.right - 2, rect.bottom - 2]];
+  const covers = corners.map(([x, y]) => {
+    const hit = document.elementsFromPoint(x, y)[0] as HTMLElement | undefined;
+    if (!hit || el.contains(hit) || hit.contains(el)) return null;
+    const cn = typeof hit.className === "string" ? hit.className.slice(0, 30) : "";
+    return hit.tagName + (cn ? "." + cn : "");
+  }).filter(Boolean);
+  console.log("SKIP occluded", elId(el), "by:", covers.join(" | "));
+}
+
 // --- Walker filter ---
 // Routes to REJECT/SKIP/ACCEPT by calling predicates.
 // FILTER_REJECT prunes entire subtrees (developer intent, display:none).
@@ -119,17 +142,27 @@ export function walkerFilter(node: Node): number {
         if (label && isVisible(label)) return NodeFilter.FILTER_ACCEPT;
       }
     }
+    if (DEFAULTS.debug) logSkip(el, "opacity:0");
     return NodeFilter.FILTER_SKIP;
   }
 
   // visibility:hidden, remaining invisibility — children may override
-  if (!isVisible(el, rect)) return NodeFilter.FILTER_SKIP;
+  if (!isVisible(el, rect)) {
+    if (DEFAULTS.debug) logSkip(el, "invisible");
+    return NodeFilter.FILTER_SKIP;
+  }
 
   // Overflow clipping
-  if (isClippedByOverflow(el, rect)) return NodeFilter.FILTER_SKIP;
+  if (isClippedByOverflow(el, rect)) {
+    if (DEFAULTS.debug) logSkip(el, "clipped " + Math.round(rect.width) + "x" + Math.round(rect.height));
+    return NodeFilter.FILTER_SKIP;
+  }
 
   // Covered by another element at any corner
-  if (isOccluded(el, rect)) return NodeFilter.FILTER_SKIP;
+  if (isOccluded(el, rect)) {
+    if (DEFAULTS.debug) logOccluded(el, rect);
+    return NodeFilter.FILTER_SKIP;
+  }
 
   return NodeFilter.FILTER_ACCEPT;
 }
