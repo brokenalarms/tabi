@@ -385,6 +385,106 @@ test("hint targets button, not visually-hidden 1x1 span inside it", async ({ pag
   expect(hintTop).toBeLessThan(110);
 });
 
+// Direct walkerFilter test on FB Messenger DOM — traces every ancestor
+// to find which element gets REJECTED and prunes the contacts subtree.
+test("walkerFilter traces each ancestor of FB contact link", async ({ page }) => {
+  await page.setViewportSize({ width: 1400, height: 900 });
+  const fs = await import("fs");
+  const fixturePath = path.resolve(__dirname, "fixtures/fb-messenger-contacts.html");
+  const fixtureHTML = fs.existsSync?.(fixturePath)
+    ? fs.readFileSync(fixturePath, "utf-8") : "";
+
+  // Realistic FB layout: sidebar on the right side of a wide page
+  await setupPage(page, `
+    <style>
+      .x78zum5 { display: flex; }
+      .xdt5ytf { flex-direction: column; }
+      .x1n2onr6 { position: relative; }
+      .x1iyjqo2 { flex-grow: 1; }
+      .x2lwn1j { min-width: 0; }
+      .x193iq5w { width: 100%; }
+      .x1ey2m1c { position: absolute; }
+      .x10l6tqk { top: 0; }
+      .x13vifvy { bottom: 0; }
+      .x47corl { right: 0; }
+      .xg01cxk { left: 0; }
+      .x1i10hfl { display: block; cursor: pointer; text-decoration: none; }
+      .x1lliihq { color: inherit; }
+      .xdl72j9 { overflow: hidden; }
+      .html-div { padding: var(--x-paddingBlock, 0) var(--x-paddingInline, 0); }
+    </style>
+    <div style="display:flex;">
+      <div style="flex:1; width:1000px; height:900px;">Main content</div>
+      <div style="width:350px; overflow:hidden;">
+        <div style="overflow-x:hidden; overflow-y:auto; height:900px;">
+          ${fixtureHTML || `
+          <ul style="list-style:none; padding:0; margin:0;">
+            <li><div class="x78zum5 xdt5ytf"><div class="x78zum5 xdt5ytf x1iyjqo2 x2lwn1j"><div class="x78zum5 xdt5ytf">
+              <a class="x1i10hfl x1n2onr6 xdl72j9 x1lliihq" href="/messages/t/1/" role="link" tabindex="0">
+                <div class="html-div x78zum5 xdt5ytf" style="--x-paddingInline:8px;--x-paddingBlock:8px;">
+                  <div class="x78zum5"><svg style="height:36px;width:36px;"><circle cx="18" cy="18" r="18" fill="#ccc"/></svg>
+                  <span>Alice</span></div>
+                </div>
+                <div class="x1ey2m1c x10l6tqk x13vifvy x47corl xg01cxk" role="none" style="border-radius:8px;inset:0;"></div>
+              </a>
+            </div></div></div></li>
+            <li><div><div data-visualcompletion="ignore-late-mutation"><div class="x78zum5 xdt5ytf"><div class="x78zum5 xdt5ytf x1iyjqo2 x2lwn1j"><div class="x78zum5 xdt5ytf">
+              <a class="x1i10hfl x1n2onr6 xdl72j9 x1lliihq" href="/messages/t/2/" role="link" tabindex="0">
+                <div class="html-div x78zum5 xdt5ytf" style="--x-paddingInline:8px;--x-paddingBlock:8px;">
+                  <div class="x78zum5"><svg style="height:36px;width:36px;"><circle cx="18" cy="18" r="18" fill="#ccc"/></svg>
+                  <span>Bob</span></div>
+                </div>
+                <div class="x1ey2m1c x10l6tqk x13vifvy x47corl xg01cxk" role="none"></div>
+              </a>
+            </div></div></div></div></div></li>
+          </ul>`}
+        </div>
+      </div>
+    </div>
+  `);
+
+  // Call walkerFilter directly on each contact <a> and every ancestor
+  const trace = await page.evaluate(() => {
+    const { walkerFilter } = window.TestHarness;
+    const NF = NodeFilter;
+    const links = document.querySelectorAll('a[href*="/messages/"]');
+    return Array.from(links).map(a => {
+      // Trace ancestors from body down to <a>
+      const chain: Array<{tag: string; verdict: string; rect: string}> = [];
+      const ancestors: HTMLElement[] = [];
+      let el: HTMLElement | null = a as HTMLElement;
+      while (el && el !== document.body) {
+        ancestors.unshift(el);
+        el = el.parentElement;
+      }
+      for (const anc of ancestors) {
+        const v = walkerFilter(anc);
+        const r = anc.getBoundingClientRect();
+        chain.push({
+          tag: anc.tagName + (anc.getAttribute("role") ? `[${anc.getAttribute("role")}]` : ""),
+          verdict: v === NF.FILTER_ACCEPT ? "ACCEPT" : v === NF.FILTER_REJECT ? "REJECT" : "SKIP",
+          rect: Math.round(r.width) + "x" + Math.round(r.height),
+        });
+      }
+      return { href: (a.getAttribute("href") || "").slice(0, 25), chain };
+    });
+  });
+
+  for (const link of trace) {
+    console.log(`\n--- ${link.href} ---`);
+    for (const step of link.chain) {
+      const marker = step.verdict === "REJECT" ? "❌" : step.verdict === "ACCEPT" ? "✅" : "⏭️";
+      console.log(`  ${marker} ${step.verdict} ${step.tag} ${step.rect}`);
+    }
+  }
+
+  // No ancestor should REJECT
+  for (const link of trace) {
+    const rejects = link.chain.filter(s => s.verdict === "REJECT");
+    expect(rejects).toEqual([]);
+  }
+});
+
 // clip: rect(0 0 0 0) on a position:static ancestor has no visual effect
 // but the walker's clip check must not REJECT the subtree.
 test("clip on non-positioned ancestor does not prune visible links", async ({ page }) => {
