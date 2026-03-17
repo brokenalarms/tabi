@@ -6,7 +6,7 @@
 import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_SELECTOR } from "./constants";
 import {
   isExcludedByIntent, childrenCannotBeVisible, isOnScreen, isVisible,
-  isClippedByOverflow, isOccluded, getRepeatingContainer,
+  isClippedByOverflow, isOccluded,
 } from "./elementPredicates";
 import { findAssociatedLabel } from "./elementTraversals";
 
@@ -31,13 +31,19 @@ export function walkerFilter(node: Node): number {
     const m = clipPath.match(/inset\((\d+)%/);
     if (m && parseInt(m[1]) >= 50) return NodeFilter.FILTER_REJECT;
   }
-  const clip = style.getPropertyValue("clip") || el.style.getPropertyValue("clip");
-  if (clip && clip !== "auto") {
-    const m = clip.match(/rect\(([^)]+)\)/);
-    if (m) {
-      const vals = m[1].split(/[,\s]+/).map(parseFloat).filter(v => !isNaN(v));
-      if (vals.length >= 4 && (vals[2] - vals[0]) <= 1 && (vals[1] - vals[3]) <= 1) {
-        return NodeFilter.FILTER_REJECT;
+  // clip only applies to position:absolute/fixed elements (CSS spec).
+  // Computed styles still report the value on static elements, but it has
+  // no visual effect — don't prune visible subtrees based on an inert clip.
+  const pos = style.position;
+  if (pos === "absolute" || pos === "fixed") {
+    const clip = style.getPropertyValue("clip") || el.style.getPropertyValue("clip");
+    if (clip && clip !== "auto") {
+      const m = clip.match(/rect\(([^)]+)\)/);
+      if (m) {
+        const vals = m[1].split(/[,\s]+/).map(parseFloat).filter(v => !isNaN(v));
+        if (vals.length >= 4 && (vals[2] - vals[0]) <= 1 && (vals[1] - vals[3]) <= 1) {
+          return NodeFilter.FILTER_REJECT;
+        }
       }
     }
   }
@@ -134,30 +140,15 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
     const shadowRoots: ShadowRoot[] = [];
     const nativeInteractiveSet = new Set(NATIVE_INTERACTIVE_ELEMENTS);
     const filter = (node: Node): number => {
-      const el = node as HTMLElement;
-      let verdict = walkerFilter(node);
+      const verdict = walkerFilter(node);
       if (verdict !== NodeFilter.FILTER_REJECT) {
-        const sr = el.shadowRoot;
+        const sr = (node as HTMLElement).shadowRoot;
         if (sr) shadowRoots.push(sr);
-      }
-      // Container rescue: if a native interactive element (a, button, etc.)
-      // would be SKIPped but sits inside a visible repeating container (li, tr),
-      // accept it — the container is the visual unit and the link is its
-      // click target. This handles sites like Facebook where CSS properties on
-      // deeply nested wrappers cause false positives in clipping/occlusion checks.
-      if (verdict === NodeFilter.FILTER_SKIP && nativeInteractiveSet.has(el.tagName.toLowerCase()) && el.matches(CLICKABLE_SELECTOR)) {
-        const container = getRepeatingContainer(el);
-        if (container) {
-          const cr = container.getBoundingClientRect();
-          if (cr.width > 0 && cr.height > 0 && isOnScreen(cr) && isVisible(container, cr)) {
-            verdict = NodeFilter.FILTER_ACCEPT;
-          }
-        }
       }
       // Native interactive elements are atomic: accept them but prune their
       // subtrees so children (labels, icons, spans) don't get separate hints.
-      if (verdict === NodeFilter.FILTER_ACCEPT && nativeInteractiveSet.has(el.tagName.toLowerCase())) {
-        result.push(el);
+      if (verdict === NodeFilter.FILTER_ACCEPT && nativeInteractiveSet.has((node as HTMLElement).tagName.toLowerCase())) {
+        result.push(node as HTMLElement);
         return NodeFilter.FILTER_REJECT;
       }
       return verdict;

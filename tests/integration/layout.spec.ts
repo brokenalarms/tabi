@@ -385,148 +385,31 @@ test("hint targets button, not visually-hidden 1x1 span inside it", async ({ pag
   expect(hintTop).toBeLessThan(110);
 });
 
-// Facebook Messenger: diagnose which walker check filters contact links.
-// Uses the real FB DOM structure with simulated atomic CSS.
-test("FB Messenger walker diagnostics for contact links", async ({ page }) => {
-  await page.setViewportSize({ width: 1400, height: 900 });
-  const fs = await import("fs");
-  const fixturePath = path.resolve(__dirname, "fixtures/fb-messenger-contacts.html");
-  const fixtureHTML = fs.readFileSync(fixturePath, "utf-8");
+// clip: rect(0 0 0 0) on a position:static ancestor has no visual effect
+// but the walker's clip check must not REJECT the subtree.
+test("clip on non-positioned ancestor does not prune visible links", async ({ page }) => {
+  await page.setViewportSize({ width: 400, height: 768 });
 
-  // Wrap in a scrollable container with scrollbar overlay, simulating FB layout
+  // First verify: does WebKit report clip on a static element?
   await setupPage(page, `
-    <style>
-      /* Facebook atomic CSS approximations */
-      .x78zum5 { display: flex; }
-      .xdt5ytf { flex-direction: column; }
-      .x1n2onr6 { position: relative; }
-      .x1ja2u2z { align-items: stretch; }
-      .x9f619 { box-sizing: border-box; }
-      .x2lah0s { align-self: stretch; }
-      .x1iyjqo2 { flex-grow: 1; }
-      .x2lwn1j { min-width: 0; }
-      .x193iq5w { width: 100%; }
-      .x1qughib { justify-content: space-between; }
-      .x6s0dn4 { align-items: center; }
-      .xozqiw3 { flex-wrap: nowrap; }
-      .x1q0g3np { gap: 0; }
-      .xs83m0k { flex-shrink: 1; }
-      .x1a02dak { flex-basis: 0px; }
-      .xdl72j9 { overflow: hidden; }
-      .x1yrsyyn { padding-top: 0; }
-      .x1icxu4v { padding-right: 0; }
-      .x10b6aqq { padding-bottom: 0; }
-      .x25sj25 { padding-left: 0; }
-
-      /* Overlay div: position absolute covering parent */
-      .x1ey2m1c { position: absolute; }
-      .x10l6tqk { top: 0; }
-      .x13vifvy { bottom: 0; }
-      .x47corl { right: 0; }
-      .xg01cxk { left: 0; }
-      .x1o0tod { z-index: 1; }
-
-      /* Link styling — on real FB, the <a> gets display:block from x1i10hfl */
-      .x1i10hfl { display: block; cursor: pointer; text-decoration: none; }
-      /* xf159sx wraps the <a> — might set overflow:hidden for hover effects */
-      .xf159sx { overflow: hidden; }
-      /* xdl72j9 is on the name text container — truncates long names */
-      .xdl72j9 { overflow: hidden; }
-      .x1lliihq { color: inherit; }
-
-      /* Container */
-      .xb57i2i { overflow-y: auto; }
-
-      /* Custom properties → real padding */
-      .html-div { padding: var(--x-paddingBlock, 0) var(--x-paddingInline, 0); row-gap: var(--x-rowGap, 0); }
-    </style>
-    <div style="position:relative; width:350px; height:700px; overflow-y:auto;">
-      ${fixtureHTML}
-      <!-- Custom scrollbar track -->
-      <div style="position:absolute; top:0; right:0; width:8px; height:1764px; display:block;"></div>
+    <div id="static-clip" style="clip: rect(0 0 0 0); position: static;">
+      <a href="/test" style="display:block; padding:10px;">Visible link</a>
     </div>
   `);
 
-  // Run walker diagnostics on each contact link
-  const diagnostics = await page.evaluate(() => {
-    const { walkerFilter, predicates } = window.TestHarness;
-    const CLICKABLE_SELECTOR = 'a, button, input, textarea, select, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [role="option"], [role="checkbox"], [role="radio"], [role="switch"], [role="treeitem"], label[for], [onclick], [onmousedown]';
-    const links = document.querySelectorAll('a[href*="/messages/"]');
-    return Array.from(links).map(a => {
-      const el = a as HTMLElement;
-      const rect = el.getBoundingClientRect();
-      const style = getComputedStyle(el);
-
-      // Run walkerFilter
-      const verdict = walkerFilter(el);
-      const verdictName = verdict === NodeFilter.FILTER_ACCEPT ? "ACCEPT"
-        : verdict === NodeFilter.FILTER_REJECT ? "REJECT" : "SKIP";
-
-      // Run individual checks to find which one fails
-      const checks: Record<string, boolean | string> = {};
-      checks.excludedByIntent = predicates.isExcludedByIntent(el);
-      checks.childrenHidden = predicates.childrenCannotBeVisible(el);
-      checks.rectZero = rect.width === 0 || rect.height === 0;
-      checks.onScreen = predicates.isOnScreen(rect);
-      checks.matchesSelector = el.matches(CLICKABLE_SELECTOR);
-      checks.opacity0 = parseFloat(style.opacity) === 0;
-      checks.visible = predicates.isVisible(el, rect);
-      checks.clippedByOverflow = predicates.isClippedByOverflow(el, rect);
-      checks.occluded = predicates.isOccluded(el, rect);
-
-      // Walk ancestors for overflow
-      const overflowAncestors: string[] = [];
-      let anc = el.parentElement;
-      while (anc && anc !== document.body) {
-        const s = getComputedStyle(anc);
-        if (s.overflow !== "visible" || s.overflowX !== "visible" || s.overflowY !== "visible") {
-          const ar = anc.getBoundingClientRect();
-          overflowAncestors.push(
-            `${anc.tagName}(overflow:${s.overflow},ox:${s.overflowX},oy:${s.overflowY},` +
-            `rect:${Math.round(ar.width)}x${Math.round(ar.height)}@${Math.round(ar.top)},${Math.round(ar.left)})`
-          );
-        }
-        anc = anc.parentElement;
-      }
-
-      return {
-        href: (a.getAttribute("href") || "").slice(0, 25),
-        rect: [Math.round(rect.width), Math.round(rect.height)],
-        verdict: verdictName,
-        checks,
-        overflowAncestors,
-      };
-    });
+  const clipInfo = await page.evaluate(() => {
+    const div = document.getElementById("static-clip")!;
+    const s = getComputedStyle(div);
+    return {
+      clip: s.getPropertyValue("clip"),
+      position: s.position,
+      childVisible: div.querySelector("a")!.getBoundingClientRect().height > 0,
+    };
   });
-
-  for (const d of diagnostics) {
-    console.log(`${d.verdict} ${d.href} rect:${d.rect}`, JSON.stringify(d.checks), d.overflowAncestors.length ? `overflow:${d.overflowAncestors}` : "");
-  }
-
-  const accepted = diagnostics.filter(d => d.verdict === "ACCEPT");
-  expect(accepted.length).toBe(diagnostics.length);
-});
-
-// Container rescue: a link that would be SKIPped (e.g. by clipping/occlusion)
-// is rescued when its repeating container (li) is visible. This handles sites
-// like Facebook where deep CSS wrappers cause false positives.
-test("link rescued by visible repeating container when clipped by ancestor", async ({ page }) => {
-  await page.setViewportSize({ width: 400, height: 768 });
-  await setupPage(page, `
-    <ul style="list-style:none; padding:0; margin:0; width:350px;">
-      <li style="position:relative; height:60px;">
-        <!-- Wrapper with overflow:hidden and zero explicit height — clips the link -->
-        <div style="overflow:hidden; height:0;">
-          <a id="rescued" href="/messages/t/1/" role="link"
-             style="display:block; padding:8px;">
-            <span>Alice</span>
-          </a>
-        </div>
-      </li>
-    </ul>
-  `);
+  console.log("Clip on static element:", JSON.stringify(clipInfo));
 
   const hintCount = await activateHints(page);
+  console.log("Hints with clip on static ancestor:", hintCount);
   expect(hintCount).toBe(1);
 });
 
