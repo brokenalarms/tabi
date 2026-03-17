@@ -6,7 +6,7 @@
 import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_SELECTOR } from "./constants";
 import {
   isExcludedByIntent, childrenCannotBeVisible, isOnScreen, isVisible,
-  isClippedByOverflow, isOccluded,
+  isClippedByOverflow, isOccluded, getRepeatingContainer,
 } from "./elementPredicates";
 import { findAssociatedLabel } from "./elementTraversals";
 
@@ -134,15 +134,30 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
     const shadowRoots: ShadowRoot[] = [];
     const nativeInteractiveSet = new Set(NATIVE_INTERACTIVE_ELEMENTS);
     const filter = (node: Node): number => {
-      const verdict = walkerFilter(node);
+      const el = node as HTMLElement;
+      let verdict = walkerFilter(node);
       if (verdict !== NodeFilter.FILTER_REJECT) {
-        const sr = (node as HTMLElement).shadowRoot;
+        const sr = el.shadowRoot;
         if (sr) shadowRoots.push(sr);
+      }
+      // Container rescue: if a native interactive element (a, button, etc.)
+      // would be SKIPped but sits inside a visible repeating container (li, tr),
+      // accept it — the container is the visual unit and the link is its
+      // click target. This handles sites like Facebook where CSS properties on
+      // deeply nested wrappers cause false positives in clipping/occlusion checks.
+      if (verdict === NodeFilter.FILTER_SKIP && nativeInteractiveSet.has(el.tagName.toLowerCase()) && el.matches(CLICKABLE_SELECTOR)) {
+        const container = getRepeatingContainer(el);
+        if (container) {
+          const cr = container.getBoundingClientRect();
+          if (cr.width > 0 && cr.height > 0 && isOnScreen(cr) && isVisible(container, cr)) {
+            verdict = NodeFilter.FILTER_ACCEPT;
+          }
+        }
       }
       // Native interactive elements are atomic: accept them but prune their
       // subtrees so children (labels, icons, spans) don't get separate hints.
-      if (verdict === NodeFilter.FILTER_ACCEPT && nativeInteractiveSet.has((node as HTMLElement).tagName.toLowerCase())) {
-        result.push(node as HTMLElement);
+      if (verdict === NodeFilter.FILTER_ACCEPT && nativeInteractiveSet.has(el.tagName.toLowerCase())) {
+        result.push(el);
         return NodeFilter.FILTER_REJECT;
       }
       return verdict;
