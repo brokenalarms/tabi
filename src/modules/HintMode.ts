@@ -108,12 +108,12 @@ export class HintMode {
     for (const el of elements) {
       const rect = this.getHintRect(el);
       const target = this.getHintTargetElement(el);
-      const rc = target === el ? getRepeatingContainer(el) : null;
-      if (rc) {
-        const rcRect = rc.getBoundingClientRect();
-        const sole = !elements.some(other => other !== el && rc.contains(other));
-        if (isContainerSized(rc, rcRect) && sole) {
-          this.hintPlacementMap.set(el, { style: HintStyle.ContainerGlow, rect, container: rc });
+      const repeatingContainer = target === el ? getRepeatingContainer(el) : null;
+      if (repeatingContainer) {
+        const containerRect = repeatingContainer.getBoundingClientRect();
+        const sole = !elements.some(other => other !== el && repeatingContainer.contains(other));
+        if (isContainerSized(repeatingContainer, containerRect) && sole) {
+          this.hintPlacementMap.set(el, { style: HintStyle.ContainerGlow, rect, container: repeatingContainer });
           continue;
         }
       }
@@ -313,18 +313,20 @@ export class HintMode {
   }
 
   private createHintDiv(element: HTMLElement, label: string): HTMLDivElement {
-    const placement = this.hintPlacementMap.get(element)!;
+    const placement = this.hintPlacementMap.get(element);
     const div = document.createElement("div");
     div.className = "vimium-hint";
     div.textContent = label;
 
-    switch (placement.style) {
-      case HintStyle.ContainerGlow:
-        this.positionContainerGlow(div, placement.container);
-        break;
-      case HintStyle.Pill:
-        this.positionPill(div, placement.rect);
-        break;
+    if (placement) {
+      switch (placement.style) {
+        case HintStyle.ContainerGlow:
+          this.positionContainerGlow(div, placement.container);
+          break;
+        case HintStyle.Pill:
+          this.positionPill(div, placement.rect);
+          break;
+      }
     }
 
     if (this.overlay) this.overlay.appendChild(div);
@@ -448,7 +450,9 @@ export class HintMode {
       if (h !== hint) h.div.style.display = "none";
     }
 
-    const targetRect = this.hintPlacementMap.get(element)!.rect;
+    const placement = this.hintPlacementMap.get(element);
+    if (!placement) return;
+    const targetRect = placement.rect;
     const tagRect = hint.div.getBoundingClientRect();
     if (tagRect.width > 0) {
       const dx = (targetRect.left + targetRect.width / 2) - (tagRect.left + tagRect.width / 2);
