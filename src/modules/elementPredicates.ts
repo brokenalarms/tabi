@@ -272,9 +272,10 @@ export function isAnchorToLabelTarget(el: HTMLElement, labelForIds: Set<string>)
 }
 
 /** Should this element's hint redirect to its heading descendant?
- *  True for block-level <a> with heading content outside repeating containers.
- *  Positions the hint on the heading text rather than the full-width block. */
+ *  True for any <a> with heading content outside repeating containers.
+ *  Positions the hint on the heading text rather than the link's full extent.
+ *  Works regardless of the link's display value (block, inline-block, inline-flex, etc.). */
 export function shouldRedirectToHeading(el: HTMLElement): boolean {
   return el.tagName.toLowerCase() === "a" &&
-    isBlockLevel(el) && hasHeadingContent(el) && !isInRepeatingContainer(el);
+    hasHeadingContent(el) && !isInRepeatingContainer(el);
 }
