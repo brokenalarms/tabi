@@ -4,8 +4,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-echo "→ Cleaning build artifacts…"
+echo "→ Cleaning build artifacts and Safari extension cache…"
 rm -rf build/
+rm -rf ~/Library/Containers/com.brokenalarms.Vimium.Extension
 
 echo "→ Generating Xcode project…"
 npm run build
