@@ -12,18 +12,16 @@ import {
 import { findAssociatedLabel } from "./elementTraversals";
 import { DEFAULTS } from "../types";
 
-// --- Debug overlay ---
-// When DEFAULTS.debug is true, draws colored dots on all <a> elements:
+// --- Debug dots ---
+// When DEFAULTS.debug is true, draws colored dots on all <a> elements into
+// the provided overlay (the hint overlay).  Dots disappear automatically
+// when the overlay is removed on deactivation.
 //   green  = discovered (in final result after dedup)
 //   orange = passed walker but removed by dedup
 //   red    = filtered out by walker (SKIP or REJECT)
-// Dots auto-remove after 10 seconds.
 
-function showDebugOverlay(result: HTMLElement[]): void {
+export function renderDebugDots(overlay: HTMLElement, result: HTMLElement[]): void {
   if (!DEFAULTS.debug) return;
-  const overlay = document.createElement("div");
-  overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:999999;";
-  document.documentElement.appendChild(overlay);
   const resultSet = new Set(result);
   for (const a of document.querySelectorAll("a[href]")) {
     const r = (a as HTMLElement).getBoundingClientRect();
@@ -31,14 +29,12 @@ function showDebugOverlay(result: HTMLElement[]): void {
     const found = resultSet.has(a as HTMLElement);
     const verdict = walkerFilter(a as Node);
     const passed = verdict === NodeFilter.FILTER_ACCEPT;
-    // green = in final result, orange = passed walker but deduped, red = walker filtered
     const color = found ? "lime" : passed ? "orange" : "red";
     const dot = document.createElement("div");
     dot.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:8px;height:8px;border-radius:50%;background:${color};opacity:0.9;`;
     dot.title = `${color === "lime" ? "DISCOVERED" : color === "orange" ? "DEDUPED" : "FILTERED"}: ${(a as HTMLElement).getAttribute("href")?.slice(0, 50)}`;
     overlay.appendChild(dot);
   }
-  setTimeout(() => overlay.remove(), 10000);
 }
 
 // --- Walker filter ---
@@ -303,7 +299,5 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
     }
   }
 
-  const finalResult = result.filter(el => !toRemove.has(el));
-  showDebugOverlay(finalResult);
-  return finalResult;
+  return result.filter(el => !toRemove.has(el));
 }
