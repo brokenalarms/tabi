@@ -433,4 +433,51 @@ describe("HintMode", () => {
             assert.ok(!hintMode.isActive());
         });
     });
+
+    describe("Pill padding-bottom subtraction", () => {
+        // angrymetalguy.com: <a> links inside narrow <li> nav items have large
+        // padding-bottom. The pill hint should be placed at the content edge,
+        // not below the padding. Padding subtraction is a pill concern, not a
+        // container concern — it applies regardless of repeating containers.
+        it("subtracts padding-bottom for links inside repeating containers", () => {
+            // Narrow li (36px wide) — too small for ContainerGlow, so gets Pill
+            const li = makeElement("LI", { top: 0, left: 0, width: 36, height: 60 });
+            const link = makeElement("A", {
+                href: "#",
+                top: 0, left: 0, width: 36, height: 60,
+                paddingBottom: "20px",
+            });
+            li.appendChild(link);
+
+            loadModules([link]);
+            const { hintMode } = getState();
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive());
+
+            const overlay = document.documentElement.querySelector(".vimium-hint-overlay");
+            const hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
+            assert.ok(hint, "hint div should exist");
+            // Pill at content edge: (60 - 20) + 2 = 42px, not 62px
+            assert.equal(hint.style.top, "42px");
+        });
+
+        // Base case: without padding-bottom, hint sits at rect.bottom + 2
+        it("places hint at bottom edge when no padding", () => {
+            const li = makeElement("LI", { top: 0, left: 0, width: 36, height: 40 });
+            const link = makeElement("A", {
+                href: "#",
+                top: 0, left: 0, width: 36, height: 40,
+            });
+            li.appendChild(link);
+
+            loadModules([link]);
+            const { hintMode } = getState();
+            hintMode.activate(false);
+
+            const overlay = document.documentElement.querySelector(".vimium-hint-overlay");
+            const hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
+            assert.ok(hint);
+            assert.equal(hint.style.top, "42px");
+        });
+    });
 });
