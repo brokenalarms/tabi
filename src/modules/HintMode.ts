@@ -242,19 +242,6 @@ export class HintMode {
       container = node.children.length > 0 || hasTextAlongside;
     }
 
-    // Multi-line links: use the first visible client rect so the hint
-    // sits at the first line, not the bounding box center.  Only for
-    // direct targets — heading-redirect targets use getBoundingClientRect
-    // because getClientRects on an inline heading returns per-line rects
-    // and picking the first line positions the hint mid-heading.
-    if (el.tagName.toLowerCase() === "a" && el === target) {
-      const clientRects = el.getClientRects();
-      for (let i = 0; i < clientRects.length; i++) {
-        const cr = clientRects[i];
-        if (cr.width > 1 && cr.height > 1) { rect = cr; break; }
-      }
-    }
-
     // Inline elements in vertical lists: expand to nearest repeating container's
     // width so hints align. Walks up through single-child wrappers (e.g.
     // <li><span><a>text</a></span></li> expands to <li> width).

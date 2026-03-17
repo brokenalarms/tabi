@@ -180,6 +180,55 @@ test("heading redirect hint sits below h3, not inside it", async ({ page }) => {
   expect(headingHintTop).toBeDefined();
 });
 
+// Multi-line inline link: hint must sit below the last line, not the first.
+// getClientRects() returns per-line rects for inline elements — using the
+// first rect would position the hint mid-link. getBoundingClientRect()
+// gives the full bounding box whose bottom is the last line's bottom.
+test("multi-line link hint sits below last line", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await setupPage(page, `
+    <div style="width:300px; padding:20px;">
+      <a href="/article" id="link" style="font-size:16px; line-height:1.4;">
+        This is a long link that wraps to multiple lines due to the narrow container width
+      </a>
+    </div>
+  `);
+
+  const result = await page.evaluate(() => {
+    const { KeyHandler, HintMode, Mode } = window.TestHarness;
+    const kh = new KeyHandler();
+    const hm = new HintMode(kh);
+    hm.wireCommands();
+    kh.on("exitToNormal", () => {
+      if (hm.isActive()) hm.deactivate();
+      kh.setMode(Mode.NORMAL);
+    });
+    hm.activate(false);
+
+    const link = document.getElementById("link")!;
+    const linkRect = link.getBoundingClientRect();
+    const clientRects = link.getClientRects();
+    const hint = document.querySelector(".vimium-hint") as HTMLElement;
+    const hintTop = hint ? parseFloat(hint.style.top) : -1;
+
+    hm.destroy();
+    return {
+      linkBottom: linkRect.bottom,
+      firstLineBottom: clientRects[0]?.bottom ?? -1,
+      lineCount: clientRects.length,
+      hintTop,
+    };
+  });
+
+  // Verify the link actually wraps (test precondition)
+  expect(result.lineCount).toBeGreaterThan(1);
+  // Hint must be near the link's full bottom (last line), not the first line
+  expect(result.hintTop).toBeGreaterThan(result.linkBottom - 2);
+  expect(result.hintTop).toBeLessThan(result.linkBottom + 10);
+  // And NOT near the first line bottom
+  expect(result.hintTop).toBeGreaterThan(result.firstLineBottom + 5);
+});
+
 test("hint targets button, not visually-hidden 1x1 span inside it", async ({ page }) => {
   // Button wraps a 1x1 visually-hidden span. The hint should be positioned
   // relative to the button's bounding rect (pill-below-pointer at bottom + 2),
