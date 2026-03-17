@@ -222,11 +222,73 @@ test("multi-line link hint sits below last line", async ({ page }) => {
 
   // Verify the link actually wraps (test precondition)
   expect(result.lineCount).toBeGreaterThan(1);
-  // Hint must be near the link's full bottom (last line), not the first line
-  expect(result.hintTop).toBeGreaterThan(result.linkBottom - 2);
-  expect(result.hintTop).toBeLessThan(result.linkBottom + 10);
-  // And NOT near the first line bottom
-  expect(result.hintTop).toBeGreaterThan(result.firstLineBottom + 5);
+  // Pill is placed at rect.bottom + 2; the 4px tail intrudes into the text.
+  // hintTop should be exactly linkBottom + 2.
+  expect(result.hintTop).toBe(result.linkBottom + 2);
+});
+
+// Container-style hint: wide element with branching children in a repeating
+// container (<li>) gets a glow border + inside-end pill (no pointer tail).
+// The glow wraps the <li>, the pill is vertically centered on the right edge.
+test("container element gets glow border and inside-end pill", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await setupPage(page, `
+    <ul style="list-style:none; padding:0;">
+      <li id="item" style="width:400px; height:80px; padding:10px;">
+        <a href="/article" id="link" style="display:block; width:100%; height:100%; text-decoration:none;">
+          <span>Article Title</span>
+          <span>Description text here</span>
+        </a>
+      </li>
+    </ul>
+  `);
+
+  const result = await page.evaluate(() => {
+    const { KeyHandler, HintMode, Mode } = window.TestHarness;
+    const kh = new KeyHandler();
+    const hm = new HintMode(kh);
+    hm.wireCommands();
+    kh.on("exitToNormal", () => {
+      if (hm.isActive()) hm.deactivate();
+      kh.setMode(Mode.NORMAL);
+    });
+    hm.activate(false);
+
+    const item = document.getElementById("item")!;
+    const itemRect = item.getBoundingClientRect();
+    const glow = document.querySelector(".vimium-hint-container-glow") as HTMLElement;
+    const hint = document.querySelector(".vimium-hint") as HTMLElement;
+    const tail = document.querySelector(".vimium-hint-tail");
+
+    const res = {
+      hasGlow: glow !== null,
+      hasTail: tail !== null,
+      hintTransform: hint?.style.transform ?? "",
+      // Glow should wrap the <li>
+      glowLeft: glow ? parseFloat(glow.style.left) : -1,
+      glowTop: glow ? parseFloat(glow.style.top) : -1,
+      glowWidth: glow ? parseFloat(glow.style.width) : -1,
+      glowHeight: glow ? parseFloat(glow.style.height) : -1,
+      // Pill should be vertically centered on the element
+      hintTop: hint ? parseFloat(hint.style.top) : -1,
+      itemMidY: itemRect.top + itemRect.height / 2,
+      itemRight: itemRect.right,
+    };
+
+    hm.destroy();
+    return res;
+  });
+
+  // Container style: has glow, no tail
+  expect(result.hasGlow).toBe(true);
+  expect(result.hasTail).toBe(false);
+  // Pill uses translate(-100%, -50%) for inside-end placement
+  expect(result.hintTransform).toBe("translate(-100%, -50%)");
+  // Pill is vertically centered on the element
+  expect(result.hintTop).toBeCloseTo(result.itemMidY, 0);
+  // Glow dimensions approximately match the element
+  expect(result.glowWidth).toBeGreaterThan(390);
+  expect(result.glowHeight).toBeGreaterThan(70);
 });
 
 test("hint targets button, not visually-hidden 1x1 span inside it", async ({ page }) => {
