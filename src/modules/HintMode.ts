@@ -56,6 +56,13 @@ type HintPlacement =
 
 const HINT_CHARS = "sadgjklewcmpoh";
 
+function nodeListHasElement(nodes: NodeList): boolean {
+  for (const n of nodes) {
+    if (n.nodeType === Node.ELEMENT_NODE) return true;
+  }
+  return false;
+}
+
 export class HintMode {
   private keyHandler: KeyHandlerLike;
   private active: boolean;
@@ -68,6 +75,7 @@ export class HintMode {
   private readonly onScroll: () => void;
   private readonly onResize: () => void;
   private mutationObserver: MutationObserver | null;
+  private mutationDebounce: ReturnType<typeof setTimeout> | null;
   /** Resolved hint placement for each discovered element. Populated in activate(). */
   private hintPlacementMap: Map<HTMLElement, HintPlacement>;
 
@@ -83,6 +91,7 @@ export class HintMode {
     this.onScroll = this.deactivate.bind(this);
     this.onResize = this.deactivate.bind(this);
     this.mutationObserver = null;
+    this.mutationDebounce = null;
     this.hintPlacementMap = new Map();
   }
 
@@ -148,9 +157,20 @@ export class HintMode {
     document.removeEventListener("mousedown", this.onMouseDown, true);
     window.removeEventListener("scroll", this.onScroll, true);
     window.removeEventListener("resize", this.onResize);
+    if (this.mutationDebounce !== null) {
+      clearTimeout(this.mutationDebounce);
+      this.mutationDebounce = null;
+    }
     if (this.mutationObserver) {
       this.mutationObserver.disconnect();
       this.mutationObserver = null;
+    }
+
+    // Remove any orphaned focus rings (e.g. deactivation interrupted the
+    // hint collapse animation before afterCollapse could clean up).
+    // Skip rings that are already fading out — those will self-remove on animationend.
+    for (const ring of document.documentElement.querySelectorAll(".vimium-hint-ring:not(.vimium-hint-ring-out)")) {
+      ring.remove();
     }
 
     if (this.overlay) {
@@ -188,15 +208,24 @@ export class HintMode {
 
   // --- DOM mutation observation ---
 
-  /** Dismiss hints when the page DOM changes (e.g. lazy-loaded content
-   *  shifts existing elements). Ignores mutations inside our own overlay. */
+  /** Dismiss hints when the page DOM changes structurally (e.g. lazy-loaded
+   *  content shifts existing elements). Only reacts to element-level
+   *  additions/removals — not attribute tweaks or text changes. Debounces
+   *  to tolerate rapid micro-mutations (SPAs settling, analytics scripts). */
   private observeMutations(): void {
     if (typeof MutationObserver === "undefined") return;
     const overlay = this.overlay;
     this.mutationObserver = new MutationObserver((mutations) => {
       for (const m of mutations) {
         if (overlay && (m.target === overlay || overlay.contains(m.target as Node))) continue;
-        this.deactivate();
+        // Only care about element nodes being added or removed — ignore
+        // text nodes, comment nodes, and attribute-only changes.
+        const hasElementChange =
+          nodeListHasElement(m.addedNodes) || nodeListHasElement(m.removedNodes);
+        if (!hasElementChange) continue;
+        // Debounce: wait for the DOM to settle before dismissing.
+        if (this.mutationDebounce !== null) clearTimeout(this.mutationDebounce);
+        this.mutationDebounce = setTimeout(() => this.deactivate(), 300);
         return;
       }
     });
@@ -507,7 +536,15 @@ export class HintMode {
     document.documentElement.appendChild(ring);
 
     const afterCollapse = (): void => {
+      // If hints were already torn down (e.g. by mutation observer during
+      // the collapse animation), skip the click — the target may have
+      // moved and the ring was already cleaned up by deactivate().
+      const wasActive = this.active;
       this.deactivate();
+      if (!wasActive) {
+        ring.remove();
+        return;
+      }
 
       const isLink = element.tagName.toLowerCase() === "a" && (element as HTMLAnchorElement).href;
       const opensNewWindow = isLink && (newTab || (element as HTMLAnchorElement).target === "_blank");
