@@ -19,6 +19,6 @@ export const REPEATING_CONTAINER_SELECTOR = "li, tr";
 export const HEADING_ELEMENTS = ["h1", "h2", "h3", "h4", "h5", "h6"];
 export const HEADING_SELECTOR = HEADING_ELEMENTS.join(", ");
 
-export const MINIMUM_CONTAINER_WIDTH = 64;
+export const MINIMUM_CONTAINER_WIDTH = 100;
 export const MINIMUM_CONTAINER_HEIGHT = 32;
 
