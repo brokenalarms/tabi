@@ -48,11 +48,11 @@ interface Hint {
   div: HTMLDivElement;
 }
 
-const enum HintStyle { Pill, ContainerGlow }
+type HintStyle = "pill" | "containerGlow";
 
 type HintPlacement =
-  | { style: HintStyle.Pill; rect: DOMRect }
-  | { style: HintStyle.ContainerGlow; rect: DOMRect; container: HTMLElement };
+  | { style: "pill"; rect: DOMRect }
+  | { style: "containerGlow"; rect: DOMRect; container: HTMLElement };
 
 /** Strategy for applying ContainerGlow to elements sharing a repeating container parent.
  *  - "any": at least one container qualifies → all siblings get ContainerGlow
@@ -137,7 +137,7 @@ export class HintMode {
         }
         group.push({ el, rect, container, noNestedLinks, sized });
       } else {
-        this.hintPlacementMap.set(el, { style: HintStyle.Pill, rect });
+        this.hintPlacementMap.set(el, { style: "pill", rect });
       }
     }
 
@@ -150,9 +150,9 @@ export class HintMode {
 
       for (const { el, rect, container } of group) {
         if (useGlow) {
-          this.hintPlacementMap.set(el, { style: HintStyle.ContainerGlow, rect, container });
+          this.hintPlacementMap.set(el, { style: "containerGlow", rect, container });
         } else {
-          this.hintPlacementMap.set(el, { style: HintStyle.Pill, rect });
+          this.hintPlacementMap.set(el, { style: "pill", rect });
         }
       }
     }
@@ -381,10 +381,10 @@ export class HintMode {
 
     if (placement) {
       switch (placement.style) {
-        case HintStyle.ContainerGlow:
+        case "containerGlow":
           this.positionContainerGlow(div, placement.container);
           break;
-        case HintStyle.Pill:
+        case "pill":
           this.positionPill(div, placement.rect);
           break;
       }
