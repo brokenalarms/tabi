@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
-import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isContentlessOverlay } from "../src/modules/elementPredicates";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isContentlessOverlay, shouldRedirectToHeading } from "../src/modules/elementPredicates";
 import { findBlockAncestor } from "../src/modules/HintMode";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
@@ -763,6 +763,91 @@ describe("checkbox/radio hint positioning", () => {
 
         const hintLeft = parseFloat(hints[0].style.left);
         assert.ok(hintLeft < 50, `Radio hint left (${hintLeft}) should be near the control (~18), not centered on parent (~300)`);
+    });
+
+    // AAA: visible checkbox inside a container-style <label> with heading + description.
+    // The checkbox redirect moved the hint to the label (far from the control).
+    // Visible checkboxes should keep their own hint; the label gets its own via label[for].
+    it("visible checkbox inside label keeps hint on control, not label", () => {
+        const label = makeElement("LABEL", { top: 0, left: 0, width: 800, height: 100, display: "block" });
+        label.setAttribute("for", "cb1");
+        const heading = makeElement("H3", { top: 0, left: 0, width: 400, height: 25, textContent: "New Offers" });
+        const checkbox = makeElement("INPUT", { type: "checkbox", top: 10, left: 700, width: 20, height: 20, display: "inline" });
+        checkbox.id = "cb1";
+        label.appendChild(heading);
+        label.appendChild(checkbox);
+
+        loadModules([checkbox]);
+        (globalThis as any).document.elementsFromPoint = () => [checkbox];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        const hintLeft = parseFloat(hints[0].style.left);
+        // Checkbox is at left:700, width:20 — center is 710.
+        // If redirected to label, center would be ~400 (center of 800px label).
+        assert.ok(hintLeft >= 700 && hintLeft <= 720,
+            `Hint left (${hintLeft}) should be near checkbox (~710), not label center (~400)`);
+    });
+
+    // Prism web component: visible <input> is sibling of <label>, not inside it.
+    // The checkbox redirect moved the hint to the label text.
+    // Visible checkboxes should keep their own hint.
+    it("visible checkbox sibling of label keeps hint on control", () => {
+        const wrapper = makeElement("DIV", { top: 0, left: 0, width: 400, height: 30, display: "block" });
+        const checkbox = makeElement("INPUT", { type: "checkbox", top: 5, left: 10, width: 20, height: 20, display: "inline" });
+        checkbox.id = "cb2";
+        const label = makeElement("LABEL", { top: 0, left: 40, width: 200, height: 30, display: "inline", textContent: "Keep me signed in" });
+        label.setAttribute("for", "cb2");
+        wrapper.appendChild(checkbox);
+        wrapper.appendChild(label);
+
+        loadModules([checkbox]);
+        (globalThis as any).document.elementsFromPoint = () => [checkbox];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        const hintLeft = parseFloat(hints[0].style.left);
+        // Checkbox is at left:10, width:20 — center is 20.
+        // If redirected to label, center would be ~140 (center of label at left:40, width:200).
+        assert.ok(hintLeft >= 10 && hintLeft <= 30,
+            `Hint left (${hintLeft}) should be near checkbox (~20), not label center (~140)`);
+    });
+
+    // Zero-size checkbox (web component pattern: native input hidden, custom visual shown).
+    // Must still redirect to label since there's no visible position for the input.
+    it("zero-size checkbox redirects to label as fallback", () => {
+        const wrapper = makeElement("DIV", { top: 0, left: 0, width: 400, height: 30, display: "block" });
+        const checkbox = makeElement("INPUT", { type: "checkbox", top: 0, left: 0, width: 0, height: 0, display: "inline" });
+        checkbox.id = "cb3";
+        const label = makeElement("LABEL", { top: 0, left: 40, width: 200, height: 30, display: "inline", textContent: "Hidden input label" });
+        label.setAttribute("for", "cb3");
+        wrapper.appendChild(checkbox);
+        wrapper.appendChild(label);
+
+        loadModules([checkbox]);
+        (globalThis as any).document.elementsFromPoint = () => [checkbox];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        const hintLeft = parseFloat(hints[0].style.left);
+        // Zero-size input — hint should redirect to label, center at ~140.
+        assert.ok(hintLeft >= 130 && hintLeft <= 150,
+            `Hint left (${hintLeft}) should be on label (~140) since checkbox is zero-size`);
     });
 });
 
@@ -2007,6 +2092,49 @@ describe("isInRepeatingContainer", () => {
     });
 });
 
+// Google: inline-block <a> wrapping <h3> heading + URL info.
+// shouldRedirectToHeading must fire for non-block display values (inline-block,
+// inline-flex) so the hint centers on the heading, not the combined children.
+describe("shouldRedirectToHeading", () => {
+    it("redirects for block link with heading", () => {
+        const link = makeElement("A", { href: "/page", display: "block", width: 800, height: 60, top: 0, left: 0 });
+        const heading = makeElement("H3", { width: 400, height: 25, top: 0, left: 0, textContent: "Title" });
+        link.appendChild(heading);
+        assert.ok(shouldRedirectToHeading(link));
+    });
+
+    it("redirects for inline-block link with heading", () => {
+        // Base: block link redirects
+        const blockLink = makeElement("A", { href: "/page", display: "block", width: 800, height: 60, top: 0, left: 0 });
+        blockLink.appendChild(makeElement("H3", { width: 400, height: 25, top: 0, left: 0, textContent: "Title" }));
+        assert.ok(shouldRedirectToHeading(blockLink), "block link should redirect");
+
+        // Delta: inline-block link should also redirect
+        const link = makeElement("A", { href: "/page", display: "inline-block", width: 500, height: 60, top: 0, left: 0 });
+        const heading = makeElement("H3", { width: 200, height: 25, top: 0, left: 0, textContent: "Title" });
+        link.appendChild(heading);
+        assert.ok(shouldRedirectToHeading(link), "inline-block link with heading should also redirect");
+    });
+
+    it("does not redirect inside repeating container", () => {
+        const env = createDOM(`
+            <li>
+                <a id="t" href="/page"><h3>Title</h3></a>
+            </li>
+        `);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.ok(!shouldRedirectToHeading(el), "link in <li> should not redirect to heading");
+        env.cleanup();
+    });
+
+    it("does not redirect when no heading exists", () => {
+        const env = createDOM(`<a id="t" href="/page"><span>Not a heading</span></a>`);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.ok(!shouldRedirectToHeading(el), "link without heading should not redirect");
+        env.cleanup();
+    });
+});
+
 // Integration: verify hint positioning composes the predicates correctly
 describe("block link hint positioning", () => {
     afterEach(() => {
@@ -2061,6 +2189,33 @@ describe("block link hint positioning", () => {
         assert.equal(hints?.length, 1);
         assert.ok(!hints[0]?.querySelector(".vimium-hint-tail"),
             "Link inside <li> should not get pointer tail");
+    });
+
+    it("inline-block link with heading centers hint on heading, not combined children", () => {
+        // Google: <a> with display:inline-block wraps <h3> (200px) + URL div (450px).
+        // Without heading redirect, content-narrowing centers on combined children (~225px).
+        // With heading redirect, hint centers on the h3 text rect (~100px).
+        const link = makeElement("A", { href: "/page", top: 10, left: 0, width: 500, height: 60, display: "inline-block" });
+        const heading = makeElement("H3", { top: 10, left: 0, width: 200, height: 25, display: "inline", textContent: "Renters Insurance" });
+        const urlDiv = makeElement("DIV", { top: 40, left: 0, width: 450, height: 15, textContent: "https://example.com" });
+        link.appendChild(heading);
+        link.appendChild(urlDiv);
+
+        loadModules([link]);
+        (globalThis as any).document.elementsFromPoint = () => [link];
+
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        const hintLeft = parseFloat(hints[0].style.left);
+        // Heading is 200px wide starting at left:0 — center is ~100px.
+        // If content-narrowing fires instead, center would be ~225px (combined 450px extent).
+        assert.ok(hintLeft >= 90 && hintLeft <= 110,
+            `Hint left (${hintLeft}) should center on heading (~100), not combined children (~225)`);
     });
 });
 

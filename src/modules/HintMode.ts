@@ -184,7 +184,7 @@ export class HintMode {
   private getHintTargetElement(el: HTMLElement): HTMLElement {
     const rect = el.getBoundingClientRect();
 
-    if (isRedirectableControl(el)) {
+    if (isRedirectableControl(el) && rect.width === 0 && rect.height === 0) {
       const label = findAssociatedLabel(el);
       if (label) return label;
     }
