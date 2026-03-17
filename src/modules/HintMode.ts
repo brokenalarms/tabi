@@ -113,8 +113,11 @@ export class HintMode {
 
     // Resolve hint placement. ContainerGlow is all-or-none per container
     // group: elements sharing the same repeating-container parent are styled
-    // uniformly based on CONTAINER_GLOW_STRATEGY.
-    type ContainerCandidate = { el: HTMLElement; rect: DOMRect; container: HTMLElement; qualified: boolean };
+    // uniformly based on CONTAINER_GLOW_STRATEGY. If any container in the
+    // group has multiple discovered elements inside it, the entire group is
+    // disqualified — ContainerGlow only makes sense when each container
+    // holds exactly one hint target.
+    type ContainerCandidate = { el: HTMLElement; rect: DOMRect; container: HTMLElement; sole: boolean; sized: boolean };
     const containerGroups = new Map<HTMLElement, ContainerCandidate[]>();
 
     for (const el of elements) {
@@ -125,7 +128,7 @@ export class HintMode {
       if (container && CONTAINER_GLOW_STRATEGY !== "none") {
         const sole = !elements.some(other => other !== el && container.contains(other));
         const containerRect = container.getBoundingClientRect();
-        const qualified = isContainerSized(container, containerRect) && sole;
+        const sized = isContainerSized(container, containerRect);
         const parent = container.parentElement || container;
 
         let group = containerGroups.get(parent);
@@ -133,16 +136,17 @@ export class HintMode {
           group = [];
           containerGroups.set(parent, group);
         }
-        group.push({ el, rect, container, qualified });
+        group.push({ el, rect, container, sole, sized });
       } else {
         this.hintPlacementMap.set(el, { style: HintStyle.Pill, rect });
       }
     }
 
     for (const [, group] of containerGroups) {
-      const useGlow = CONTAINER_GLOW_STRATEGY === "any"
-        ? group.some(g => g.qualified)
-        : group.every(g => g.qualified);
+      const allSole = group.every(g => g.sole);
+      const useGlow = allSole && (CONTAINER_GLOW_STRATEGY === "any"
+        ? group.some(g => g.sized)
+        : group.every(g => g.sized));
 
       for (const { el, rect, container } of group) {
         if (useGlow) {
