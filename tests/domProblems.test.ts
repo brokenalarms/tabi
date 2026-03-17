@@ -2361,3 +2361,47 @@ describe("jsaction click discovery", () => {
         assert.equal(walkerFilter(el), NodeFilter.FILTER_SKIP);
     });
 });
+
+// ISSUE: Replaced elements (iframe, object, embed) render opaque external content
+// but have no DOM children — isContentlessOverlay incorrectly exempts them from
+// occluding elements behind them, so hints shine through.
+// SITE: Google Drive — callout popup iframe covers page elements
+// FIX: isContentlessOverlay returns false for replaced elements that render external content
+describe("isContentlessOverlay replaced elements", () => {
+    it("iframe is not a contentless overlay despite having no DOM children", () => {
+        const env = createDOM(`
+            <div>
+                <div id="empty"></div>
+                <iframe id="frame" role="presentation"></iframe>
+            </div>
+        `);
+
+        const empty = env.document.getElementById("empty") as unknown as HTMLElement;
+        const frame = env.document.getElementById("frame") as unknown as HTMLElement;
+
+        // Base: an empty div IS a contentless overlay
+        assert.equal(isContentlessOverlay(empty), true);
+
+        // Delta: an iframe is NOT — it renders external content
+        assert.equal(isContentlessOverlay(frame), false);
+
+        env.cleanup();
+    });
+
+    it("object and embed are not contentless overlays", () => {
+        const env = createDOM(`
+            <div>
+                <object id="obj" data="plugin.swf"></object>
+                <embed id="emb" src="plugin.swf">
+            </div>
+        `);
+
+        const obj = env.document.getElementById("obj") as unknown as HTMLElement;
+        const emb = env.document.getElementById("emb") as unknown as HTMLElement;
+
+        assert.equal(isContentlessOverlay(obj), false);
+        assert.equal(isContentlessOverlay(emb), false);
+
+        env.cleanup();
+    });
+});
