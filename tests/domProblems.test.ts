@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
-import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isContentlessOverlay } from "../src/modules/elementPredicates";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isContentlessOverlay } from "../src/modules/elementPredicates";
 import { findBlockAncestor } from "../src/modules/HintMode";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
@@ -1954,6 +1954,57 @@ describe("isInRepeatingContainer", () => {
         assert.ok(!isInRepeatingContainer(el));
         env.cleanup();
     });
+
+    // Twitter/X: nav uses flat sibling <a> links instead of <li> wrappers.
+    // 3+ sibling <a> elements form a repeating nav pattern.
+    it("returns true for sibling <a> links in a nav", () => {
+        // Base: a single <a> in a div is NOT in a repeating container
+        const envSingle = createDOM(`<div><a id="solo" href="#">link</a></div>`);
+        const solo = envSingle.document.getElementById("solo") as unknown as HTMLElement;
+        assert.equal(isInRepeatingContainer(solo), false,
+            "Single <a> should not be in a repeating container");
+        envSingle.cleanup();
+
+        // Delta: 3+ sibling <a> elements ARE in a repeating container
+        const env = createDOM(`
+            <nav>
+                <a id="t" href="/home">Home</a>
+                <a href="/explore">Explore</a>
+                <a href="/notifications">Notifications</a>
+            </nav>
+        `);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.equal(isInRepeatingContainer(el), true,
+            "Sibling <a> in nav should be in a repeating container");
+        env.cleanup();
+    });
+
+    it("returns false for only two sibling <a> links", () => {
+        const env = createDOM(`
+            <nav>
+                <a id="t" href="/home">Home</a>
+                <a href="/explore">Explore</a>
+            </nav>
+        `);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.equal(isInRepeatingContainer(el), false,
+            "Two sibling <a> elements is not a repeating pattern");
+        env.cleanup();
+    });
+
+    it("getRepeatingContainer returns the <a> itself for sibling links", () => {
+        const env = createDOM(`
+            <nav>
+                <a id="t" href="/home">Home</a>
+                <a href="/explore">Explore</a>
+                <a href="/notifications">Notifications</a>
+            </nav>
+        `);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.equal(getRepeatingContainer(el), el,
+            "Repeating container for sibling <a> should be the <a> itself");
+        env.cleanup();
+    });
 });
 
 // Integration: verify hint positioning composes the predicates correctly
@@ -2258,6 +2309,24 @@ describe("isSiblingInRepeatingContainer", () => {
         // Same <li> — not siblings, could be a real occluder
         assert.equal(isSiblingInRepeatingContainer(t, cover), false);
 
+        env.cleanup();
+    });
+
+    // Twitter/X: sibling <a> links in nav should be treated as siblings
+    // in a repeating container for occlusion exemption
+    it("returns true for elements in sibling <a> nav links", () => {
+        const env = createDOM(`
+            <nav>
+                <a id="link1" href="/home">Home</a>
+                <a id="link2" href="/explore">Explore</a>
+                <a href="/notifications">Notifications</a>
+            </nav>
+        `);
+        const a = env.document.getElementById("link1") as HTMLElement;
+        const b = env.document.getElementById("link2") as HTMLElement;
+
+        assert.equal(isSiblingInRepeatingContainer(a, b), true,
+            "Sibling <a> links should be siblings in a repeating container");
         env.cleanup();
     });
 });

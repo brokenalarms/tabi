@@ -156,11 +156,11 @@ export function isInSameLabel(a: HTMLElement, b: HTMLElement): boolean {
 }
 
 /** Are these two elements in sibling repeating containers (different <li>/<tr>
- *  sharing the same parent)? Adjacent items' overflowing content is not a real
- *  occluder — it's just sibling bleed from the same list/table. */
+ *  sharing the same parent, or sibling <a> links)? Adjacent items' overflowing
+ *  content is not a real occluder — it's just sibling bleed from the same list. */
 export function isSiblingInRepeatingContainer(a: HTMLElement, b: HTMLElement): boolean {
-  const aItem = a.closest(REPEATING_CONTAINER_SELECTOR);
-  const bItem = b.closest(REPEATING_CONTAINER_SELECTOR);
+  const aItem = getRepeatingContainer(a);
+  const bItem = getRepeatingContainer(b);
   return aItem !== null && bItem !== null &&
          aItem !== bItem &&
          aItem.parentElement === bItem.parentElement;
@@ -191,16 +191,31 @@ export function isBlockLevel(el: HTMLElement): boolean {
   return display !== "" && !display.startsWith("inline");
 }
 
-/** Return the nearest repeating container (li, tr) that generates a box,
- *  or null if the element is not in one. */
+/** Minimum number of same-tag sibling <a> elements to count as a repeating
+ *  pattern (e.g. Twitter/X nav uses flat sibling links instead of <li>). */
+const MINIMUM_SIBLING_LINKS = 3;
+
+/** Return the nearest repeating container (li, tr, or sibling <a>) that
+ *  generates a box, or null if the element is not in one.
+ *  For sibling <a> links (3+ under the same parent), the <a> itself is
+ *  the repeating container — there's no wrapping <li>. */
 export function getRepeatingContainer(el: HTMLElement): HTMLElement | null {
   const container = el.closest(REPEATING_CONTAINER_SELECTOR) as HTMLElement | null;
-  return container !== null && hasBox(container) ? container : null;
+  if (container !== null && hasBox(container)) return container;
+  if (el.tagName === "A" && el.parentElement !== null) {
+    const siblings = el.parentElement.children;
+    let count = 0;
+    for (let i = 0; i < siblings.length; i++) {
+      if (siblings[i].tagName === "A") count++;
+      if (count >= MINIMUM_SIBLING_LINKS) return el;
+    }
+  }
+  return null;
 }
 
-/** Is this element inside a vertically repeating container (list or table row)?
- *  Elements inside <li> or <tr> are part of a flowing layout where hints should
- *  stay centered on the full container width for vertical alignment.
+/** Is this element inside a repeating container (list item, table row, or
+ *  sibling link group)? Elements in repeating containers are part of a flowing
+ *  layout where hints should stay aligned.
  *  Only counts ancestors that have a box — a display:contents <li> isn't a
  *  real container and shouldn't affect hint positioning. */
 export function isInRepeatingContainer(el: HTMLElement): boolean {
