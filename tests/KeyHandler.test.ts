@@ -286,6 +286,28 @@ describe("KeyHandler", () => {
             fireKeyDown(ev);
             assert.ok(!ev.defaultPrevented);
         });
+
+        // Fallback: if focusin never fired (e.g. input was already focused
+        // when content script loaded), keydown should detect the focused
+        // input via document.activeElement and switch to INSERT.
+        it("switches to INSERT on keydown when input is already focused", () => {
+            let called = false;
+            keyHandler.on("scrollDown", () => { called = true; });
+            const input = document.createElement("input");
+            input.type = "text";
+            document.body.appendChild(input);
+            // Focus the input, then forcibly reset mode to NORMAL to simulate
+            // the content script loading after the field was already focused
+            // (focusin already fired but the KeyHandler wasn't listening yet).
+            input.focus();
+            keyHandler.setMode(Mode.NORMAL);
+            assert.equal(keyHandler.getMode(), "NORMAL");
+            const ev = makeKeyEvent("KeyJ");
+            fireKeyDown(ev);
+            assert.equal(keyHandler.getMode(), "INSERT");
+            assert.ok(!called, "command should not fire when input is focused");
+            assert.ok(!ev.defaultPrevented);
+        });
     });
 
     describe("Overlay modes (HINTS, TAB_SEARCH)", () => {
