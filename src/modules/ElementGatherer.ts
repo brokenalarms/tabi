@@ -6,9 +6,40 @@
 import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_SELECTOR } from "./constants";
 import {
   isExcludedByIntent, childrenCannotBeVisible, isOnScreen, isVisible,
-  isClippedByOverflow, isOccluded,
+  isClippedByOverflow, isOccluded, isZeroSizeAnchor, isRedirectableControl,
+  isAnchorToLabelTarget,
 } from "./elementPredicates";
 import { findAssociatedLabel } from "./elementTraversals";
+import { DEFAULTS } from "../types";
+
+// --- Debug overlay ---
+// When DEFAULTS.debug is true, draws colored dots on all <a> elements:
+//   green  = discovered (in final result after dedup)
+//   orange = passed walker but removed by dedup
+//   red    = filtered out by walker (SKIP or REJECT)
+// Dots auto-remove after 10 seconds.
+
+function showDebugOverlay(result: HTMLElement[]): void {
+  if (!DEFAULTS.debug) return;
+  const overlay = document.createElement("div");
+  overlay.style.cssText = "position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:999999;";
+  document.documentElement.appendChild(overlay);
+  const resultSet = new Set(result);
+  for (const a of document.querySelectorAll("a[href]")) {
+    const r = (a as HTMLElement).getBoundingClientRect();
+    if (r.width === 0 || r.height === 0) continue;
+    const found = resultSet.has(a as HTMLElement);
+    const verdict = walkerFilter(a as Node);
+    const passed = verdict === NodeFilter.FILTER_ACCEPT;
+    // green = in final result, orange = passed walker but deduped, red = walker filtered
+    const color = found ? "lime" : passed ? "orange" : "red";
+    const dot = document.createElement("div");
+    dot.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:8px;height:8px;border-radius:50%;background:${color};opacity:0.9;`;
+    dot.title = `${color === "lime" ? "DISCOVERED" : color === "orange" ? "DEDUPED" : "FILTERED"}: ${(a as HTMLElement).getAttribute("href")?.slice(0, 50)}`;
+    overlay.appendChild(dot);
+  }
+  setTimeout(() => overlay.remove(), 10000);
+}
 
 // --- Walker filter ---
 // Routes to REJECT/SKIP/ACCEPT by calling predicates.
@@ -48,24 +79,22 @@ export function walkerFilter(node: Node): number {
     }
   }
 
-  // Effective rect: anchor-child fallback for zero-size <a>,
-  // label redirect for zero-size radio/checkbox
+  // Effective rect: fallback for zero-size elements.
+  // Zero-size anchors use their first visible child's rect.
+  // Zero-size radio/checkbox inputs use their associated label's rect.
   let rect = el.getBoundingClientRect();
   if (rect.width === 0 || rect.height === 0) {
     let fallbackRect: DOMRect | null = null;
-    if (el.tagName.toLowerCase() === "a") {
+    if (isZeroSizeAnchor(el, rect)) {
       for (const child of el.children) {
         const cr = (child as HTMLElement).getBoundingClientRect();
         if (cr.width > 0 && cr.height > 0) { fallbackRect = cr; break; }
       }
-    } else if (el.tagName.toLowerCase() === "input") {
-      const type = ((el as HTMLInputElement).type || "").toLowerCase();
-      if (type === "radio" || type === "checkbox") {
-        const label = findAssociatedLabel(el);
-        if (label) {
-          const lr = label.getBoundingClientRect();
-          if (lr.width > 0 && lr.height > 0) fallbackRect = lr;
-        }
+    } else if (isRedirectableControl(el)) {
+      const label = findAssociatedLabel(el);
+      if (label) {
+        const lr = label.getBoundingClientRect();
+        if (lr.width > 0 && lr.height > 0) fallbackRect = lr;
       }
     }
     if (!fallbackRect) return NodeFilter.FILTER_SKIP;
@@ -234,11 +263,8 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
   }
   if (labelForIds.size > 0) {
     for (const el of result) {
-      if (el.tagName.toLowerCase() === "a") {
-        const href = el.getAttribute("href");
-        if (href && href.charAt(0) === "#" && labelForIds.has(href.slice(1))) {
-          toRemove.add(el);
-        }
+      if (isAnchorToLabelTarget(el, labelForIds)) {
+        toRemove.add(el);
       }
     }
   }
@@ -277,5 +303,7 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
     }
   }
 
-  return result.filter(el => !toRemove.has(el));
+  const finalResult = result.filter(el => !toRemove.has(el));
+  showDebugOverlay(finalResult);
+  return finalResult;
 }

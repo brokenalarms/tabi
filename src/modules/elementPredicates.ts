@@ -126,10 +126,9 @@ export function isOccluded(el: HTMLElement, rect: DOMRect): boolean {
     return true;
   };
 
-  // Check all 4 corners. An element is occluded when BOTH bottom corners are
-  // covered. Top-only coverage (loading bars, header borders) is exempt.
-  // Single-side coverage (custom scrollbar on the right edge) is also exempt —
-  // the element is still clickable on the uncovered side.
+  // Check all 4 corners but require at least one BOTTOM corner to be covered.
+  // Top-only coverage (e.g. a thin loading bar or header border overlapping the
+  // top edge) doesn't block interaction — the element is still clickable below.
   const corners: [number, number, boolean][] = [
     [rect.left + 2, rect.top + 2, false],
     [rect.right - 2, rect.top + 2, false],
@@ -137,14 +136,13 @@ export function isOccluded(el: HTMLElement, rect: DOMRect): boolean {
     [rect.right - 2, rect.bottom - 2, true],
   ];
 
-  let bottomCoveredCount = 0;
   for (const [x, y, isBottom] of corners) {
     const hits = document.elementsFromPoint(clampX(x), clampY(y));
     if (hits.length > 0 && isCover(hits[0] as HTMLElement)) {
-      if (isBottom) bottomCoveredCount++;
+      if (isBottom) return true;
     }
   }
-  return bottomCoveredCount >= 2;
+  return false;
 }
 
 /** Are these two elements in sibling repeating containers (different <li>/<tr>
@@ -228,6 +226,14 @@ export function isRedirectableControl(el: HTMLElement): boolean {
 /** Is this an anchor with zero dimensions whose hint should redirect to a visible child? */
 export function isZeroSizeAnchor(el: HTMLElement, rect: DOMRect): boolean {
   return el.tagName.toLowerCase() === "a" && rect.width === 0 && rect.height === 0;
+}
+
+/** Is this an <a href="#id"> that points to a label's associated input?
+ *  These anchors duplicate the label's click target and should be deduped. */
+export function isAnchorToLabelTarget(el: HTMLElement, labelForIds: Set<string>): boolean {
+  if (el.tagName.toLowerCase() !== "a") return false;
+  const href = el.getAttribute("href");
+  return href !== null && href.charAt(0) === "#" && labelForIds.has(href.slice(1));
 }
 
 /** Should this element's hint redirect to its heading descendant?

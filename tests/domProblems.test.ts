@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
-import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, isSiblingInRepeatingContainer } from "../src/modules/elementPredicates";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget } from "../src/modules/elementPredicates";
 import { findBlockAncestor } from "../src/modules/HintMode";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
@@ -217,6 +217,30 @@ describe("visibility edge cases", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive(), "Zero-size radio with visible label should get a hint");
     });
+});
+
+it("isAnchorToLabelTarget identifies anchors pointing to label targets", () => {
+    const env = createDOM(`
+        <a id="yes" href="#menu-toggle">Open menu</a>
+        <a id="no-hash" href="/page">Regular link</a>
+        <a id="no-match" href="#other">Other anchor</a>
+        <div id="not-a">Not a link</div>
+    `);
+    const labelForIds = new Set(["menu-toggle"]);
+    const yes = env.document.getElementById("yes") as unknown as HTMLElement;
+    const noHash = env.document.getElementById("no-hash") as unknown as HTMLElement;
+    const noMatch = env.document.getElementById("no-match") as unknown as HTMLElement;
+    const notA = env.document.getElementById("not-a") as unknown as HTMLElement;
+
+    assert.equal(isAnchorToLabelTarget(yes, labelForIds), true,
+        "Anchor with href=#id matching a label target");
+    assert.equal(isAnchorToLabelTarget(noHash, labelForIds), false,
+        "Anchor without # prefix");
+    assert.equal(isAnchorToLabelTarget(noMatch, labelForIds), false,
+        "Anchor with # but id not in label set");
+    assert.equal(isAnchorToLabelTarget(notA, labelForIds), false,
+        "Non-anchor element");
+    env.cleanup();
 });
 
 describe("label-for dedup", () => {
@@ -1005,41 +1029,27 @@ describe("overlay occlusion", () => {
         assert.ok(hintMode.isActive(), "Top-only cover should not occlude the link");
     });
 
-    // ISSUE: Element occluded — both bottom corners covered by an unrelated element.
-    // SITE: theguardian.com — card links covered by adjacent section
-    // FIX: isOccluded requires both bottom corners to be covered. Single-side
-    // coverage (e.g. a custom scrollbar on one edge) should not occlude.
-    it("both bottom corners covered → occluded; one side only → not occluded", () => {
+    // ISSUE: Element partially occluded — bottom corner covered by an unrelated element.
+    // SITE: theguardian.com — card links partially covered by adjacent section
+    // FIX: isOccluded requires at least one bottom corner to be covered.
+    it("filters element when a bottom corner is occluded", () => {
+        // Link at (10,10)-(210,30). Overlay covers only the bottom-right quadrant.
         const link = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 20 });
+        const overlay = makeElement("DIV", { top: 20, left: 150, width: 200, height: 200 });
 
-        // Base: overlay covers both bottom corners → occluded
-        const fullOverlay = makeElement("DIV", { top: 0, left: 0, width: 300, height: 300 });
         loadModules([link]);
+
         (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
-            const or = fullOverlay.getBoundingClientRect();
+            const or = overlay.getBoundingClientRect();
             if (x >= or.left && x < or.right && y >= or.top && y < or.bottom) {
-                return [fullOverlay, link];
+                return [overlay, link];
             }
             return [link];
         };
-        let { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(!hintMode.isActive(), "Base: both bottom corners covered should be filtered");
-        hintMode.deactivate();
 
-        // Delta: scrollbar covers only right side → NOT occluded
-        const scrollbar = makeElement("DIV", { top: 0, left: 200, width: 10, height: 300 });
-        loadModules([link]);
-        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
-            const sr = scrollbar.getBoundingClientRect();
-            if (x >= sr.left && x < sr.right && y >= sr.top && y < sr.bottom) {
-                return [scrollbar, link];
-            }
-            return [link];
-        };
-        ({ hintMode } = getState());
+        const { hintMode } = getState();
         hintMode.activate(false);
-        assert.ok(hintMode.isActive(), "Delta: right-side-only scrollbar should not occlude");
+        assert.ok(!hintMode.isActive(), "Link with one bottom corner occluded should be filtered");
     });
 });
 
