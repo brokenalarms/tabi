@@ -13,9 +13,9 @@ import { findAssociatedLabel } from "./elementTraversals";
 import { DEFAULTS } from "../types";
 
 // --- Debug dots ---
-// When DEFAULTS.debug is true, renderDebugDots() draws colored dots on all
-// <a> elements into the provided overlay (the hint overlay).  Dots disappear
-// automatically when the overlay is removed on deactivation.
+// When DEFAULTS.debug is true, draws colored dots on all <a> elements into
+// the provided overlay (the hint overlay).  Dots disappear automatically
+// when the overlay is removed on deactivation.
 //   green  = discovered (in final result after dedup)
 //   orange = passed walker but removed by dedup
 //   red    = filtered out by walker (SKIP or REJECT)
