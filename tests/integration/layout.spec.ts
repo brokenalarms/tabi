@@ -123,6 +123,63 @@ test("targets nav text, not aria-hidden badge count", async ({ page }) => {
   expect(hintTop).toBeGreaterThanOrEqual(25);
 });
 
+// Google search result: block <a> with <h3> heading + site info below.
+// Heading redirect fires — getClientRects on inline headings returns per-line
+// rects, and padding-bottom subtraction can push the hint into the heading.
+// The hint must sit below the h3's bounding rect, not overlap it.
+// SITE: google.com — search result links
+// FIX: Skip getClientRects and padding-bottom subtraction for heading-redirect targets.
+test("heading redirect hint sits below h3, not inside it", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+
+  // Inline h3 with wrapping text: getClientRects returns per-line rects.
+  // Without the fix, picking the first line rect positions the hint mid-heading.
+  await setupPage(page, `
+    <div style="width:600px; padding:20px;">
+      <a href="/result" id="link" style="display:block; text-decoration:none;">
+        <h3 id="heading" style="font-size:20px; line-height:1.3; display:inline;">
+          Chelsea 2-0 Man Utd: Women's League Cup glory secured as Lauren James and Aggie Beever-Jones score
+        </h3>
+        <br>
+        <div style="display:flex; align-items:center; gap:8px; padding:4px 0;">
+          <span>Sky Sports</span>
+          <cite>https://www.skysports.com</cite>
+        </div>
+      </a>
+      <p style="margin-top:4px;">
+        <a href="/readmore" id="readmore">Read more</a>
+      </p>
+    </div>
+  `);
+
+  const result = await page.evaluate(() => {
+    const { KeyHandler, HintMode, Mode } = window.TestHarness;
+    const kh = new KeyHandler();
+    const hm = new HintMode(kh);
+    hm.wireCommands();
+    kh.on("exitToNormal", () => {
+      if (hm.isActive()) hm.deactivate();
+      kh.setMode(Mode.NORMAL);
+    });
+    hm.activate(false);
+
+    const heading = document.getElementById("heading")!;
+    const headingRect = heading.getBoundingClientRect();
+    const hints = Array.from(document.querySelectorAll(".vimium-hint")) as HTMLElement[];
+    const hintTops = hints.map(h => parseFloat(h.style.top));
+
+    hm.destroy();
+    return { headingBottom: headingRect.bottom, hintTops };
+  });
+
+  // The heading link hint must be at or just below the heading bottom edge,
+  // not inside the heading text (which would mean delta < 0).
+  const headingHintTop = result.hintTops.find(t =>
+    t >= result.headingBottom - 2 && t <= result.headingBottom + 10
+  );
+  expect(headingHintTop).toBeDefined();
+});
+
 test("hint targets button, not visually-hidden 1x1 span inside it", async ({ page }) => {
   // Button wraps a 1x1 visually-hidden span. The hint should be positioned
   // relative to the button's bounding rect (pill-below-pointer at bottom + 2),

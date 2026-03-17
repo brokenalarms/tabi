@@ -242,15 +242,13 @@ export class HintMode {
       container = node.children.length > 0 || hasTextAlongside;
     }
 
-    if (el !== target && el.getBoundingClientRect().width > window.innerWidth * 0.25) {
-      const paddingTop = parseFloat(getComputedStyle(target).paddingTop) || 0;
-      if (paddingTop > 0) {
-        rect = new DOMRect(rect.left, rect.top + paddingTop, rect.width, rect.height - paddingTop);
-      }
-    }
-
-    if (el.tagName.toLowerCase() === "a") {
-      const clientRects = (el === target ? el : target).getClientRects();
+    // Multi-line links: use the first visible client rect so the hint
+    // sits at the first line, not the bounding box center.  Only for
+    // direct targets — heading-redirect targets use getBoundingClientRect
+    // because getClientRects on an inline heading returns per-line rects
+    // and picking the first line positions the hint mid-heading.
+    if (el.tagName.toLowerCase() === "a" && el === target) {
+      const clientRects = el.getClientRects();
       for (let i = 0; i < clientRects.length; i++) {
         const cr = clientRects[i];
         if (cr.width > 1 && cr.height > 1) { rect = cr; break; }
@@ -277,9 +275,13 @@ export class HintMode {
 
     // Shrink rect by padding-bottom so the hint pointer touches the content
     // edge rather than floating below the padding (e.g. MediaWiki sidebar links).
-    const paddingBottom = parseFloat(getComputedStyle(target).paddingBottom) || 0;
-    if (paddingBottom > 0) {
-      rect = new DOMRect(rect.left, rect.top, rect.width, rect.height - paddingBottom);
+    // Only for direct link targets — heading-redirect targets should use
+    // the heading's full bounding rect so the hint sits below the heading.
+    if (el === target && el.tagName.toLowerCase() === "a") {
+      const paddingBottom = parseFloat(getComputedStyle(target).paddingBottom) || 0;
+      if (paddingBottom > 0) {
+        rect = new DOMRect(rect.left, rect.top, rect.width, rect.height - paddingBottom);
+      }
     }
 
     const containerEl = (container && repeatingContainer) ? repeatingContainer : null;
