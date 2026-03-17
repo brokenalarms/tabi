@@ -221,6 +221,17 @@ export function hasHeadingContent(el: HTMLElement): boolean {
   return el.querySelector(HEADING_SELECTOR) !== null;
 }
 
+// --- SPA framework event delegation ---
+
+/** Does this element have a jsaction attribute declaring a click handler?
+ *  Google's Closure Library uses jsaction="click:handlerName" for event delegation.
+ *  This is the SPA equivalent of onclick — an explicit click handler in the DOM. */
+export function hasJsactionClick(el: HTMLElement): boolean {
+  const jsaction = el.getAttribute("jsaction");
+  if (jsaction === null) return false;
+  return /(^|;\s*)click:/.test(jsaction);
+}
+
 // --- Hint target redirect predicates ---
 
 /** Is this a radio or checkbox input whose hint should redirect to its label? */

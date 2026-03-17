@@ -7,7 +7,7 @@ import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_SELECTOR } from "./constants";
 import {
   isExcludedByIntent, childrenCannotBeVisible, isOnScreen, isVisible,
   isClippedByOverflow, isOccluded, isZeroSizeAnchor, isRedirectableControl,
-  isAnchorToLabelTarget,
+  isAnchorToLabelTarget, hasJsactionClick,
 } from "./elementPredicates";
 import { findAssociatedLabel } from "./elementTraversals";
 import { DEFAULTS } from "../types";
@@ -131,7 +131,7 @@ export function walkerFilter(node: Node): number {
   // Each false positive required a new dedup rule (wrapper dedup, sibling dedup, cover
   // occlusion), adding complexity without reliability. SPAs that care about accessibility
   // should use ARIA roles or semantic HTML — those are the signals we trust.
-  if (!el.matches(CLICKABLE_SELECTOR)) return NodeFilter.FILTER_SKIP;
+  if (!el.matches(CLICKABLE_SELECTOR) && !hasJsactionClick(el)) return NodeFilter.FILTER_SKIP;
 
   // Opacity:0 radio/checkbox with visible label — redirect to label
   if (parseFloat(style.opacity) === 0) {
