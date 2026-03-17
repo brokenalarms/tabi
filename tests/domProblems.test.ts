@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
-import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel } from "../src/modules/elementPredicates";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isContentlessOverlay } from "../src/modules/elementPredicates";
 import { findBlockAncestor } from "../src/modules/HintMode";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
@@ -976,7 +976,7 @@ describe("overlay occlusion", () => {
 
     it("filters links occluded by a fixed overlay", () => {
         const articleLink = makeElement("A", { href: "/article", top: 400, left: 50, width: 200, height: 20 });
-        const overlayDiv = makeElement("DIV", { top: 0, left: 0, width: 1024, height: 768 });
+        const overlayDiv = makeElement("DIV", { top: 0, left: 0, width: 1024, height: 768, textContent: "Loading..." });
 
         loadModules([articleLink]);
 
@@ -1035,7 +1035,7 @@ describe("overlay occlusion", () => {
     it("filters element when a bottom corner is occluded", () => {
         // Link at (10,10)-(210,30). Overlay covers only the bottom-right quadrant.
         const link = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 20 });
-        const overlay = makeElement("DIV", { top: 20, left: 150, width: 200, height: 200 });
+        const overlay = makeElement("DIV", { top: 20, left: 150, width: 200, height: 200, textContent: "Menu" });
 
         loadModules([link]);
 
@@ -1108,7 +1108,7 @@ describe("clickable sibling occlusion", () => {
 
     it("element behind non-clickable overlay gets filtered", () => {
         const link = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 20 });
-        const overlay = makeElement("DIV", { top: 0, left: 0, width: 1024, height: 768 });
+        const overlay = makeElement("DIV", { top: 0, left: 0, width: 1024, height: 768, textContent: "Confirm action" });
 
         loadModules([link]);
 
@@ -1125,7 +1125,7 @@ describe("clickable sibling occlusion", () => {
     // SITE: github.com — profile dropdown menu items cover sidebar links
     // FIX: coveredByOverlay checks containment only, not interactivity of cover
     it("element behind unrelated interactive element gets filtered", () => {
-        const menuItem = makeElement("A", { href: "/menu", top: 10, left: 10, width: 200, height: 20 });
+        const menuItem = makeElement("A", { href: "/menu", top: 10, left: 10, width: 200, height: 20, textContent: "Settings" });
         const sidebarLink = makeElement("A", { href: "/sidebar", top: 10, left: 10, width: 200, height: 20 });
 
         // Only sidebarLink is a candidate; menuItem is from a separate tree (dropdown)
@@ -1167,7 +1167,7 @@ describe("clickable sibling occlusion", () => {
     // FIX: Any unrelated element covering both test points blocks hints.
     it("element behind disabled button overlay gets filtered", () => {
         const link = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 20 });
-        const disabledBtn = makeElement("BUTTON", { top: 0, left: 0, width: 1024, height: 768 });
+        const disabledBtn = makeElement("BUTTON", { top: 0, left: 0, width: 1024, height: 768, textContent: "Unavailable" });
         (disabledBtn as HTMLButtonElement).disabled = true;
 
         loadModules([link]);

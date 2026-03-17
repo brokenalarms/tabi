@@ -346,7 +346,12 @@ export class HintMode {
     glow.style.height = glowRect.height + "px";
     if (this.overlay) this.overlay.appendChild(glow);
 
-    const insetRight = Math.max(6, parseFloat(cs.paddingRight) || 0);
+    const padding = Math.max(
+      parseFloat(cs.paddingRight) || 0,
+      parseFloat(cs.paddingTop) || 0,
+      parseFloat(cs.paddingBottom) || 0
+    );
+    const insetRight = Math.min(Math.max(6, padding), 24);
     const pos = this.viewportToDocument(
       glowRect.right - insetRight,
       glowRect.top + glowRect.height / 2
