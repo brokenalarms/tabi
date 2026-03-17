@@ -228,6 +228,14 @@ export function isZeroSizeAnchor(el: HTMLElement, rect: DOMRect): boolean {
   return el.tagName.toLowerCase() === "a" && rect.width === 0 && rect.height === 0;
 }
 
+/** Is this an <a href="#id"> that points to a label's associated input?
+ *  These anchors duplicate the label's click target and should be deduped. */
+export function isAnchorToLabelTarget(el: HTMLElement, labelForIds: Set<string>): boolean {
+  if (el.tagName.toLowerCase() !== "a") return false;
+  const href = el.getAttribute("href");
+  return href !== null && href.charAt(0) === "#" && labelForIds.has(href.slice(1));
+}
+
 /** Should this element's hint redirect to its heading descendant?
  *  True for block-level <a> with heading content outside repeating containers.
  *  Positions the hint on the heading text rather than the full-width block. */

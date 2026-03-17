@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
-import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, isSiblingInRepeatingContainer } from "../src/modules/elementPredicates";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget } from "../src/modules/elementPredicates";
 import { findBlockAncestor } from "../src/modules/HintMode";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
@@ -217,6 +217,30 @@ describe("visibility edge cases", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive(), "Zero-size radio with visible label should get a hint");
     });
+});
+
+it("isAnchorToLabelTarget identifies anchors pointing to label targets", () => {
+    const env = createDOM(`
+        <a id="yes" href="#menu-toggle">Open menu</a>
+        <a id="no-hash" href="/page">Regular link</a>
+        <a id="no-match" href="#other">Other anchor</a>
+        <div id="not-a">Not a link</div>
+    `);
+    const labelForIds = new Set(["menu-toggle"]);
+    const yes = env.document.getElementById("yes") as unknown as HTMLElement;
+    const noHash = env.document.getElementById("no-hash") as unknown as HTMLElement;
+    const noMatch = env.document.getElementById("no-match") as unknown as HTMLElement;
+    const notA = env.document.getElementById("not-a") as unknown as HTMLElement;
+
+    assert.equal(isAnchorToLabelTarget(yes, labelForIds), true,
+        "Anchor with href=#id matching a label target");
+    assert.equal(isAnchorToLabelTarget(noHash, labelForIds), false,
+        "Anchor without # prefix");
+    assert.equal(isAnchorToLabelTarget(noMatch, labelForIds), false,
+        "Anchor with # but id not in label set");
+    assert.equal(isAnchorToLabelTarget(notA, labelForIds), false,
+        "Non-anchor element");
+    env.cleanup();
 });
 
 describe("label-for dedup", () => {
@@ -1025,7 +1049,7 @@ describe("overlay occlusion", () => {
 
         const { hintMode } = getState();
         hintMode.activate(false);
-        assert.ok(!hintMode.isActive(), "Link with one corner occluded should be filtered");
+        assert.ok(!hintMode.isActive(), "Link with one bottom corner occluded should be filtered");
     });
 });
 
