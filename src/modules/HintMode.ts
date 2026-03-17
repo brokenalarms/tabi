@@ -56,6 +56,11 @@ type HintPlacement =
 
 const HINT_CHARS = "sadgjklewcmpoh";
 
+/** How far (px) a hinted element may drift before we dismiss hints. */
+const DRIFT_THRESHOLD = 5;
+/** How often (ms) we check for position drift. */
+const DRIFT_CHECK_INTERVAL = 200;
+
 export class HintMode {
   private keyHandler: KeyHandlerLike;
   private active: boolean;
@@ -67,7 +72,7 @@ export class HintMode {
   private readonly onMouseDown: () => void;
   private readonly onScroll: () => void;
   private readonly onResize: () => void;
-  private mutationObserver: MutationObserver | null;
+  private driftTimer: ReturnType<typeof setInterval> | null;
   /** Resolved hint placement for each discovered element. Populated in activate(). */
   private hintPlacementMap: Map<HTMLElement, HintPlacement>;
 
@@ -82,7 +87,7 @@ export class HintMode {
     this.onMouseDown = this.deactivate.bind(this);
     this.onScroll = this.deactivate.bind(this);
     this.onResize = this.deactivate.bind(this);
-    this.mutationObserver = null;
+    this.driftTimer = null;
     this.hintPlacementMap = new Map();
   }
 
@@ -135,7 +140,7 @@ export class HintMode {
     document.addEventListener("mousedown", this.onMouseDown, true);
     window.addEventListener("scroll", this.onScroll, true);
     window.addEventListener("resize", this.onResize);
-    this.observeMutations();
+    this.startDriftCheck();
   }
 
   deactivate(): void {
@@ -148,9 +153,16 @@ export class HintMode {
     document.removeEventListener("mousedown", this.onMouseDown, true);
     window.removeEventListener("scroll", this.onScroll, true);
     window.removeEventListener("resize", this.onResize);
-    if (this.mutationObserver) {
-      this.mutationObserver.disconnect();
-      this.mutationObserver = null;
+    if (this.driftTimer !== null) {
+      clearInterval(this.driftTimer);
+      this.driftTimer = null;
+    }
+
+    // Remove any orphaned focus rings (e.g. deactivation interrupted the
+    // hint collapse animation before afterCollapse could clean up).
+    // Skip rings that are already fading out — those will self-remove on animationend.
+    for (const ring of document.documentElement.querySelectorAll(".vimium-hint-ring:not(.vimium-hint-ring-out)")) {
+      ring.remove();
     }
 
     if (this.overlay) {
@@ -186,24 +198,21 @@ export class HintMode {
     this.unwireCommands();
   }
 
-  // --- DOM mutation observation ---
+  // --- Layout drift detection ---
 
-  /** Dismiss hints when the page DOM changes (e.g. lazy-loaded content
-   *  shifts existing elements). Ignores mutations inside our own overlay. */
-  private observeMutations(): void {
-    if (typeof MutationObserver === "undefined") return;
-    const overlay = this.overlay;
-    this.mutationObserver = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        if (overlay && (m.target === overlay || overlay.contains(m.target as Node))) continue;
+  /** Periodically check whether hinted elements have shifted from their
+   *  original positions. Dismisses hints if drift exceeds the threshold.
+   *  Only checks the first element — a layout shift moves everything. */
+  private startDriftCheck(): void {
+    const [el, placement] = this.hintPlacementMap.entries().next().value!;
+    const original = placement.rect;
+    this.driftTimer = setInterval(() => {
+      const current = el.getBoundingClientRect();
+      if (Math.abs(current.top - original.top) > DRIFT_THRESHOLD ||
+          Math.abs(current.left - original.left) > DRIFT_THRESHOLD) {
         this.deactivate();
-        return;
       }
-    });
-    this.mutationObserver.observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-    });
+    }, DRIFT_CHECK_INTERVAL);
   }
 
   // --- Hint target element ---
@@ -507,7 +516,15 @@ export class HintMode {
     document.documentElement.appendChild(ring);
 
     const afterCollapse = (): void => {
+      // If hints were already torn down (e.g. by mutation observer during
+      // the collapse animation), skip the click — the target may have
+      // moved and the ring was already cleaned up by deactivate().
+      const wasActive = this.active;
       this.deactivate();
+      if (!wasActive) {
+        ring.remove();
+        return;
+      }
 
       const isLink = element.tagName.toLowerCase() === "a" && (element as HTMLAnchorElement).href;
       const opensNewWindow = isLink && (newTab || (element as HTMLAnchorElement).target === "_blank");
