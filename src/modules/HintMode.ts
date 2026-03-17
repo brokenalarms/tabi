@@ -59,7 +59,7 @@ type HintPlacement =
  *  - "all": every container must qualify for any to get ContainerGlow
  *  - "none": never use ContainerGlow (always Pill) */
 type ContainerGlowStrategy = "any" | "all" | "none";
-const CONTAINER_GLOW_STRATEGY: ContainerGlowStrategy = "any";
+const CONTAINER_GLOW_STRATEGY: ContainerGlowStrategy = "all";
 
 const HINT_CHARS = "sadgjklewcmpoh";
 
