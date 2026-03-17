@@ -107,3 +107,8 @@ The element discovery pipeline only uses semantic signals (`CLICKABLE_SELECTOR`:
 **Why:** `tabindex` without a role or handler is used by sites for structural keyboard navigation — e.g. Reddit's `<details role="article" tabindex="0">` wrapping comment threads. These containers are focusable so users can arrow through them, but they aren't click targets. The actual interactive elements inside (links, buttons, vote arrows) already get their own hints via semantic signals. Treating `tabindex` as a clickable signal produced false positives on these structural containers.
 
 **Trade-off:** A bare `<div tabindex="0">` with a JS click listener but no role, no `onclick` attribute, and no semantic markup won't be discovered. This is invalid HTML from an accessibility standpoint — such elements are invisible to screen readers and keyboard users. We don't account for it.
+
+### TypeScript conventions
+
+- **No `_` prefixes on private members.** The `private` keyword is sufficient — underscore prefixes are a JavaScript-era convention that adds noise. Use plain names: `private keyBuffer`, not `private _keyBuffer`.
+- **No `!!` boolean coercion.** Use proper type narrowing instead of `!!value`. For example, use `value !== null` or `value !== undefined` rather than `!!value`.
