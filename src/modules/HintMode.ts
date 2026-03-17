@@ -48,6 +48,12 @@ interface Hint {
   div: HTMLDivElement;
 }
 
+const enum HintStyle { Pill, ContainerGlow }
+
+type HintPlacement =
+  | { style: HintStyle.Pill; rect: DOMRect }
+  | { style: HintStyle.ContainerGlow; rect: DOMRect; container: HTMLElement };
+
 const HINT_CHARS = "sadgjklewcmpoh";
 
 export class HintMode {
@@ -61,9 +67,8 @@ export class HintMode {
   private readonly onMouseDown: () => void;
   private readonly onScroll: () => void;
   private readonly onResize: () => void;
-  /** Elements that should get container styling (glow + inside-end pill).
-   *  Maps element → its repeating container. Populated in activate(). */
-  private containerStylingMap: Map<HTMLElement, HTMLElement>;
+  /** Resolved hint placement for each discovered element. Populated in activate(). */
+  private hintPlacementMap: Map<HTMLElement, HintPlacement>;
 
   constructor(keyHandler: KeyHandlerLike) {
     this.keyHandler = keyHandler;
@@ -76,7 +81,7 @@ export class HintMode {
     this.onMouseDown = this.deactivate.bind(this);
     this.onScroll = this.deactivate.bind(this);
     this.onResize = this.deactivate.bind(this);
-    this.containerStylingMap = new Map();
+    this.hintPlacementMap = new Map();
   }
 
   // --- Public API ---
@@ -97,18 +102,22 @@ export class HintMode {
       return;
     }
 
-    // Decide container styling once, with full context: the repeating
-    // container must be large enough AND the element must be the sole
-    // interactive element inside it.
+    // Resolve hint placement for each element. Container glow requires a
+    // repeating container that is large enough and contains no other
+    // discovered elements. Everything else gets a pill.
     for (const el of elements) {
+      const rect = this.getHintRect(el);
       const target = this.getHintTargetElement(el);
       const rc = target === el ? getRepeatingContainer(el) : null;
-      if (!rc) continue;
-      const rcRect = rc.getBoundingClientRect();
-      const sole = !elements.some(other => other !== el && rc.contains(other));
-      if (isContainerSized(rc, rcRect) && sole) {
-        this.containerStylingMap.set(el, rc);
+      if (rc) {
+        const rcRect = rc.getBoundingClientRect();
+        const sole = !elements.some(other => other !== el && rc.contains(other));
+        if (isContainerSized(rc, rcRect) && sole) {
+          this.hintPlacementMap.set(el, { style: HintStyle.ContainerGlow, rect, container: rc });
+          continue;
+        }
       }
+      this.hintPlacementMap.set(el, { style: HintStyle.Pill, rect });
     }
 
     const labels = HintMode.generateLabels(elements.length);
@@ -116,7 +125,7 @@ export class HintMode {
     if (this.overlay) renderDebugDots(this.overlay, elements);
     this.hints = elements.map((el, i) => {
       const label = labels[i];
-      const div = this.createHintDiv(el, label, elements);
+      const div = this.createHintDiv(el, label);
       return { element: el, label, div };
     });
 
@@ -147,7 +156,7 @@ export class HintMode {
     }
 
     this.hints = [];
-    this.containerStylingMap.clear();
+    this.hintPlacementMap.clear();
     this.keyHandler.setMode(Mode.NORMAL);
   }
 
@@ -303,49 +312,57 @@ export class HintMode {
     this.overlay.classList.add("visible");
   }
 
-  private createHintDiv(element: HTMLElement, label: string, allElements: HTMLElement[]): HTMLDivElement {
-    const rect = this.getHintRect(element);
-    const containerEl = this.containerStylingMap.get(element);
+  private createHintDiv(element: HTMLElement, label: string): HTMLDivElement {
+    const placement = this.hintPlacementMap.get(element)!;
     const div = document.createElement("div");
     div.className = "vimium-hint";
     div.textContent = label;
 
-    if (containerEl) {
-      // Container: glow border + inside-end pill.
-      // The glow runs along the repeating container's (li, tr) inner edge —
-      // no outward expansion, since adjacent items are flush.
-      const glowRect = containerEl.getBoundingClientRect();
-      const cs = getComputedStyle(containerEl);
-      const glow = document.createElement("div");
-      glow.className = "vimium-hint-container-glow";
-      const glowPos = this.viewportToDocument(glowRect.left, glowRect.top);
-      glow.style.left = glowPos.x + "px";
-      glow.style.top = glowPos.y + "px";
-      glow.style.width = glowRect.width + "px";
-      glow.style.height = glowRect.height + "px";
-      if (this.overlay) this.overlay.appendChild(glow);
-
-      const insetRight = Math.max(6, parseFloat(cs.paddingRight) || 0);
-      const pos = this.viewportToDocument(
-        glowRect.right - insetRight,
-        glowRect.top + glowRect.height / 2
-      );
-      div.style.left = pos.x + "px";
-      div.style.top = pos.y + "px";
-      div.style.transform = "translate(-100%, -50%)";
-    } else {
-      // Non-container: pill below with pointer tail
-      const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
-      div.style.left = Math.max(0, pos.x) + "px";
-      div.style.top = Math.max(0, pos.y) + "px";
-      div.style.transform = "translateX(-50%)";
-      const tail = document.createElement("div");
-      tail.className = "vimium-hint-tail";
-      div.appendChild(tail);
+    switch (placement.style) {
+      case HintStyle.ContainerGlow:
+        this.positionContainerGlow(div, placement.container);
+        break;
+      case HintStyle.Pill:
+        this.positionPill(div, placement.rect);
+        break;
     }
 
     if (this.overlay) this.overlay.appendChild(div);
     return div;
+  }
+
+  /** Glow border on repeating container + inside-end pill label. */
+  private positionContainerGlow(div: HTMLDivElement, container: HTMLElement): void {
+    const glowRect = container.getBoundingClientRect();
+    const cs = getComputedStyle(container);
+    const glow = document.createElement("div");
+    glow.className = "vimium-hint-container-glow";
+    const glowPos = this.viewportToDocument(glowRect.left, glowRect.top);
+    glow.style.left = glowPos.x + "px";
+    glow.style.top = glowPos.y + "px";
+    glow.style.width = glowRect.width + "px";
+    glow.style.height = glowRect.height + "px";
+    if (this.overlay) this.overlay.appendChild(glow);
+
+    const insetRight = Math.max(6, parseFloat(cs.paddingRight) || 0);
+    const pos = this.viewportToDocument(
+      glowRect.right - insetRight,
+      glowRect.top + glowRect.height / 2
+    );
+    div.style.left = pos.x + "px";
+    div.style.top = pos.y + "px";
+    div.style.transform = "translate(-100%, -50%)";
+  }
+
+  /** Pill below element with pointer tail. */
+  private positionPill(div: HTMLDivElement, rect: DOMRect): void {
+    const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
+    div.style.left = Math.max(0, pos.x) + "px";
+    div.style.top = Math.max(0, pos.y) + "px";
+    div.style.transform = "translateX(-50%)";
+    const tail = document.createElement("div");
+    tail.className = "vimium-hint-tail";
+    div.appendChild(tail);
   }
 
   // --- Key handling ---
@@ -431,7 +448,7 @@ export class HintMode {
       if (h !== hint) h.div.style.display = "none";
     }
 
-    const targetRect = this.getHintRect(element);
+    const targetRect = this.hintPlacementMap.get(element)!.rect;
     const tagRect = hint.div.getBoundingClientRect();
     if (tagRect.width > 0) {
       const dx = (targetRect.left + targetRect.width / 2) - (tagRect.left + tagRect.width / 2);
