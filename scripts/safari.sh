@@ -5,6 +5,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "→ Cleaning build artifacts…"
+rm -rf build/
 
 echo "→ Generating Xcode project…"
 npm run build
