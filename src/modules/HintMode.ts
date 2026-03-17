@@ -291,32 +291,34 @@ export class HintMode {
       }
     }
 
-    // Narrow rect horizontally to the children's content extent so the hint
-    // centers on visible content, not an empty stretched box (e.g. Reddit's
-    // flex <a> grid items that are wider than their SVG+text content).
-    // Only for <a> links — buttons and role-based elements define their own area.
-    if (target.tagName.toLowerCase() === "a" && target.children.length > 0) {
-      let contentLeft = Infinity, contentRight = -Infinity;
-      for (const child of target.children) {
-        const cr = (child as HTMLElement).getBoundingClientRect();
-        if (cr.width > 0 && cr.height > 0) {
-          contentLeft = Math.min(contentLeft, cr.left);
-          contentRight = Math.max(contentRight, cr.right);
-        }
-      }
-      if (contentLeft < contentRight) {
-        rect = new DOMRect(contentLeft, rect.top, contentRight - contentLeft, rect.height);
-      }
-    }
-
-    // Shrink rect by padding-bottom so the hint pointer touches the content
-    // edge rather than floating below the padding (e.g. MediaWiki sidebar links).
-    // Only for <a> elements — buttons use padding as part of their visual area.
-    // Redirected targets (heading, label) use their full bounding rect.
+    // Narrow <a> rects to text content bounds so the pill points at the
+    // visible content, not a padded or oversized box.
+    // Redirected targets (heading, label) are already text-sized.
     if (el === target && el.tagName.toLowerCase() === "a") {
-      const paddingBottom = parseFloat(getComputedStyle(target).paddingBottom) || 0;
-      if (paddingBottom > 0) {
-        rect = new DOMRect(rect.left, rect.top, rect.width, rect.height - paddingBottom);
+      if (target.children.length > 0) {
+        // Children present: narrow to their union rect (both axes).
+        // Handles padded nav links, stretched flex boxes, image wrappers.
+        let cLeft = Infinity, cRight = -Infinity;
+        let cTop = Infinity, cBottom = -Infinity;
+        for (const child of target.children) {
+          const cr = (child as HTMLElement).getBoundingClientRect();
+          if (cr.width > 0 && cr.height > 0) {
+            cLeft = Math.min(cLeft, cr.left);
+            cRight = Math.max(cRight, cr.right);
+            cTop = Math.min(cTop, cr.top);
+            cBottom = Math.max(cBottom, cr.bottom);
+          }
+        }
+        if (cLeft < cRight && cTop < cBottom) {
+          rect = new DOMRect(cLeft, cTop, cRight - cLeft, cBottom - cTop);
+        }
+      } else {
+        // Text-only link: subtract padding-bottom so the pill touches the
+        // text baseline rather than floating below the padding.
+        const paddingBottom = parseFloat(getComputedStyle(target).paddingBottom) || 0;
+        if (paddingBottom > 0) {
+          rect = new DOMRect(rect.left, rect.top, rect.width, rect.height - paddingBottom);
+        }
       }
     }
 
