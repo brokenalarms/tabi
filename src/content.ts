@@ -83,7 +83,9 @@ function applyTheme(theme: Theme): void {
 function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   const keyHandler = new KeyHandler();
 
-  // Apply initial settings
+  // Apply initial settings — write back to DEFAULTS so modules that read
+  // DEFAULTS.debug / DEFAULTS.animate pick up the user's stored values.
+  Object.assign(DEFAULTS, resolved);
   keyHandler.setKeyBindingMode(resolved.keyBindingMode);
   applyTheme(resolved.theme);
 
@@ -109,6 +111,12 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
     }
     if (changes.theme?.newValue) {
       applyTheme(changes.theme.newValue as Theme);
+    }
+    if (changes.animate !== undefined) {
+      DEFAULTS.animate = changes.animate.newValue as boolean;
+    }
+    if (changes.debug !== undefined) {
+      DEFAULTS.debug = changes.debug.newValue as boolean;
     }
   });
 
