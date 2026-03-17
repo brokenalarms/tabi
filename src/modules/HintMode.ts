@@ -112,12 +112,11 @@ export class HintMode {
     }
 
     // Resolve hint placement. ContainerGlow is all-or-none per container
-    // group: elements sharing the same repeating-container parent are styled
-    // uniformly based on CONTAINER_GLOW_STRATEGY. Size eligibility is a
-    // group decision; sole (no nested interactive hints) is per-element —
-    // a container with another hint inside falls back to Pill because the
-    // glow label would clash, but that doesn't disqualify its siblings.
-    type ContainerCandidate = { el: HTMLElement; rect: DOMRect; container: HTMLElement; sole: boolean; sized: boolean };
+    // group (siblings sharing the same repeating-container parent).
+    // Disqualified immediately if any container has nested interactive
+    // hints (glow label would clash). Beyond that, size eligibility is
+    // decided by CONTAINER_GLOW_STRATEGY ("any" or "all").
+    type ContainerCandidate = { el: HTMLElement; rect: DOMRect; container: HTMLElement; noNestedHints: boolean; sized: boolean };
     const containerGroups = new Map<HTMLElement, ContainerCandidate[]>();
 
     for (const el of elements) {
@@ -126,7 +125,7 @@ export class HintMode {
       const container = target === el ? getRepeatingContainer(el) : null;
 
       if (container && CONTAINER_GLOW_STRATEGY !== "none") {
-        const sole = !elements.some(other => other !== el && container.contains(other));
+        const noNestedHints = !elements.some(other => other !== el && container.contains(other));
         const containerRect = container.getBoundingClientRect();
         const sized = isContainerSized(container, containerRect);
         const parent = container.parentElement || container;
@@ -136,19 +135,21 @@ export class HintMode {
           group = [];
           containerGroups.set(parent, group);
         }
-        group.push({ el, rect, container, sole, sized });
+        group.push({ el, rect, container, noNestedHints, sized });
       } else {
         this.hintPlacementMap.set(el, { style: HintStyle.Pill, rect });
       }
     }
 
     for (const [, group] of containerGroups) {
+      const allFreeOfNestedHints = group.every(g => g.noNestedHints);
       const groupSized = CONTAINER_GLOW_STRATEGY === "any"
         ? group.some(g => g.sized)
         : group.every(g => g.sized);
+      const useGlow = allFreeOfNestedHints && groupSized;
 
-      for (const { el, rect, container, sole } of group) {
-        if (groupSized && sole) {
+      for (const { el, rect, container } of group) {
+        if (useGlow) {
           this.hintPlacementMap.set(el, { style: HintStyle.ContainerGlow, rect, container });
         } else {
           this.hintPlacementMap.set(el, { style: HintStyle.Pill, rect });
