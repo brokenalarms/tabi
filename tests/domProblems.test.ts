@@ -1005,27 +1005,41 @@ describe("overlay occlusion", () => {
         assert.ok(hintMode.isActive(), "Top-only cover should not occlude the link");
     });
 
-    // ISSUE: Element partially occluded — bottom corner covered by an unrelated element.
-    // SITE: theguardian.com — card links partially covered by adjacent section
-    // FIX: isOccluded requires at least one bottom corner to be covered.
-    it("filters element when a bottom corner is occluded", () => {
-        // Link at (10,10)-(210,30). Overlay covers only the bottom-right quadrant.
+    // ISSUE: Element occluded — both bottom corners covered by an unrelated element.
+    // SITE: theguardian.com — card links covered by adjacent section
+    // FIX: isOccluded requires both bottom corners to be covered. Single-side
+    // coverage (e.g. a custom scrollbar on one edge) should not occlude.
+    it("both bottom corners covered → occluded; one side only → not occluded", () => {
         const link = makeElement("A", { href: "/page", top: 10, left: 10, width: 200, height: 20 });
-        const overlay = makeElement("DIV", { top: 20, left: 150, width: 200, height: 200 });
 
+        // Base: overlay covers both bottom corners → occluded
+        const fullOverlay = makeElement("DIV", { top: 0, left: 0, width: 300, height: 300 });
         loadModules([link]);
-
         (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
-            const or = overlay.getBoundingClientRect();
+            const or = fullOverlay.getBoundingClientRect();
             if (x >= or.left && x < or.right && y >= or.top && y < or.bottom) {
-                return [overlay, link];
+                return [fullOverlay, link];
             }
             return [link];
         };
-
-        const { hintMode } = getState();
+        let { hintMode } = getState();
         hintMode.activate(false);
-        assert.ok(!hintMode.isActive(), "Link with one corner occluded should be filtered");
+        assert.ok(!hintMode.isActive(), "Base: both bottom corners covered should be filtered");
+        hintMode.deactivate();
+
+        // Delta: scrollbar covers only right side → NOT occluded
+        const scrollbar = makeElement("DIV", { top: 0, left: 200, width: 10, height: 300 });
+        loadModules([link]);
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            const sr = scrollbar.getBoundingClientRect();
+            if (x >= sr.left && x < sr.right && y >= sr.top && y < sr.bottom) {
+                return [scrollbar, link];
+            }
+            return [link];
+        };
+        ({ hintMode } = getState());
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(), "Delta: right-side-only scrollbar should not occlude");
     });
 });
 

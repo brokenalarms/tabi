@@ -384,3 +384,37 @@ test("hint targets button, not visually-hidden 1x1 span inside it", async ({ pag
   expect(hintTop).toBeGreaterThan(90);
   expect(hintTop).toBeLessThan(110);
 });
+
+// Facebook Messenger: custom scrollbar overlay covers the right edge of
+// contact links, causing isOccluded to filter them out. The scrollbar is
+// not a descendant of the <a> or in a sibling <li>, so it looks like a cover.
+test("custom scrollbar overlay does not occlude contact links", async ({ page }) => {
+  await page.setViewportSize({ width: 400, height: 768 });
+  await setupPage(page, `
+    <div style="position:relative; width:350px; height:600px; overflow:hidden;">
+      <ul style="list-style:none; padding:0; margin:0;">
+        <li>
+          <a id="c1" href="/messages/t/1/" role="link"
+             style="display:flex; align-items:center; padding:8px; gap:8px;">
+            <svg style="height:36px; width:36px;"><circle cx="18" cy="18" r="18" fill="#ccc"/></svg>
+            <span>Alice</span>
+          </a>
+        </li>
+        <li>
+          <a id="c2" href="/messages/t/2/" role="link"
+             style="display:flex; align-items:center; padding:8px; gap:8px;">
+            <svg style="height:36px; width:36px;"><circle cx="18" cy="18" r="18" fill="#ccc"/></svg>
+            <span>Bob</span>
+          </a>
+        </li>
+      </ul>
+      <!-- Custom scrollbar track — overlays the right edge like Facebook's -->
+      <div data-visualcompletion="ignore" data-thumb="1"
+           style="position:absolute; top:0; right:0; width:10px; height:100%;
+                  display:block;"></div>
+    </div>
+  `);
+
+  const hintCount = await activateHints(page);
+  expect(hintCount).toBe(2);
+});

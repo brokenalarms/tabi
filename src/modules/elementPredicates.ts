@@ -126,9 +126,10 @@ export function isOccluded(el: HTMLElement, rect: DOMRect): boolean {
     return true;
   };
 
-  // Check all 4 corners but require at least one BOTTOM corner to be covered.
-  // Top-only coverage (e.g. a thin loading bar or header border overlapping the
-  // top edge) doesn't block interaction — the element is still clickable below.
+  // Check all 4 corners. An element is occluded when BOTH bottom corners are
+  // covered. Top-only coverage (loading bars, header borders) is exempt.
+  // Single-side coverage (custom scrollbar on the right edge) is also exempt —
+  // the element is still clickable on the uncovered side.
   const corners: [number, number, boolean][] = [
     [rect.left + 2, rect.top + 2, false],
     [rect.right - 2, rect.top + 2, false],
@@ -136,13 +137,14 @@ export function isOccluded(el: HTMLElement, rect: DOMRect): boolean {
     [rect.right - 2, rect.bottom - 2, true],
   ];
 
+  let bottomCoveredCount = 0;
   for (const [x, y, isBottom] of corners) {
     const hits = document.elementsFromPoint(clampX(x), clampY(y));
     if (hits.length > 0 && isCover(hits[0] as HTMLElement)) {
-      if (isBottom) return true;
+      if (isBottom) bottomCoveredCount++;
     }
   }
-  return false;
+  return bottomCoveredCount >= 2;
 }
 
 /** Are these two elements in sibling repeating containers (different <li>/<tr>
