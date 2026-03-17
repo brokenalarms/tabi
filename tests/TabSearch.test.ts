@@ -305,14 +305,14 @@ describe("TabSearch", () => {
             let activated = false;
             const origActivate = tabSearch.activate.bind(tabSearch);
             tabSearch.activate = async () => { activated = true; await origActivate(); };
-            (keyHandler as any)._dispatch("openTabSearch");
+            (keyHandler as any).dispatch("openTabSearch");
             assert.equal(activated, true);
         });
 
         // Verifies that destroy unwires commands
         it("destroy unwires commands", () => {
             tabSearch.destroy();
-            assert.equal((keyHandler as any)._commands.has("openTabSearch"), false);
+            assert.equal((keyHandler as any).commands.has("openTabSearch"), false);
         });
     });
 });
