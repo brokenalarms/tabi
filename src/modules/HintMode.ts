@@ -56,12 +56,10 @@ type HintPlacement =
 
 const HINT_CHARS = "sadgjklewcmpoh";
 
-function nodeListHasElement(nodes: NodeList): boolean {
-  for (const n of nodes) {
-    if (n.nodeType === Node.ELEMENT_NODE) return true;
-  }
-  return false;
-}
+/** How far (px) a hinted element may drift before we dismiss hints. */
+const DRIFT_THRESHOLD = 5;
+/** How often (ms) we check for position drift. */
+const DRIFT_CHECK_INTERVAL = 200;
 
 export class HintMode {
   private keyHandler: KeyHandlerLike;
@@ -74,8 +72,7 @@ export class HintMode {
   private readonly onMouseDown: () => void;
   private readonly onScroll: () => void;
   private readonly onResize: () => void;
-  private mutationObserver: MutationObserver | null;
-  private mutationDebounce: ReturnType<typeof setTimeout> | null;
+  private driftTimer: ReturnType<typeof setInterval> | null;
   /** Resolved hint placement for each discovered element. Populated in activate(). */
   private hintPlacementMap: Map<HTMLElement, HintPlacement>;
 
@@ -90,8 +87,7 @@ export class HintMode {
     this.onMouseDown = this.deactivate.bind(this);
     this.onScroll = this.deactivate.bind(this);
     this.onResize = this.deactivate.bind(this);
-    this.mutationObserver = null;
-    this.mutationDebounce = null;
+    this.driftTimer = null;
     this.hintPlacementMap = new Map();
   }
 
@@ -144,7 +140,7 @@ export class HintMode {
     document.addEventListener("mousedown", this.onMouseDown, true);
     window.addEventListener("scroll", this.onScroll, true);
     window.addEventListener("resize", this.onResize);
-    this.observeMutations();
+    this.startDriftCheck();
   }
 
   deactivate(): void {
@@ -157,13 +153,9 @@ export class HintMode {
     document.removeEventListener("mousedown", this.onMouseDown, true);
     window.removeEventListener("scroll", this.onScroll, true);
     window.removeEventListener("resize", this.onResize);
-    if (this.mutationDebounce !== null) {
-      clearTimeout(this.mutationDebounce);
-      this.mutationDebounce = null;
-    }
-    if (this.mutationObserver) {
-      this.mutationObserver.disconnect();
-      this.mutationObserver = null;
+    if (this.driftTimer !== null) {
+      clearInterval(this.driftTimer);
+      this.driftTimer = null;
     }
 
     // Remove any orphaned focus rings (e.g. deactivation interrupted the
@@ -206,33 +198,23 @@ export class HintMode {
     this.unwireCommands();
   }
 
-  // --- DOM mutation observation ---
+  // --- Layout drift detection ---
 
-  /** Dismiss hints when the page DOM changes structurally (e.g. lazy-loaded
-   *  content shifts existing elements). Only reacts to element-level
-   *  additions/removals — not attribute tweaks or text changes. Debounces
-   *  to tolerate rapid micro-mutations (SPAs settling, analytics scripts). */
-  private observeMutations(): void {
-    if (typeof MutationObserver === "undefined") return;
-    const overlay = this.overlay;
-    this.mutationObserver = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        if (overlay && (m.target === overlay || overlay.contains(m.target as Node))) continue;
-        // Only care about element nodes being added or removed — ignore
-        // text nodes, comment nodes, and attribute-only changes.
-        const hasElementChange =
-          nodeListHasElement(m.addedNodes) || nodeListHasElement(m.removedNodes);
-        if (!hasElementChange) continue;
-        // Debounce: wait for the DOM to settle before dismissing.
-        if (this.mutationDebounce !== null) clearTimeout(this.mutationDebounce);
-        this.mutationDebounce = setTimeout(() => this.deactivate(), 300);
-        return;
+  /** Periodically sample a few hinted elements and dismiss if any have
+   *  moved more than DRIFT_THRESHOLD pixels from their original position.
+   *  Catches layout shifts from lazy-loaded content, ad injection, etc. */
+  private startDriftCheck(): void {
+    this.driftTimer = setInterval(() => {
+      for (const [el, placement] of this.hintPlacementMap) {
+        const current = el.getBoundingClientRect();
+        const original = placement.rect;
+        if (Math.abs(current.top - original.top) > DRIFT_THRESHOLD ||
+            Math.abs(current.left - original.left) > DRIFT_THRESHOLD) {
+          this.deactivate();
+          return;
+        }
       }
-    });
-    this.mutationObserver.observe(document.documentElement, {
-      childList: true,
-      subtree: true,
-    });
+    }, DRIFT_CHECK_INTERVAL);
   }
 
   // --- Hint target element ---
