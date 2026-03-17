@@ -262,10 +262,9 @@ export class HintMode {
 
     // Shrink rect by padding-bottom so the hint pointer touches the content
     // edge rather than floating below the padding (e.g. MediaWiki sidebar links).
-    // Only in repeating containers where padding is inter-item spacing.
-    // Outside lists, padding is part of the element's visual area (e.g. buttons).
+    // Only for <a> pill hints — buttons use padding as part of their visual area.
     // Redirected targets (heading, label) use their full bounding rect.
-    if (el === target && !container && isInRepeatingContainer(el)) {
+    if (el === target && !container && el.tagName.toLowerCase() === "a") {
       const paddingBottom = parseFloat(getComputedStyle(target).paddingBottom) || 0;
       if (paddingBottom > 0) {
         rect = new DOMRect(rect.left, rect.top, rect.width, rect.height - paddingBottom);

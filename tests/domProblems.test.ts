@@ -796,10 +796,7 @@ describe("hint positioning accounts for padding-bottom", () => {
     });
 
     it("hint without padding-bottom is at rect.bottom", () => {
-        // Link in <li> — repeating container where padding subtraction applies
-        const li = makeElement("LI", { top: 10, left: 50, width: 100, height: 20, display: "list-item" });
         const link = makeElement("A", { href: "#", top: 10, left: 50, width: 100, height: 20, display: "inline" });
-        li.appendChild(link);
         loadModules([link]);
 
         const { hintMode } = getState();
@@ -815,12 +812,9 @@ describe("hint positioning accounts for padding-bottom", () => {
     });
 
     it("hint is closer to content edge when element has padding-bottom", () => {
-        // Same element but with 20px padding-bottom baked into the rect height.
-        // Inside <li> so padding subtraction applies (repeating container spacing).
+        // Same element but with 20px padding-bottom baked into the rect height
         // Content ends at top=10 + contentHeight=20 = 30, but rect.bottom = 50 due to padding
-        const li = makeElement("LI", { top: 10, left: 50, width: 100, height: 40, display: "list-item" });
         const link = makeElement("A", { href: "#", top: 10, left: 50, width: 100, height: 40, display: "inline", paddingBottom: "20px" });
-        li.appendChild(link);
         loadModules([link]);
 
         const { hintMode } = getState();
