@@ -227,6 +227,65 @@ test("multi-line link hint sits below last line", async ({ page }) => {
   expect(result.hintTop).toBe(result.linkBottom + 2);
 });
 
+// Reddit "1 more reply": flex <a> is stretched to full grid width (~520px)
+// but visible content (SVG + text) is ~100px on the left. Hint should center
+// on the children's extent, not the full stretched box.
+// SITE: reddit.com — comment thread "more replies" links
+// FIX: Use union of children rects for horizontal centering.
+test("stretched flex link hint centers on content, not full box", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await setupPage(page, `
+    <div style="display:grid; grid-template-columns:520px; padding:20px;">
+      <a href="/more" id="link" style="display:flex; align-items:center; gap:4px; padding:4px 8px;">
+        <span style="display:flex; align-items:center;">
+          <svg width="16" height="16" viewBox="0 0 20 20">
+            <circle cx="10" cy="10" r="8" fill="currentColor"/>
+          </svg>
+        </span>
+        <span>1 more reply</span>
+      </a>
+    </div>
+  `);
+
+  const result = await page.evaluate(() => {
+    const { KeyHandler, HintMode, Mode } = window.TestHarness;
+    const kh = new KeyHandler();
+    const hm = new HintMode(kh);
+    hm.wireCommands();
+    kh.on("exitToNormal", () => {
+      if (hm.isActive()) hm.deactivate();
+      kh.setMode(Mode.NORMAL);
+    });
+    hm.activate(false);
+
+    const link = document.getElementById("link")!;
+    const linkRect = link.getBoundingClientRect();
+    // Compute expected content center from children
+    const children = Array.from(link.children) as HTMLElement[];
+    let contentLeft = Infinity, contentRight = 0;
+    for (const child of children) {
+      const cr = child.getBoundingClientRect();
+      if (cr.width > 0) {
+        contentLeft = Math.min(contentLeft, cr.left);
+        contentRight = Math.max(contentRight, cr.right);
+      }
+    }
+    const contentCenter = contentLeft + (contentRight - contentLeft) / 2;
+    const boxCenter = linkRect.left + linkRect.width / 2;
+
+    const hint = document.querySelector(".vimium-hint") as HTMLElement;
+    const hintLeft = hint ? parseFloat(hint.style.left) : -1;
+
+    hm.destroy();
+    return { contentCenter, boxCenter, hintLeft, linkWidth: linkRect.width, contentWidth: contentRight - contentLeft };
+  });
+
+  // Precondition: content is significantly narrower than the box
+  expect(result.contentWidth).toBeLessThan(result.linkWidth * 0.5);
+  // Hint should be near the content center, not the box center
+  expect(result.hintLeft).toBeCloseTo(result.contentCenter, 0);
+});
+
 // Container-style hint: wide element with branching children in a repeating
 // container (<li>) gets a glow border + inside-end pill (no pointer tail).
 // The glow wraps the <li>, the pill is vertically centered on the right edge.

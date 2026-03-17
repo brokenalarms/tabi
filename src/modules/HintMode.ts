@@ -242,6 +242,24 @@ export class HintMode {
       }
     }
 
+    // Narrow rect horizontally to the children's content extent so the hint
+    // centers on visible content, not an empty stretched box (e.g. Reddit's
+    // flex <a> grid items that are wider than their SVG+text content).
+    // Only for <a> links — buttons and role-based elements define their own area.
+    if (!container && target.tagName.toLowerCase() === "a" && target.children.length > 0) {
+      let contentLeft = Infinity, contentRight = -Infinity;
+      for (const child of target.children) {
+        const cr = (child as HTMLElement).getBoundingClientRect();
+        if (cr.width > 0 && cr.height > 0) {
+          contentLeft = Math.min(contentLeft, cr.left);
+          contentRight = Math.max(contentRight, cr.right);
+        }
+      }
+      if (contentLeft < contentRight) {
+        rect = new DOMRect(contentLeft, rect.top, contentRight - contentLeft, rect.height);
+      }
+    }
+
     // Shrink rect by padding-bottom so the hint pointer touches the content
     // edge rather than floating below the padding (e.g. MediaWiki sidebar links).
     // Only for direct <a> targets: buttons use padding as part of their visual
