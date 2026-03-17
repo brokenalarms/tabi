@@ -1,7 +1,7 @@
 // Stateless element predicates — each answers one question about an element.
 // Used by walkerFilter (ElementGatherer) and hint positioning (HintMode).
 
-import { HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER_HEIGHT, MINIMUM_CONTAINER_WIDTH } from "./constants";
+import { CLICKABLE_SELECTOR, HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER_HEIGHT, MINIMUM_CONTAINER_WIDTH } from "./constants";
 
 // --- Visibility & geometry ---
 
@@ -208,6 +208,20 @@ export function getRepeatingContainer(el: HTMLElement): HTMLElement | null {
     for (let i = 0; i < siblings.length; i++) {
       if (siblings[i].tagName === "A") count++;
       if (count >= MINIMUM_SIBLING_LINKS) return el;
+    }
+  }
+  if (el.parentElement !== null && el.parentElement.tagName === "NAV") {
+    const nav = el.parentElement;
+    const children = nav.children;
+    if (children.length >= MINIMUM_SIBLING_LINKS) {
+      let allSingleInteractive = true;
+      for (let i = 0; i < children.length; i++) {
+        if (children[i].querySelectorAll(CLICKABLE_SELECTOR).length > 1) {
+          allSingleInteractive = false;
+          break;
+        }
+      }
+      if (allSingleInteractive) return el;
     }
   }
   return null;

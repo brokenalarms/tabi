@@ -2125,6 +2125,61 @@ describe("isInRepeatingContainer", () => {
             "Repeating container for sibling <a> should be the <a> itself");
         env.cleanup();
     });
+
+    // Twitter/X: <nav> sidebar mixes <a> links and a <button> — the button
+    // should also be recognized as a repeating container member since every
+    // direct child of the <nav> has exactly one interactive element.
+    it("returns true for button direct child of nav with single-interactive siblings", () => {
+        // Base: a standalone button outside nav is NOT in a repeating container
+        const envStandalone = createDOM(`<div><button id="solo">Click</button></div>`);
+        const solo = envStandalone.document.getElementById("solo") as unknown as HTMLElement;
+        assert.equal(isInRepeatingContainer(solo), false,
+            "Standalone button should not be in a repeating container");
+        envStandalone.cleanup();
+
+        // Delta: button as direct child of <nav> where all children have one interactive element
+        const env = createDOM(`
+            <nav aria-label="Primary">
+                <a href="/home">Home</a>
+                <a href="/explore">Explore</a>
+                <a href="/notifications">Notifications</a>
+                <button id="t" aria-label="More menu items">More</button>
+            </nav>
+        `);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.equal(isInRepeatingContainer(el), true,
+            "Button in nav with single-interactive siblings should be in a repeating container");
+        env.cleanup();
+    });
+
+    it("returns false for nav child when a sibling has multiple interactive elements", () => {
+        const env = createDOM(`
+            <nav>
+                <a href="/home">Home</a>
+                <div><a href="/explore">Explore</a><button>Extra</button></div>
+                <button id="t">More</button>
+            </nav>
+        `);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.equal(isInRepeatingContainer(el), false,
+            "Nav child should not qualify when a sibling has multiple interactive elements");
+        env.cleanup();
+    });
+
+    it("getRepeatingContainer returns the element itself for nav children", () => {
+        const env = createDOM(`
+            <nav>
+                <a href="/home">Home</a>
+                <a href="/explore">Explore</a>
+                <a href="/notifications">Notifications</a>
+                <button id="t">More</button>
+            </nav>
+        `);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.equal(getRepeatingContainer(el), el,
+            "Repeating container for nav child should be the element itself");
+        env.cleanup();
+    });
 });
 
 // Google: inline-block <a> wrapping <h3> heading + URL info.
