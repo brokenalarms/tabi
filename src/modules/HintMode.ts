@@ -4,29 +4,11 @@
 
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
-import { REPEATING_CONTAINER_SELECTOR } from "./constants";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
-import { isContainerSized, getRepeatingContainer, hasBox, isRedirectableControl, isVisible, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
-import { findAssociatedLabel, findVisibleChild, getHeading } from "./elementTraversals";
+import { isContainerSized, isFormControl, getRepeatingContainer, isRedirectableControl, isVisible, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
+import { findAssociatedLabel, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect } from "./elementTraversals";
 
 import { Mode } from "../commands";
-
-/** Walk up through single-child ancestors to the nearest repeating container
- *  (li, tr) for hint width expansion.  Only repeating containers benefit from
- *  expansion — they create vertical lists where aligned hints aid scanning.
- *  Skips boxless ancestors (display:contents/none).
- *  Stops at body/documentElement, or when a parent has multiple children. */
-export function findBlockAncestor(el: HTMLElement): HTMLElement | null {
-  let node = el;
-  while (node.parentElement) {
-    const parent = node.parentElement;
-    if (parent === document.body || parent === document.documentElement) return null;
-    if (parent.children.length !== 1) return null;
-    if (parent.matches(REPEATING_CONTAINER_SELECTOR) && hasBox(parent)) return parent;
-    node = parent;
-  }
-  return null;
-}
 
 declare const browser: {
   runtime: {
@@ -288,51 +270,15 @@ export class HintMode {
     const target = this.getHintTargetElement(el);
     let rect = target.getBoundingClientRect();
 
-    // Inline elements in vertical lists: expand to nearest repeating container's
-    // width so hints align. Walks up through single-child wrappers (e.g.
-    // <li><span><a>text</a></span></li> expands to <li> width).
-    const tag = target.tagName.toLowerCase();
-    const isFormControl = tag === "input" || tag === "textarea" || tag === "select";
-    if (!isFormControl) {
-      const blockAncestor = findBlockAncestor(target);
-      if (blockAncestor) {
-        const hasMixedContent = Array.from(blockAncestor.childNodes).some(
-          n => n.nodeType === 3 && (n.textContent || "").trim().length > 0
-        );
-        if (!hasMixedContent) {
-          const ancestorRect = blockAncestor.getBoundingClientRect();
-          rect = new DOMRect(ancestorRect.left, rect.top, ancestorRect.width, rect.height);
-        }
-      }
-    }
-
-    // Narrow rect horizontally to the children's content extent so the hint
-    // centers on visible content, not an empty stretched box (e.g. Reddit's
-    // flex <a> grid items that are wider than their SVG+text content).
-    // Only for <a> links — buttons and role-based elements define their own area.
-    if (target.tagName.toLowerCase() === "a" && target.children.length > 0) {
-      let contentLeft = Infinity, contentRight = -Infinity;
-      for (const child of target.children) {
-        const cr = (child as HTMLElement).getBoundingClientRect();
-        if (cr.width > 0 && cr.height > 0) {
-          contentLeft = Math.min(contentLeft, cr.left);
-          contentRight = Math.max(contentRight, cr.right);
-        }
-      }
-      if (contentLeft < contentRight) {
-        rect = new DOMRect(contentLeft, rect.top, contentRight - contentLeft, rect.height);
-      }
-    }
-
-    // Shrink rect by padding-bottom so the hint pointer touches the content
-    // edge rather than floating below the padding (e.g. MediaWiki sidebar links).
-    // Only for <a> elements — buttons use padding as part of their visual area.
-    // Redirected targets (heading, label) use their full bounding rect.
+    // Narrow <a> rects to text content bounds (children union or padding-subtracted).
+    // Redirected targets (heading, label) are already text-sized.
     if (el === target && el.tagName.toLowerCase() === "a") {
-      const paddingBottom = parseFloat(getComputedStyle(target).paddingBottom) || 0;
-      if (paddingBottom > 0) {
-        rect = new DOMRect(rect.left, rect.top, rect.width, rect.height - paddingBottom);
-      }
+      rect = getLinkContentRect(target, rect);
+    }
+
+    // Expand width to repeating container ancestor for aligned hints in lists.
+    if (!isFormControl(target)) {
+      rect = getBlockAncestorRect(target, rect) ?? rect;
     }
 
     return rect;

@@ -7,7 +7,7 @@ import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from ".
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
 import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isContentlessOverlay, shouldRedirectToHeading } from "../src/modules/elementPredicates";
-import { findBlockAncestor } from "../src/modules/HintMode";
+import { findBlockAncestor } from "../src/modules/elementTraversals";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
 describe("element discovery", () => {

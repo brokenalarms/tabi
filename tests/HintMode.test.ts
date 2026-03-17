@@ -434,13 +434,33 @@ describe("HintMode", () => {
         });
     });
 
-    describe("Pill padding-bottom subtraction", () => {
-        // angrymetalguy.com: <a> links inside narrow <li> nav items have large
-        // padding-bottom. The pill hint should be placed at the content edge,
-        // not below the padding. Padding subtraction is a pill concern, not a
-        // container concern — it applies regardless of repeating containers.
-        it("subtracts padding-bottom for links inside repeating containers", () => {
-            // Narrow li (36px wide) — too small for ContainerGlow, so gets Pill
+    describe("Pill text content targeting", () => {
+        // angrymetalguy.com nav: <a> links contain <span> children but the <a>
+        // has large padding/height from parent sizing. The pill should point at
+        // the children's content bottom, not the padded <a> box bottom.
+        it("narrows pill rect vertically to children content bounds", () => {
+            // <a> is 80px tall (from parent sizing), but <span> text is only 20px
+            const span = makeElement("SPAN", { top: 10, left: 20, width: 60, height: 20 });
+            const link = makeElement("A", {
+                href: "#",
+                top: 0, left: 0, width: 200, height: 80,
+                children: [span],
+            });
+
+            loadModules([link]);
+            const { hintMode } = getState();
+            hintMode.activate(false);
+            assert.ok(hintMode.isActive());
+
+            const overlay = document.documentElement.querySelector(".vimium-hint-overlay");
+            const hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
+            assert.ok(hint, "hint div should exist");
+            // Pill at children bottom: span.bottom(30) + 2 = 32px, not 82px
+            assert.equal(hint.style.top, "32px");
+        });
+
+        // Base case: without children, padding-bottom subtraction still works
+        it("subtracts padding-bottom for text-only links", () => {
             const li = makeElement("LI", { top: 0, left: 0, width: 36, height: 60 });
             const link = makeElement("A", {
                 href: "#",
@@ -461,8 +481,8 @@ describe("HintMode", () => {
             assert.equal(hint.style.top, "42px");
         });
 
-        // Base case: without padding-bottom, hint sits at rect.bottom + 2
-        it("places hint at bottom edge when no padding", () => {
+        // Base case: no padding, no children — hint at rect.bottom + 2
+        it("places hint at bottom edge when no padding and no children", () => {
             const li = makeElement("LI", { top: 0, left: 0, width: 36, height: 40 });
             const link = makeElement("A", {
                 href: "#",

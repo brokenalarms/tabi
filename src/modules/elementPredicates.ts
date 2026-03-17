@@ -271,6 +271,14 @@ export function hasJsactionClick(el: HTMLElement): boolean {
   return /(^|;\s*)click:/.test(jsaction);
 }
 
+/** Is this a native form control (input, textarea, select)?
+ *  Form controls define their own visual area — hint rect adjustments like
+ *  block ancestor expansion don't apply to them. */
+export function isFormControl(el: HTMLElement): boolean {
+  const tag = el.tagName.toLowerCase();
+  return tag === "input" || tag === "textarea" || tag === "select";
+}
+
 // --- Hint target redirect predicates ---
 
 /** Is this a radio or checkbox input whose hint should redirect to its label? */
