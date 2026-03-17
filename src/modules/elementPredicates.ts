@@ -191,39 +191,47 @@ export function isBlockLevel(el: HTMLElement): boolean {
   return display !== "" && !display.startsWith("inline");
 }
 
-/** Minimum number of same-tag sibling <a> elements to count as a repeating
- *  pattern (e.g. Twitter/X nav uses flat sibling links instead of <li>). */
-const MINIMUM_SIBLING_LINKS = 3;
+/** Minimum number of repeating siblings to count as a repeating pattern. */
+const MINIMUM_REPEATING_SIBLINGS = 3;
 
-/** Return the nearest repeating container (li, tr, or sibling <a>) that
- *  generates a box, or null if the element is not in one.
- *  For sibling <a> links (3+ under the same parent), the <a> itself is
- *  the repeating container — there's no wrapping <li>. */
-export function getRepeatingContainer(el: HTMLElement): HTMLElement | null {
+/** Is this element inside a semantic list container (li, tr) that generates a box? */
+function isInListContainer(el: HTMLElement): HTMLElement | null {
   const container = el.closest(REPEATING_CONTAINER_SELECTOR) as HTMLElement | null;
-  if (container !== null && hasBox(container)) return container;
-  if (el.tagName === "A" && el.parentElement !== null) {
-    const siblings = el.parentElement.children;
-    let count = 0;
-    for (let i = 0; i < siblings.length; i++) {
-      if (siblings[i].tagName === "A") count++;
-      if (count >= MINIMUM_SIBLING_LINKS) return el;
-    }
+  return container !== null && hasBox(container) ? container : null;
+}
+
+/** Is this an <a> with 3+ sibling <a> links (flat nav pattern without <li> wrappers)? */
+function isInSiblingLinkGroup(el: HTMLElement): boolean {
+  if (el.tagName !== "A" || el.parentElement === null) return false;
+  const siblings = el.parentElement.children;
+  let count = 0;
+  for (let i = 0; i < siblings.length; i++) {
+    if (siblings[i].tagName === "A") count++;
+    if (count >= MINIMUM_REPEATING_SIBLINGS) return true;
   }
-  if (el.parentElement !== null && el.parentElement.tagName === "NAV") {
-    const nav = el.parentElement;
-    const children = nav.children;
-    if (children.length >= MINIMUM_SIBLING_LINKS) {
-      let allSingleInteractive = true;
-      for (let i = 0; i < children.length; i++) {
-        if (children[i].querySelectorAll(CLICKABLE_SELECTOR).length > 1) {
-          allSingleInteractive = false;
-          break;
-        }
-      }
-      if (allSingleInteractive) return el;
-    }
+  return false;
+}
+
+/** Is this a direct child of a <nav> where every sibling has at most one
+ *  interactive element? Catches non-link interactive children (e.g. buttons)
+ *  in flat nav layouts like Twitter/X's sidebar. */
+function isInNavWithSingleInteractiveChildren(el: HTMLElement): boolean {
+  if (el.parentElement === null || el.parentElement.tagName !== "NAV") return false;
+  const children = el.parentElement.children;
+  if (children.length < MINIMUM_REPEATING_SIBLINGS) return false;
+  for (let i = 0; i < children.length; i++) {
+    if (children[i].querySelectorAll(CLICKABLE_SELECTOR).length > 1) return false;
   }
+  return true;
+}
+
+/** Return the nearest repeating container for this element, or null.
+ *  Checks semantic list containers first, then flat sibling patterns. */
+export function getRepeatingContainer(el: HTMLElement): HTMLElement | null {
+  const listContainer = isInListContainer(el);
+  if (listContainer !== null) return listContainer;
+  if (isInSiblingLinkGroup(el)) return el;
+  if (isInNavWithSingleInteractiveChildren(el)) return el;
   return null;
 }
 
