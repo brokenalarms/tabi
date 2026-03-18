@@ -166,22 +166,17 @@ test("heading redirect hint sits below h3, not inside it", async ({ page }) => {
 
     const heading = document.getElementById("heading")!;
     const headingRect = heading.getBoundingClientRect();
-    const style = getComputedStyle(heading);
-    const fontSize = parseFloat(style.fontSize) || 0;
-    const lineHeight = parseFloat(style.lineHeight) || 0;
-    const halfLeading = lineHeight > fontSize ? (lineHeight - fontSize) / 2 : 0;
     const hints = Array.from(document.querySelectorAll(".vimium-hint")) as HTMLElement[];
     const hintTops = hints.map(h => parseFloat(h.style.top));
 
     hm.destroy();
-    return { headingBottom: headingRect.bottom, halfLeading, hintTops };
+    return { headingBottom: headingRect.bottom, hintTops };
   });
 
-  // The heading link hint must be at or just below the visual text bottom
-  // (headingBottom - halfLeading), not inside the heading text.
-  const textBottom = result.headingBottom - result.halfLeading;
+  // The heading link hint must be at or just below the heading bottom edge,
+  // not inside the heading text (which would mean delta < 0).
   const headingHintTop = result.hintTops.find(t =>
-    t >= textBottom - 2 && t <= textBottom + 10
+    t >= result.headingBottom - 2 && t <= result.headingBottom + 10
   );
   expect(headingHintTop).toBeDefined();
 });
@@ -214,10 +209,6 @@ test("multi-line link hint sits below last line", async ({ page }) => {
     const link = document.getElementById("link")!;
     const linkRect = link.getBoundingClientRect();
     const clientRects = link.getClientRects();
-    const style = getComputedStyle(link);
-    const fontSize = parseFloat(style.fontSize) || 0;
-    const lineHeight = parseFloat(style.lineHeight) || 0;
-    const halfLeading = lineHeight > fontSize ? (lineHeight - fontSize) / 2 : 0;
     const hint = document.querySelector(".vimium-hint") as HTMLElement;
     const hintTop = hint ? parseFloat(hint.style.top) : -1;
 
@@ -226,15 +217,15 @@ test("multi-line link hint sits below last line", async ({ page }) => {
       linkBottom: linkRect.bottom,
       firstLineBottom: clientRects[0]?.bottom ?? -1,
       lineCount: clientRects.length,
-      halfLeading,
       hintTop,
     };
   });
 
   // Verify the link actually wraps (test precondition)
   expect(result.lineCount).toBeGreaterThan(1);
-  // Pill is placed at rect.bottom - halfLeading + 4 (tail height = 4px).
-  expect(result.hintTop).toBe(result.linkBottom - result.halfLeading + 4);
+  // Pill is placed at rect.bottom + 2; the 4px tail intrudes into the text.
+  // hintTop should be exactly linkBottom + 2.
+  expect(result.hintTop).toBe(result.linkBottom + 2);
 });
 
 // Reddit "1 more reply": flex <a> is stretched to full grid width (~520px)

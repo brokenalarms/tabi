@@ -7,7 +7,7 @@ import { DEFAULTS } from "../types";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
 import { HINT_HEIGHT } from "./constants";
 import { isContainerSized, isFormControl, getRepeatingContainer, isNestedRepeatingContainer, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
-import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHalfLeading } from "./elementTraversals";
+import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect } from "./elementTraversals";
 
 import { Mode } from "../commands";
 
@@ -286,9 +286,7 @@ export class HintMode {
       rect = getBlockAncestorRect(target, rect) ?? rect;
     }
 
-    // Tighten to visual text bottom by subtracting half-leading.
-    const hl = getHalfLeading(target);
-    return new DOMRect(rect.left, rect.top, rect.width, rect.height - hl);
+    return rect;
   }
 
   // --- Label generation ---
@@ -396,7 +394,7 @@ export class HintMode {
 
   /** Pill below element with pointer tail. */
   private positionPill(div: HTMLDivElement, rect: DOMRect): void {
-    const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 4);
+    const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
     div.style.left = Math.max(0, pos.x) + "px";
     div.style.top = Math.max(0, pos.y) + "px";
     div.style.transform = "translateX(-50%)";

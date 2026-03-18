@@ -455,8 +455,8 @@ describe("HintMode", () => {
             const overlay = document.documentElement.querySelector(".vimium-hint-overlay");
             const hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
             assert.ok(hint, "hint div should exist");
-            // Pill at children bottom: span.bottom(30) + 4 = 34px, not 82px
-            assert.equal(hint.style.top, "34px");
+            // Pill at children bottom: span.bottom(30) + 2 = 32px, not 82px
+            assert.equal(hint.style.top, "32px");
         });
 
         // Base case: without children, padding-bottom subtraction still works
@@ -477,56 +477,11 @@ describe("HintMode", () => {
             const overlay = document.documentElement.querySelector(".vimium-hint-overlay");
             const hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
             assert.ok(hint, "hint div should exist");
-            // Pill at content edge: (60 - 20) + 4 = 44px, not 62px
-            assert.equal(hint.style.top, "44px");
+            // Pill at content edge: (60 - 20) + 2 = 42px, not 62px
+            assert.equal(hint.style.top, "42px");
         });
 
-        // AngryMetalGuy: uppercase category links with large line-height push pill
-        // below visual text bottom. Half-leading ((lineHeight - fontSize) / 2)
-        // should be subtracted from rect bottom so pill aligns with text.
-        it("subtracts half-leading for text-only links with explicit line-height", () => {
-            const li = makeElement("LI", { top: 0, left: 0, width: 36, height: 40 });
-            // fontSize 16px, lineHeight 32px → halfLeading = 8px
-            const link = makeElement("A", {
-                href: "#",
-                top: 0, left: 0, width: 36, height: 32,
-                fontSize: "16px",
-                lineHeight: "32px",
-            });
-            li.appendChild(link);
-
-            loadModules([link]);
-            const { hintMode } = getState();
-            hintMode.activate(false);
-
-            const overlay = document.documentElement.querySelector(".vimium-hint-overlay");
-            const hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
-            assert.ok(hint);
-            // Pill at: rect.bottom(32) - halfLeading(8) + 4 = 28px
-            assert.equal(hint.style.top, "28px");
-        });
-
-        // Base case: no leading adjustment when line-height is not set
-        it("no half-leading subtraction without explicit line-height", () => {
-            const li = makeElement("LI", { top: 0, left: 0, width: 36, height: 40 });
-            const link = makeElement("A", {
-                href: "#",
-                top: 0, left: 0, width: 36, height: 32,
-            });
-            li.appendChild(link);
-
-            loadModules([link]);
-            const { hintMode } = getState();
-            hintMode.activate(false);
-
-            const overlay = document.documentElement.querySelector(".vimium-hint-overlay");
-            const hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
-            assert.ok(hint);
-            // No line-height set → no adjustment: rect.bottom(32) + 4 = 36px
-            assert.equal(hint.style.top, "36px");
-        });
-
-        // Base case: no padding, no children — hint at rect.bottom + 4
+        // Base case: no padding, no children — hint at rect.bottom + 2
         it("places hint at bottom edge when no padding and no children", () => {
             const li = makeElement("LI", { top: 0, left: 0, width: 36, height: 40 });
             const link = makeElement("A", {
@@ -542,7 +497,7 @@ describe("HintMode", () => {
             const overlay = document.documentElement.querySelector(".vimium-hint-overlay");
             const hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
             assert.ok(hint);
-            assert.equal(hint.style.top, "44px");
+            assert.equal(hint.style.top, "42px");
         });
     });
 });
