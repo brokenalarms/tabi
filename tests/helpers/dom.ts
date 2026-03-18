@@ -38,6 +38,7 @@ export function createDOM(html?: string): DOMEnvironment {
   (globalThis as any).DOMRect = (window as any).DOMRect;
   (globalThis as any).HTMLElement = (window as any).HTMLElement;
   (globalThis as any).KeyboardEvent = (window as any).KeyboardEvent;
+  (globalThis as any).MouseEvent = (window as any).MouseEvent;
   (globalThis as any).clearTimeout = globalThis.clearTimeout;
 
   const cleanup = (): void => {

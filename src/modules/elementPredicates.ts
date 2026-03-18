@@ -283,11 +283,21 @@ export function hasListBoundaryBetween(ancestor: HTMLElement, descendant: HTMLEl
 
 /** Does this container have other discovered elements inside it?
  *  Elements behind a list boundary are at a different tree level and are
- *  exempt — they won't visually clash with the container's glow. */
-export function hasNestedLinks(container: HTMLElement, el: HTMLElement, elements: HTMLElement[]): boolean {
-  return elements.some(other =>
-    other !== el && container.contains(other) &&
-    !hasListBoundaryBetween(container, other));
+ *  exempt — they won't visually clash with the container's glow.
+ *  Uses a Set for O(1) membership checks instead of scanning the full list. */
+export function hasNestedLinks(container: HTMLElement, el: HTMLElement, discoveredSet: Set<HTMLElement>): boolean {
+  // Walk direct descendants (not behind a list boundary) looking for
+  // any other discovered element. Prune at list boundaries.
+  const walk = (node: HTMLElement): boolean => {
+    for (const child of node.children) {
+      const c = child as HTMLElement;
+      if (LIST_BOUNDARY_TAGS.has(c.tagName)) continue;
+      if (c !== el && discoveredSet.has(c)) return true;
+      if (walk(c)) return true;
+    }
+    return false;
+  };
+  return walk(container);
 }
 
 

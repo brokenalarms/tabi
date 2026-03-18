@@ -108,13 +108,15 @@ export class HintMode {
     type ContainerCandidate = { el: HTMLElement; rect: DOMRect; container: HTMLElement; noNestedLinks: boolean; glowEligible: boolean };
     const containerGroups = new Map<HTMLElement, ContainerCandidate[]>();
 
+    const discoveredSet = new Set(elements);
+
     for (const el of elements) {
       const rect = this.getHintRect(el);
       const target = this.getHintTargetElement(el);
       const container = target === el ? getRepeatingContainer(el) : null;
 
       if (container && CONTAINER_GLOW_STRATEGY !== "none") {
-        const noNestedLinks = !hasNestedLinks(container, el, elements);
+        const noNestedLinks = !hasNestedLinks(container, el, discoveredSet);
         const hasChildList = container.querySelector(LIST_BOUNDARY_SELECTOR) !== null;
         const containerRect = this.getGlowRect(container);
         const glowEligible = hasChildList || isLargeEnoughForGlow(container, containerRect);
