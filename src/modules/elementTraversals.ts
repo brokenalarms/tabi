@@ -56,7 +56,8 @@ export function findVisibleChild(el: HTMLElement): HTMLElement | null {
 
 /** Return the first heading descendant (h1–h6), or null. */
 export function getHeading(el: HTMLElement): HTMLElement | null {
-  return el.querySelector(HEADING_SELECTOR) as HTMLElement | null;
+  return el.querySelector(HEADING_SELECTOR) as HTMLElement | null
+    ?? el.closest(HEADING_SELECTOR) as HTMLElement | null;
 }
 
 // --- Hint rect helpers ---
