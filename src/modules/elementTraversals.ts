@@ -3,7 +3,7 @@
 // Used by both ElementGatherer and HintMode.
 
 import { HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR } from "./constants";
-import { hasBox, isVisible, isSubtreeRemoved } from "./elementPredicates";
+import { hasBox, isVisible, isSubtreeRemoved, isRedirectableControl } from "./elementPredicates";
 
 /** Find the label associated with a form control (via for= or ancestor <label>). */
 export function findAssociatedLabel(el: HTMLElement): HTMLElement | null {
@@ -16,14 +16,26 @@ export function findAssociatedLabel(el: HTMLElement): HTMLElement | null {
   return null;
 }
 
-/** Find a label-wrapped checkbox/radio inside an element.
- *  Returns the input if visible; otherwise returns the label (which wraps
- *  the visual control icon). Used to redirect <a> hints to the checkbox area. */
-export function findEmbeddedControl(el: HTMLElement): HTMLElement | null {
-  const label = el.querySelector("label") as HTMLElement | null;
-  if (!label) return null;
-  const input = label.querySelector("input[type='checkbox'], input[type='radio']") as HTMLInputElement | null;
-  if (!input) return null;
+/** Resolve a label+input pair to the right hint target element.
+ *  Handles two configurations:
+ *  1. Element IS a checkbox/radio — looks up for its associated label
+ *  2. Element CONTAINS a label wrapping a checkbox/radio — looks down
+ *  In both cases: visible input → input, hidden input → label. */
+export function findControlTarget(el: HTMLElement): HTMLElement | null {
+  let input: HTMLElement | null = null;
+  let label: HTMLElement | null = null;
+
+  if (isRedirectableControl(el)) {
+    input = el;
+    label = findAssociatedLabel(el);
+  } else {
+    label = el.querySelector("label") as HTMLElement | null;
+    if (label) {
+      input = label.querySelector("input[type='checkbox'], input[type='radio']") as HTMLElement | null;
+    }
+  }
+
+  if (!input || !label) return null;
   if (isVisible(input) && !isSubtreeRemoved(input)) return input;
   return label;
 }

@@ -6,8 +6,8 @@ import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
 import { HINT_HEIGHT } from "./constants";
-import { isContainerSized, isFormControl, getRepeatingContainer, isNestedRepeatingContainer, isRedirectableControl, isVisible, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
-import { findAssociatedLabel, findEmbeddedControl, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHalfLeading } from "./elementTraversals";
+import { isContainerSized, isFormControl, getRepeatingContainer, isNestedRepeatingContainer, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
+import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHalfLeading } from "./elementTraversals";
 
 import { Mode } from "../commands";
 
@@ -258,18 +258,12 @@ export class HintMode {
   private getHintTargetElement(el: HTMLElement): HTMLElement {
     const rect = el.getBoundingClientRect();
 
-    if (isRedirectableControl(el) && !isVisible(el, rect)) {
-      const label = findAssociatedLabel(el);
-      if (label) return label;
-    }
+    const controlTarget = findControlTarget(el);
+    if (controlTarget) return controlTarget;
+
     if (isZeroSizeAnchor(el, rect)) {
       const child = findVisibleChild(el);
       if (child) return child;
-    }
-    // Link containing a label-wrapped checkbox/radio — redirect to the control area
-    if (el.tagName.toLowerCase() === "a") {
-      const control = findEmbeddedControl(el);
-      if (control) return control;
     }
     if (shouldRedirectToHeading(el)) {
       return getHeading(el)!;
