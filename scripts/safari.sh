@@ -28,7 +28,14 @@ fi
 echo "→ Reloading Safari…"
 osascript -e '
   tell application "Safari"
+    -- Save window bounds before quitting
+    set savedBounds to {}
     if it is running then
+      try
+        repeat with w in windows
+          set end of savedBounds to bounds of w
+        end repeat
+      end try
       quit
       delay 1.5
     end if
@@ -38,6 +45,16 @@ osascript -e '
     tell application "System Events"
       keystroke "t" using {command down, shift down}
     end tell
+    -- Restore window bounds
+    delay 0.5
+    try
+      set winList to windows
+      repeat with i from 1 to count of savedBounds
+        if i ≤ (count of winList) then
+          set bounds of item i of winList to item i of savedBounds
+        end if
+      end repeat
+    end try
   end tell
 '
 
