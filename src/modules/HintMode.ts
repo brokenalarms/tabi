@@ -7,6 +7,7 @@ import { DEFAULTS } from "../types";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
 import { HINT_HEIGHT } from "./constants";
 import { isLargeEnoughForGlow, isFormControl, getRepeatingContainer, hasNestedLinks, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
+import { LIST_BOUNDARY_SELECTOR } from "./constants";
 import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect } from "./elementTraversals";
 
 import { Mode } from "../commands";
@@ -376,7 +377,17 @@ export class HintMode {
 
   /** Glow border on repeating container + inside-end pill label. */
   private positionContainerGlow(div: HTMLDivElement, container: HTMLElement): void {
-    const glowRect = container.getBoundingClientRect();
+    let glowRect = container.getBoundingClientRect();
+
+    // When the container has a nested list, clamp the glow to the header
+    // row above it — don't wrap the entire subtree.
+    const nestedList = container.querySelector(LIST_BOUNDARY_SELECTOR);
+    if (nestedList) {
+      const listTop = nestedList.getBoundingClientRect().top;
+      if (listTop > glowRect.top) {
+        glowRect = new DOMRect(glowRect.left, glowRect.top, glowRect.width, listTop - glowRect.top);
+      }
+    }
     const glow = document.createElement("div");
     glow.className = "vimium-hint-container-glow";
     const glowPos = this.viewportToDocument(glowRect.left, glowRect.top);
