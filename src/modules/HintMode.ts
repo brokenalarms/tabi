@@ -6,7 +6,7 @@ import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
 import { HINT_HEIGHT } from "./constants";
-import { isContainerSized, isFormControl, getRepeatingContainer, isRedirectableControl, isVisible, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
+import { isContainerSized, isFormControl, getRepeatingContainer, isNestedRepeatingContainer, isRedirectableControl, isVisible, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
 import { findAssociatedLabel, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect } from "./elementTraversals";
 
 import { Mode } from "../commands";
@@ -110,7 +110,8 @@ export class HintMode {
     for (const el of elements) {
       const rect = this.getHintRect(el);
       const target = this.getHintTargetElement(el);
-      const container = target === el ? getRepeatingContainer(el) : null;
+      const rawContainer = target === el ? getRepeatingContainer(el) : null;
+      const container = rawContainer && !isNestedRepeatingContainer(el) ? rawContainer : null;
 
       if (container && CONTAINER_GLOW_STRATEGY !== "none") {
         const noNestedLinks = !elements.some(other => other !== el && container.contains(other));

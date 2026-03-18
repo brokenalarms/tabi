@@ -218,9 +218,10 @@ export function isBlockLevel(el: HTMLElement): boolean {
 /** Minimum number of repeating siblings to count as a repeating pattern. */
 const MINIMUM_REPEATING_SIBLINGS = 3;
 
-/** Is this element inside a semantic list container (li, tr) that generates a box? */
+/** Is this element inside a semantic list container (li, tr) that generates a box?
+ *  Starts from parentElement — a container is an ancestor, never self. */
 function isInListContainer(el: HTMLElement): HTMLElement | null {
-  const container = el.closest(REPEATING_CONTAINER_SELECTOR) as HTMLElement | null;
+  const container = el.parentElement?.closest(REPEATING_CONTAINER_SELECTOR) as HTMLElement | null ?? null;
   return container !== null && hasBox(container) ? container : null;
 }
 
@@ -266,6 +267,14 @@ export function getRepeatingContainer(el: HTMLElement): HTMLElement | null {
  *  real container and shouldn't affect hint positioning. */
 export function isInRepeatingContainer(el: HTMLElement): boolean {
   return getRepeatingContainer(el) !== null;
+}
+
+/** Is this repeating container nested inside another repeating container?
+ *  Nested containers (e.g. <li> inside <li> in tree views) shouldn't get
+ *  container glow — the parent container already owns the visual region. */
+export function isNestedRepeatingContainer(el: HTMLElement): boolean {
+  const container = getRepeatingContainer(el);
+  return container !== null && isInRepeatingContainer(container);
 }
 
 /** Is this element large and rectangular enough for container-style hint placement?
