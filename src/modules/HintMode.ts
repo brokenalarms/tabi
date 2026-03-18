@@ -382,7 +382,7 @@ export class HintMode {
     glow.style.height = glowRect.height + "px";
     if (this.overlay) this.overlay.appendChild(glow);
 
-    const verticalInset = (glowRect.height - HINT_HEIGHT) / 2;
+    const verticalInset = (glowRect.height - HINT_HEIGHT) / 3;
     const insetRight = Math.min(verticalInset, 24);
     const pos = this.viewportToDocument(
       glowRect.right - insetRight,
