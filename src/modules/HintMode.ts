@@ -110,8 +110,8 @@ export class HintMode {
     for (const el of elements) {
       const rect = this.getHintRect(el);
       const target = this.getHintTargetElement(el);
-      const rawContainer = target === el ? getRepeatingContainer(el) : null;
-      const container = rawContainer && !isNestedRepeatingContainer(el) ? rawContainer : null;
+      const container = target === el && !isNestedRepeatingContainer(el)
+        ? getRepeatingContainer(el) : null;
 
       if (container && CONTAINER_GLOW_STRATEGY !== "none") {
         const noNestedLinks = !elements.some(other => other !== el && container.contains(other));
