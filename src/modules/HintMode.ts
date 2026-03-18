@@ -5,6 +5,7 @@
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
+import { HINT_HEIGHT } from "./constants";
 import { isContainerSized, isFormControl, getRepeatingContainer, isRedirectableControl, isVisible, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
 import { findAssociatedLabel, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect } from "./elementTraversals";
 
@@ -371,7 +372,6 @@ export class HintMode {
   /** Glow border on repeating container + inside-end pill label. */
   private positionContainerGlow(div: HTMLDivElement, container: HTMLElement): void {
     const glowRect = container.getBoundingClientRect();
-    const cs = getComputedStyle(container);
     const glow = document.createElement("div");
     glow.className = "vimium-hint-container-glow";
     const glowPos = this.viewportToDocument(glowRect.left, glowRect.top);
@@ -381,12 +381,8 @@ export class HintMode {
     glow.style.height = glowRect.height + "px";
     if (this.overlay) this.overlay.appendChild(glow);
 
-    const padding = Math.max(
-      parseFloat(cs.paddingRight) || 0,
-      parseFloat(cs.paddingTop) || 0,
-      parseFloat(cs.paddingBottom) || 0
-    );
-    const insetRight = Math.min(Math.max(6, padding), 24);
+    const verticalInset = (glowRect.height - HINT_HEIGHT) / 2;
+    const insetRight = Math.min(verticalInset, 24);
     const pos = this.viewportToDocument(
       glowRect.right - insetRight,
       glowRect.top + glowRect.height / 2
