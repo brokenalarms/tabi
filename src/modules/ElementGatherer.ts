@@ -3,7 +3,7 @@
 // non-clickable nodes, and yield visible clickable elements, then deduplicates
 // via containment analysis.
 
-import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_SELECTOR, LIST_BOUNDARY_TAGS } from "./constants";
+import { CLICKABLE_SELECTOR, LIST_BOUNDARY_TAGS } from "./constants";
 import {
   isExcludedByIntent, childrenCannotBeVisible, isOnScreen, isVisible,
   isClippedByOverflow, isOccluded, isZeroSizeAnchor, isRedirectableControl,
@@ -180,21 +180,13 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
     const walkRoot = root === document ? document.body || document.documentElement : root;
     if (!walkRoot) return;
 
-    // Wrap walkerFilter to also collect shadow roots from non-rejected nodes
-    // and prune subtrees of native interactive elements (they're atomic controls).
+    // Wrap walkerFilter to also collect shadow roots from non-rejected nodes.
     const shadowRoots: ShadowRoot[] = [];
-    const nativeInteractiveSet = new Set(NATIVE_INTERACTIVE_ELEMENTS);
     const filter = (node: Node): number => {
       const verdict = walkerFilter(node);
       if (verdict !== NodeFilter.FILTER_REJECT) {
         const sr = (node as HTMLElement).shadowRoot;
         if (sr) shadowRoots.push(sr);
-      }
-      // Native interactive elements are atomic: accept them but prune their
-      // subtrees so children (labels, icons, spans) don't get separate hints.
-      if (verdict === NodeFilter.FILTER_ACCEPT && nativeInteractiveSet.has((node as HTMLElement).tagName.toLowerCase())) {
-        result.push(node as HTMLElement);
-        return NodeFilter.FILTER_REJECT;
       }
       return verdict;
     };

@@ -3,7 +3,6 @@
 // and hint positioning, which require a real layout engine.
 
 import { test, expect } from "@playwright/test";
-import { NodeFilter } from "happy-dom";
 import path from "path";
 
 const HARNESS_PATH = path.resolve(__dirname, "harness.js");
@@ -556,7 +555,8 @@ test("multi-line link inside heading is not falsely occluded by adjacent content
     return walkerFilter(document.getElementById("heading-link")!);
   });
 
-  expect(verdict).toBe(NodeFilter.FILTER_ACCEPT);
+  // NodeFilter.FILTER_ACCEPT = 1
+  expect(verdict).toBe(1);
 });
 
 // Clicking a hint dispatches a click to the target element only after the
@@ -580,8 +580,8 @@ test("hint click dispatches after collapse animation completes", async ({ page }
     }
   `});
 
-  const clicked = await page.evaluate(() => {
-    return new Promise<boolean>((resolve) => {
+  const result = await page.evaluate(() => {
+    return new Promise<{ clickedBeforeAnimation: boolean; clickedAfter: boolean }>((resolve) => {
       const target = document.getElementById("target")!;
       let wasClicked = false;
       target.addEventListener("click", () => { wasClicked = true; });
@@ -603,16 +603,22 @@ test("hint click dispatches after collapse animation completes", async ({ page }
       });
       document.dispatchEvent(event);
 
-      // Click should not have happened yet (animation is 150ms)
+      // Click should not have happened yet (animation hasn't ended)
       const clickedBeforeAnimation = wasClicked;
 
-      // Wait for animation to complete + buffer
-      setTimeout(() => {
-        resolve(!clickedBeforeAnimation && wasClicked);
-      }, 300);
+      // Manually fire animationend on the active hint div — headless
+      // WebKit may not run CSS animations, so animationend never fires.
+      const hintDiv = document.querySelector(".tabi-hint-active");
+      if (hintDiv) {
+        hintDiv.dispatchEvent(new AnimationEvent("animationend", { bubbles: false }));
+      }
+
+      // Click should now have fired synchronously via afterCollapse
+      resolve({ clickedBeforeAnimation, clickedAfter: wasClicked });
     });
   });
 
-  expect(clicked).toBe(true);
+  expect(result.clickedBeforeAnimation).toBe(false);
+  expect(result.clickedAfter).toBe(true);
 });
 

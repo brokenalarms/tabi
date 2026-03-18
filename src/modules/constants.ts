@@ -1,18 +1,13 @@
 // Shared element classification constants for the hint pipeline.
 
-// Native interactive elements — atomic controls at the lowest level of the DOM.
-// The walker accepts these and prunes their subtrees: children are content/labels,
-// not separate click targets. This prevents duplicate hints inside buttons, links, etc.
-export const NATIVE_INTERACTIVE_ELEMENTS = ["a", "button", "input", "textarea", "select"];
+// Native interactive HTML elements — discovered by the walker.
+export const NATIVE_INTERACTIVE_ELEMENTS = ["a", "button", "input", "textarea", "select", "summary"];
+
+// Embedded content elements — render external resources, never empty.
+export const EMBEDDED_CONTENT_ELEMENTS = new Set(["iframe", "object", "embed"]);
 
 const CLICKABLE_ROLES = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch", "treeitem"];
 const CLICKABLE_ATTRS = ["label[for]", "[onclick]", "[onmousedown]"];
-
-// Site-specific selectors for interactive elements that lack semantic signals.
-// These elements have JS click handlers but no role, onclick attr, or native tag.
-const SITE_CLICKABLE: Array<{ site: string; selectors: string[] }> = [
-  { site: "github.com", selectors: [".PRIVATE_TreeView-item-toggle"] },
-];
 
 /** Tags that act as list boundaries — items on different sides are
  *  at different tree levels for dedup and glow purposes. */
@@ -23,7 +18,6 @@ export const CLICKABLE_SELECTOR = [
   ...NATIVE_INTERACTIVE_ELEMENTS,
   ...CLICKABLE_ROLES.map(r => `[role='${r}']`),
   ...CLICKABLE_ATTRS,
-  ...SITE_CLICKABLE.flatMap(s => s.selectors),
 ].join(", ");
 
 export const REPEATING_CONTAINER_SELECTOR = "li, tr";

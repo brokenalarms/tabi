@@ -8,7 +8,7 @@ import { discoverElements, renderDebugDots } from "./ElementGatherer";
 import { HINT_HEIGHT } from "./constants";
 import { isLargeEnoughForGlow, isFormControl, getRepeatingContainer, hasNestedLinks, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
 import { LIST_BOUNDARY_SELECTOR } from "./constants";
-import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect, retryExpandedToggle } from "./elementTraversals";
+import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect, retryClick } from "./elementTraversals";
 
 import { Mode } from "../commands";
 
@@ -117,9 +117,11 @@ export class HintMode {
 
       if (container && CONTAINER_GLOW_STRATEGY !== "none") {
         const noNestedLinks = !hasNestedLinks(container, el, discoveredSet);
-        const hasChildList = container.querySelector(LIST_BOUNDARY_SELECTOR) !== null;
-        const containerRect = this.getGlowRect(container);
-        const glowEligible = hasChildList || isLargeEnoughForGlow(container, containerRect);
+        const nestedList = container.querySelector(LIST_BOUNDARY_SELECTOR);
+        const containerRect = nestedList
+          ? this.clampRectToHeader(container.getBoundingClientRect(), nestedList as HTMLElement)
+          : container.getBoundingClientRect();
+        const glowEligible = nestedList !== null || isLargeEnoughForGlow(container, containerRect);
         const parent = container.parentElement || container;
 
         let group = containerGroups.get(parent);
@@ -378,23 +380,22 @@ export class HintMode {
     return div;
   }
 
-  /** Container rect clamped to the header row when a nested list exists.
-   *  Without clamping, an expanded folder's rect includes all children. */
-  private getGlowRect(container: HTMLElement): DOMRect {
-    const rect = container.getBoundingClientRect();
-    const nestedList = container.querySelector(LIST_BOUNDARY_SELECTOR);
-    if (nestedList) {
-      const listTop = nestedList.getBoundingClientRect().top;
-      if (listTop > rect.top) {
-        return new DOMRect(rect.left, rect.top, rect.width, listTop - rect.top);
-      }
+  /** Clamp container rect to end before a nested list element. */
+  private clampRectToHeader(rect: DOMRect, nestedList: HTMLElement): DOMRect {
+    const listTop = nestedList.getBoundingClientRect().top;
+    if (listTop > rect.top) {
+      return new DOMRect(rect.left, rect.top, rect.width, listTop - rect.top);
     }
     return rect;
   }
 
   /** Glow border on repeating container + inside-end pill label. */
   private positionContainerGlow(div: HTMLDivElement, container: HTMLElement): void {
-    const glowRect = this.getGlowRect(container);
+    let glowRect = container.getBoundingClientRect();
+    const nestedList = container.querySelector(LIST_BOUNDARY_SELECTOR);
+    if (nestedList) {
+      glowRect = this.clampRectToHeader(glowRect, nestedList as HTMLElement);
+    }
     const glow = document.createElement("div");
     glow.className = "tabi-hint-container-glow";
     const glowPos = this.viewportToDocument(glowRect.left, glowRect.top);
@@ -560,7 +561,7 @@ export class HintMode {
         element.dispatchEvent(new MouseEvent("mousedown", opts));
         element.dispatchEvent(new MouseEvent("mouseup", opts));
         element.click();
-        retryExpandedToggle(element);
+        retryClick(element);
       }
 
       // Fade out the ring
