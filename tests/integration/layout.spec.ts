@@ -233,8 +233,8 @@ test("multi-line link hint sits below last line", async ({ page }) => {
 
   // Verify the link actually wraps (test precondition)
   expect(result.lineCount).toBeGreaterThan(1);
-  // Pill is placed at rect.bottom - halfLeading, tightened to text bottom.
-  expect(result.hintTop).toBe(result.linkBottom - result.halfLeading);
+  // Pill is placed at rect.bottom - halfLeading + 2, tightened to text bottom.
+  expect(result.hintTop).toBe(result.linkBottom - result.halfLeading + 2);
 });
 
 // Reddit "1 more reply": flex <a> is stretched to full grid width (~520px)

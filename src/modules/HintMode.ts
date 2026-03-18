@@ -397,7 +397,7 @@ export class HintMode {
 
   /** Pill below element with pointer tail. */
   private positionPill(div: HTMLDivElement, rect: DOMRect): void {
-    const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom);
+    const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
     div.style.left = Math.max(0, pos.x) + "px";
     div.style.top = Math.max(0, pos.y) + "px";
     div.style.transform = "translateX(-50%)";
