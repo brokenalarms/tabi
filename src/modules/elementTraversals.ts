@@ -52,18 +52,23 @@ export function getChildrenContentRect(el: HTMLElement): DOMRect | null {
 }
 
 /** Content-tight rect for an <a> element. Narrows to children's union rect
- *  when children are present; for text-only links, subtracts padding-bottom
- *  and half-leading so the rect bottom aligns with the visual text bottom. */
+ *  when children are present, or subtracts padding-bottom for text-only links.
+ *  Returns the original rect unchanged if no narrowing applies. */
 export function getLinkContentRect(el: HTMLElement, rect: DOMRect): DOMRect {
   if (el.children.length > 0) {
     return getChildrenContentRect(el) ?? rect;
   }
+  const paddingBottom = parseFloat(getComputedStyle(el).paddingBottom) || 0;
+  return new DOMRect(rect.left, rect.top, rect.width, rect.height - paddingBottom);
+}
+
+/** Half-leading: the space above and below text within a line box.
+ *  Line-height distributes (lineHeight - fontSize) / 2 on each side. */
+export function getHalfLeading(el: HTMLElement): number {
   const style = getComputedStyle(el);
-  const paddingBottom = parseFloat(style.paddingBottom) || 0;
   const fontSize = parseFloat(style.fontSize) || 0;
   const lineHeight = parseFloat(style.lineHeight) || 0;
-  const halfLeading = lineHeight > fontSize ? (lineHeight - fontSize) / 2 : 0;
-  return new DOMRect(rect.left, rect.top, rect.width, rect.height - paddingBottom - halfLeading);
+  return lineHeight > fontSize ? (lineHeight - fontSize) / 2 : 0;
 }
 
 /** Walk up through single-child ancestors to the nearest repeating container

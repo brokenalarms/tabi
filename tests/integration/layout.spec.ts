@@ -166,17 +166,22 @@ test("heading redirect hint sits below h3, not inside it", async ({ page }) => {
 
     const heading = document.getElementById("heading")!;
     const headingRect = heading.getBoundingClientRect();
+    const style = getComputedStyle(heading);
+    const fontSize = parseFloat(style.fontSize) || 0;
+    const lineHeight = parseFloat(style.lineHeight) || 0;
+    const halfLeading = lineHeight > fontSize ? (lineHeight - fontSize) / 2 : 0;
     const hints = Array.from(document.querySelectorAll(".vimium-hint")) as HTMLElement[];
     const hintTops = hints.map(h => parseFloat(h.style.top));
 
     hm.destroy();
-    return { headingBottom: headingRect.bottom, hintTops };
+    return { headingBottom: headingRect.bottom, halfLeading, hintTops };
   });
 
-  // The heading link hint must be at or just below the heading bottom edge,
-  // not inside the heading text (which would mean delta < 0).
+  // The heading link hint must be at or just below the visual text bottom
+  // (headingBottom - halfLeading), not inside the heading text.
+  const textBottom = result.headingBottom - result.halfLeading;
   const headingHintTop = result.hintTops.find(t =>
-    t >= result.headingBottom - 2 && t <= result.headingBottom + 10
+    t >= textBottom - 2 && t <= textBottom + 10
   );
   expect(headingHintTop).toBeDefined();
 });
@@ -228,8 +233,8 @@ test("multi-line link hint sits below last line", async ({ page }) => {
 
   // Verify the link actually wraps (test precondition)
   expect(result.lineCount).toBeGreaterThan(1);
-  // Pill is placed at rect.bottom - halfLeading + 2, tightened to text bottom.
-  expect(result.hintTop).toBe(result.linkBottom - result.halfLeading + 2);
+  // Pill is placed at rect.bottom - halfLeading, tightened to text bottom.
+  expect(result.hintTop).toBe(result.linkBottom - result.halfLeading);
 });
 
 // Reddit "1 more reply": flex <a> is stretched to full grid width (~520px)
