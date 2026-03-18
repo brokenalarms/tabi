@@ -293,7 +293,7 @@ describe("background.ts tab management", () => {
             await handleCommand("extensionActive", sender, {});
             assert.equal(activeTabSet.has(2), true);
             assert.equal(actionState[2].enabled, true);
-            assert.equal(actionState[2].title, "vimium-mac");
+            assert.equal(actionState[2].title, "tabi");
         });
 
         // Verifies that extensionInactive disables the icon for the tab.
@@ -303,7 +303,7 @@ describe("background.ts tab management", () => {
             await handleCommand("extensionInactive", sender, {});
             assert.equal(activeTabSet.has(3), false);
             assert.equal(actionState[3].enabled, false);
-            assert.equal(actionState[3].title, "vimium-mac (disabled on this site)");
+            assert.equal(actionState[3].title, "tabi (disabled on this site)");
         });
 
         // Verifies that closing a tab cleans up its entry from activeTabSet.

@@ -1,0 +1,101 @@
+/*
+ * Tabi Theme System
+ *
+ * Hint tags: themed via data-tabi-theme (contrasts with page background).
+ * Tab search / help: themed via prefers-color-scheme (follows system dark mode).
+ */
+
+/* ── Hint tag theme (default — yellow gradient) ───────────────────────── */
+
+.tabi-hint-overlay,
+.tabi-hint {
+    --tabi-hint-bg: linear-gradient(to bottom, #fff785, #ffc542);
+    --tabi-hint-border: #c38a22;
+    --tabi-hint-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --tabi-hint-color: #302505;
+    --tabi-hint-matched-opacity: 0.4;
+    --tabi-hint-bar-line: rgba(195, 138, 34, 0.4);
+    --tabi-hint-bar-glow: rgba(195, 138, 34, 0.15);
+}
+
+[data-tabi-theme="dark"] .tabi-hint-overlay,
+[data-tabi-theme="dark"] .tabi-hint {
+    --tabi-hint-bg: linear-gradient(to bottom, #4a4a4a, #333);
+    --tabi-hint-border: #666;
+    --tabi-hint-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    --tabi-hint-color: #eee;
+    --tabi-hint-matched-opacity: 0.35;
+    --tabi-hint-bar-line: rgba(102, 102, 102, 0.4);
+    --tabi-hint-bar-glow: rgba(102, 102, 102, 0.15);
+}
+
+[data-tabi-theme="light"] .tabi-hint-overlay,
+[data-tabi-theme="light"] .tabi-hint {
+    --tabi-hint-bg: linear-gradient(to bottom, #fff, #f0f0f0);
+    --tabi-hint-border: #bbb;
+    --tabi-hint-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    --tabi-hint-color: #111;
+    --tabi-hint-matched-opacity: 0.35;
+    --tabi-hint-bar-line: rgba(187, 187, 187, 0.4);
+    --tabi-hint-bar-glow: rgba(187, 187, 187, 0.15);
+}
+
+/* ── Help overlay theme (follows system dark mode) ────────────────────── */
+
+.tabi-help-overlay,
+.tabi-help-modal {
+    --tabi-help-bg: rgba(30, 30, 30, 0.92);
+    --tabi-help-shadow: 0 8px 40px rgba(0, 0, 0, 0.55), 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+    --tabi-help-color: #f0f0f0;
+    --tabi-help-border: rgba(255, 255, 255, 0.08);
+    --tabi-help-key-color: rgba(255, 255, 255, 0.55);
+    --tabi-help-desc-color: #f0f0f0;
+    --tabi-help-muted-color: rgba(255, 255, 255, 0.4);
+    --tabi-help-row-hover: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Tab search theme (follows system dark mode) ──────────────────────── */
+
+.tabi-tab-search-overlay,
+.tabi-tab-search-modal {
+    --tabi-tab-modal-bg: rgba(30, 30, 30, 0.92);
+    --tabi-tab-modal-shadow: 0 8px 40px rgba(0, 0, 0, 0.55), 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+    --tabi-tab-input-border: rgba(255, 255, 255, 0.08);
+    --tabi-tab-input-bg: rgba(255, 255, 255, 0.05);
+    --tabi-tab-input-color: #f0f0f0;
+    --tabi-tab-placeholder-color: rgba(255, 255, 255, 0.35);
+    --tabi-tab-item-border: rgba(255, 255, 255, 0.06);
+    --tabi-tab-item-selected-bg: rgba(74, 158, 255, 0.18);
+    --tabi-tab-title-color: #f0f0f0;
+    --tabi-tab-url-color: rgba(255, 255, 255, 0.5);
+    --tabi-tab-empty-color: rgba(255, 255, 255, 0.4);
+}
+
+@media (prefers-color-scheme: light) {
+    .tabi-help-overlay,
+    .tabi-help-modal {
+        --tabi-help-bg: rgba(255, 255, 255, 0.88);
+        --tabi-help-shadow: 0 8px 40px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+        --tabi-help-color: #1a1a1a;
+        --tabi-help-border: rgba(0, 0, 0, 0.08);
+        --tabi-help-key-color: rgba(0, 0, 0, 0.45);
+        --tabi-help-desc-color: #1a1a1a;
+        --tabi-help-muted-color: rgba(0, 0, 0, 0.4);
+        --tabi-help-row-hover: rgba(0, 0, 0, 0.04);
+    }
+
+    .tabi-tab-search-overlay,
+    .tabi-tab-search-modal {
+        --tabi-tab-modal-bg: rgba(255, 255, 255, 0.88);
+        --tabi-tab-modal-shadow: 0 8px 40px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+        --tabi-tab-input-border: rgba(0, 0, 0, 0.08);
+        --tabi-tab-input-bg: rgba(0, 0, 0, 0.03);
+        --tabi-tab-input-color: #1a1a1a;
+        --tabi-tab-placeholder-color: rgba(0, 0, 0, 0.35);
+        --tabi-tab-item-border: rgba(0, 0, 0, 0.06);
+        --tabi-tab-item-selected-bg: rgba(41, 121, 255, 0.1);
+        --tabi-tab-title-color: #1a1a1a;
+        --tabi-tab-url-color: rgba(0, 0, 0, 0.5);
+        --tabi-tab-empty-color: rgba(0, 0, 0, 0.4);
+    }
+}

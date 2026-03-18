@@ -1,4 +1,4 @@
-// KeyHandler — mode-aware keyboard event router for Vimium
+// KeyHandler — mode-aware keyboard event router for Tabi
 // Uses event.code for positional key bindings (layout-independent).
 
 import type { KeyBindingMode, ModeValue } from "../types";
@@ -9,7 +9,7 @@ const NON_TEXT_INPUT_TYPES = new Set([
   "checkbox", "radio", "submit", "button", "reset", "file", "image", "color", "range",
 ]);
 // ARIA roles that accept text input — elements with these roles should
-// suppress Vimium keybindings just like native <input>/<textarea>.
+// suppress Tabi keybindings just like native <input>/<textarea>.
 const TEXT_INPUT_ROLES = new Set([
   "textbox", "searchbox", "combobox",
 ]);
@@ -192,7 +192,7 @@ export class KeyHandler {
     const n = Mode.NORMAL;
     const addBinding = (mode: ModeValue, seq: string, cmd: string) => {
       if (!(cmd in COMMANDS)) {
-        console.warn(`[Vimium] Unknown command "${cmd}" — not in COMMANDS`);
+        console.warn(`[Tabi] Unknown command "${cmd}" — not in COMMANDS`);
       }
       this.bind(mode, seq, cmd);
     };

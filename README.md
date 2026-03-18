@@ -1,4 +1,4 @@
-# Vimium for Safari
+# Tabi
 
 Browse the web without a mouse. Press a key, every clickable thing on the page gets a label — type the label, it clicks. That's the core of it.
 
@@ -57,19 +57,19 @@ You don't need to know Vim. Here's what each key does:
 Requires macOS 13+ and Xcode 16.3+.
 
 ```bash
-git clone https://github.com/anthropics/vimium-mac.git
-cd vimium-mac
+git clone https://github.com/anthropics/tabi.git
+cd tabi
 
 brew install xcodegen   # if needed
 xcodegen generate
 ```
 
-Open `Vimium.xcodeproj` in Xcode, hit Run (Cmd+R), then enable the extension in Safari → Settings → Extensions.
+Open `Tabi.xcodeproj` in Xcode, hit Run (Cmd+R), then enable the extension in Safari → Settings → Extensions.
 
 ## Development
 
 ```
-Vimium/
+Tabi/
 ├── Host App/              # macOS app shell (SwiftUI)
 └── Safari Extension/
     └── Resources/

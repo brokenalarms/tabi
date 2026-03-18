@@ -29,4 +29,4 @@ The hint system discovers clickable elements, computes their visual position, an
 
 ## Overlay & positioning strategy
 
-- **`position: absolute` on `document.documentElement`** — Hints use absolute positioning with document-relative coordinates (viewport rect + scroll offset), matching Vimium's approach. Avoids breakage when ancestors of `<body>` have `transform`, `will-change`, `filter`, or `contain` properties, which create new containing blocks that shift `position: fixed` elements.
+- **`position: absolute` on `document.documentElement`** — Hints use absolute positioning with document-relative coordinates (viewport rect + scroll offset), matching Tabi's approach. Avoids breakage when ancestors of `<body>` have `transform`, `will-change`, `filter`, or `contain` properties, which create new containing blocks that shift `position: fixed` elements.

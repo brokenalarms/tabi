@@ -218,8 +218,8 @@ describe("visibility edge cases", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive(), "Should produce a hint");
 
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 1, "Should have exactly 1 hint");
 
         // Hint should be near the label (left:200), not the invisible input (left:10)
@@ -548,8 +548,8 @@ describe("hint target redirects to sole clickable child", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
 
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 1, "Should have 1 hint — parent deduped, child wins");
     });
 });
@@ -671,8 +671,8 @@ describe("inline element hint alignment", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
 
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 3, "Should have 3 hints");
 
         // All hints should have the same x position (centered on <li> width, not <a> text width)
@@ -767,8 +767,8 @@ describe("checkbox/radio hint positioning", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
 
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 1, "Should have 1 hint for checkbox");
 
         // Hint should be near the checkbox (left=10, width=16, center=18), NOT centered on li (center=300)
@@ -787,8 +787,8 @@ describe("checkbox/radio hint positioning", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
 
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 1, "Should have 1 hint for radio");
 
         const hintLeft = parseFloat(hints[0].style.left);
@@ -814,8 +814,8 @@ describe("checkbox/radio hint positioning", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
 
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 1);
         const hintLeft = parseFloat(hints[0].style.left);
         // Checkbox is at left:700, width:20 — center is 710.
@@ -843,8 +843,8 @@ describe("checkbox/radio hint positioning", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
 
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 1);
         const hintLeft = parseFloat(hints[0].style.left);
         // Checkbox is at left:10, width:20 — center is 20.
@@ -871,8 +871,8 @@ describe("checkbox/radio hint positioning", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
 
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 1);
         const hintLeft = parseFloat(hints[0].style.left);
         // Zero-size input — hint should redirect to label, center at ~140.
@@ -892,8 +892,8 @@ describe("checkbox/radio hint positioning", () => {
         loadModules([plainLink]);
         const { hintMode: hm1 } = getState();
         hm1.activate(false);
-        const overlay1 = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const baseLeft = parseFloat(overlay1?.querySelector(".vimium-hint")?.style.left);
+        const overlay1 = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const baseLeft = parseFloat(overlay1?.querySelector(".tabi-hint")?.style.left);
         hm1.destroy();
 
         // Delta: same link but with hidden checkbox inside label — hint should shift to label
@@ -913,8 +913,8 @@ describe("checkbox/radio hint positioning", () => {
         hm2.activate(false);
         assert.ok(hm2.isActive());
 
-        const overlay2 = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay2?.querySelectorAll(".vimium-hint");
+        const overlay2 = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay2?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 1);
         const hintLeft = parseFloat(hints[0].style.left);
         // Label is at left:0, width:30 — center is 15.
@@ -939,8 +939,8 @@ describe("checkbox/radio hint positioning", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
 
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 1);
         const hintLeft = parseFloat(hints[0].style.left);
         // Input is at left:5, width:16 — center is 13.
@@ -981,8 +981,8 @@ describe("inline link in mixed text content", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
 
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 1, "Should have 1 hint for the link");
 
         // Hint should be near the link (left=200, width=100, center=250), NOT centered on <p> (center=400)
@@ -1010,8 +1010,8 @@ describe("hint positioning accounts for padding-bottom", () => {
         const { hintMode } = getState();
         hintMode.activate(false);
 
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 1);
 
         // Without padding, hint top should be near rect.bottom (30) + 2 = 32
@@ -1028,8 +1028,8 @@ describe("hint positioning accounts for padding-bottom", () => {
         const { hintMode } = getState();
         hintMode.activate(false);
 
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 1);
 
         // With 20px padding-bottom, hint should be near content bottom (30) + 2 = 32,
@@ -1392,8 +1392,8 @@ describe("native interactive elements prune subtrees", () => {
         const { hintMode } = getState();
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 1, "Expected 1 hint (summary only) — details should not get a separate hint");
     });
 
@@ -1411,8 +1411,8 @@ describe("native interactive elements prune subtrees", () => {
         const { hintMode } = getState();
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 2, "Both sibling links should get hints");
         const x1 = parseFloat(hints[0].style.left);
         const x2 = parseFloat(hints[1].style.left);
@@ -1433,8 +1433,8 @@ describe("native interactive elements prune subtrees", () => {
         const { hintMode } = getState();
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 1, "Expected 1 hint (anchor only) — nested button should be pruned");
     });
 });
@@ -1499,8 +1499,8 @@ describe("inline expansion walks up to block ancestor", () => {
         const { hintMode } = getState();
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
-        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        let hints = overlay?.querySelectorAll(".vimium-hint");
+        let overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        let hints = overlay?.querySelectorAll(".tabi-hint");
         const directLeft = parseFloat(hints[0].style.left);
         assert.equal(directLeft, 150, `Direct child: hint should center on <li> (150)`);
         hintMode.deactivate();
@@ -1515,8 +1515,8 @@ describe("inline expansion walks up to block ancestor", () => {
         loadModules([a2]);
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
-        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        hints = overlay?.querySelectorAll(".vimium-hint");
+        overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        hints = overlay?.querySelectorAll(".tabi-hint");
         const wrappedLeft = parseFloat(hints[0].style.left);
 
         // Both should produce the same result — the walk-up reaches <li> in both cases
@@ -1537,8 +1537,8 @@ describe("inline expansion walks up to block ancestor", () => {
         const { hintMode } = getState();
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
-        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        let hints = overlay?.querySelectorAll(".vimium-hint");
+        let overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        let hints = overlay?.querySelectorAll(".tabi-hint");
         const expandedLeft = parseFloat(hints[0].style.left);
         assert.equal(expandedLeft, 150, // 0 + 300/2 = centers on <li>
             `Inside <li>: hint should center on <li> (150)`);
@@ -1552,8 +1552,8 @@ describe("inline expansion walks up to block ancestor", () => {
         loadModules([a2]);
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
-        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        hints = overlay?.querySelectorAll(".vimium-hint");
+        overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        hints = overlay?.querySelectorAll(".tabi-hint");
         const noExpansionLeft = parseFloat(hints[0].style.left);
         assert.equal(noExpansionLeft, 100, // 50 + 100/2 = centers on <a>
             `Inside <h2>: hint should center on <a> (100), not expand to <h2> (150)`);
@@ -1573,8 +1573,8 @@ describe("inline expansion walks up to block ancestor", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
 
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 2, "Both links should get hints");
         const x1 = parseFloat(hints[0].style.left);
         const x2 = parseFloat(hints[1].style.left);
@@ -1927,8 +1927,8 @@ describe("DOM problems — overflow clipping with near-zero visible area", () =>
         const { hintMode } = getState();
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
 
         // Should have 2 hints (input + search button), NOT 3 (skip button excluded)
         assert.equal(hints?.length, 2,
@@ -1952,8 +1952,8 @@ describe("DOM problems — overflow clipping with near-zero visible area", () =>
         const { hintMode } = getState();
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
 
         assert.equal(hints?.length, 1,
             "Button inside normal-height overflow:hidden container should get a hint");
@@ -2257,8 +2257,8 @@ describe("block link hint positioning", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
 
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 1);
         const hintLeft = parseFloat(hints[0].style.left);
         assert.ok(hintLeft >= 190 && hintLeft <= 210,
@@ -2281,12 +2281,12 @@ describe("block link hint positioning", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
 
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        assert.ok(overlay?.querySelector(".tabi-hint-container-glow"),
             "Link inside <li> should get container glow");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 1);
-        assert.ok(!hints[0]?.querySelector(".vimium-hint-tail"),
+        assert.ok(!hints[0]?.querySelector(".tabi-hint-tail"),
             "Link inside <li> should not get pointer tail");
     });
 
@@ -2307,8 +2307,8 @@ describe("block link hint positioning", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
 
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
         assert.equal(hints?.length, 1);
         const hintLeft = parseFloat(hints[0].style.left);
         // Heading is 200px wide starting at left:0 — center is ~100px.
@@ -2342,8 +2342,8 @@ describe("repeating container sizing uses container dimensions", () => {
         (globalThis as any).document.elementsFromPoint = () => [base];
         let { hintMode } = getState();
         hintMode.activate(false);
-        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        assert.ok(!overlay?.querySelector(".vimium-hint-container-glow"),
+        let overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        assert.ok(!overlay?.querySelector(".tabi-hint-container-glow"),
             "Base: narrow link without repeating container should not get container glow");
         hintMode.deactivate();
 
@@ -2359,8 +2359,8 @@ describe("repeating container sizing uses container dimensions", () => {
         (globalThis as any).document.elementsFromPoint = () => [link];
         ({ hintMode } = getState());
         hintMode.activate(false);
-        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        assert.ok(overlay?.querySelector(".vimium-hint-container-glow"),
+        overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        assert.ok(overlay?.querySelector(".tabi-hint-container-glow"),
             "Delta: link in <li> should get container glow using container dimensions");
     });
 });
@@ -2827,8 +2827,8 @@ describe("heading ancestor rect clamping", () => {
         let hm = getState().hintMode;
         hm.activate(false);
 
-        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        let hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
+        let overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        let hint = overlay?.querySelector(".tabi-hint") as HTMLElement;
         assert.ok(hint, "base: hint should exist");
         // Pill at a.bottom(40) + 2 = 42px
         assert.equal(hint.style.top, "42px");
@@ -2846,8 +2846,8 @@ describe("heading ancestor rect clamping", () => {
         hm = getState().hintMode;
         hm.activate(false);
 
-        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
+        overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        hint = overlay?.querySelector(".tabi-hint") as HTMLElement;
         assert.ok(hint, "delta: hint should exist");
         // Pill at h2.bottom(28) + 2 = 30px, not a.bottom(40) + 2 = 42px
         assert.equal(hint.style.top, "30px");

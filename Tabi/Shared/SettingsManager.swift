@@ -3,7 +3,7 @@ import Foundation
 class SettingsManager {
     static let shared = SettingsManager()
 
-    private static let appGroupID = "group.com.brokenalarms.Vimium"
+    private static let appGroupID = "group.com.brokenalarms.tabi"
     private static let keyBindingModeKey = "keyBindingMode"
     private static let themeKey = "theme"
 

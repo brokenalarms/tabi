@@ -1,4 +1,4 @@
-// HintMode — link-hint overlay for Vimium
+// HintMode — link-hint overlay for Tabi
 // Renders labeled hints over discovered elements and dispatches
 // clicks when the user types the matching label characters.
 
@@ -181,7 +181,7 @@ export class HintMode {
     // Remove any orphaned focus rings (e.g. deactivation interrupted the
     // hint collapse animation before afterCollapse could clean up).
     // Skip rings that are already fading out — those will self-remove on animationend.
-    for (const ring of document.documentElement.querySelectorAll(".vimium-hint-ring:not(.vimium-hint-ring-out)")) {
+    for (const ring of document.documentElement.querySelectorAll(".tabi-hint-ring:not(.tabi-hint-ring-out)")) {
       ring.remove();
     }
 
@@ -345,11 +345,11 @@ export class HintMode {
   private createOverlay(): void {
     // Remove any stale overlay left from a previous activation whose
     // transitionend didn't fire (e.g. rapid toggle, animations disabled).
-    const stale = document.documentElement.querySelector(".vimium-hint-overlay");
+    const stale = document.documentElement.querySelector(".tabi-hint-overlay");
     if (stale) stale.remove();
 
     this.overlay = document.createElement("div");
-    this.overlay.className = `vimium-hint-overlay${DEFAULTS.animate ? " vimium-hint-animate" : ""}`;
+    this.overlay.className = `tabi-hint-overlay${DEFAULTS.animate ? " tabi-hint-animate" : ""}`;
     document.documentElement.appendChild(this.overlay);
     void this.overlay.offsetHeight;
     this.overlay.classList.add("visible");
@@ -358,7 +358,7 @@ export class HintMode {
   private createHintDiv(element: HTMLElement, label: string): HTMLDivElement {
     const placement = this.hintPlacementMap.get(element);
     const div = document.createElement("div");
-    div.className = "vimium-hint";
+    div.className = "tabi-hint";
     div.textContent = label;
 
     if (placement) {
@@ -394,7 +394,7 @@ export class HintMode {
   private positionContainerGlow(div: HTMLDivElement, container: HTMLElement): void {
     const glowRect = this.getGlowRect(container);
     const glow = document.createElement("div");
-    glow.className = "vimium-hint-container-glow";
+    glow.className = "tabi-hint-container-glow";
     const glowPos = this.viewportToDocument(glowRect.left, glowRect.top);
     glow.style.left = glowPos.x + "px";
     glow.style.top = glowPos.y + "px";
@@ -420,7 +420,7 @@ export class HintMode {
     div.style.top = Math.max(0, pos.y) + "px";
     div.style.transform = "translateX(-50%)";
     const tail = document.createElement("div");
-    tail.className = "vimium-hint-tail";
+    tail.className = "tabi-hint-tail";
     div.appendChild(tail);
   }
 
@@ -489,7 +489,7 @@ export class HintMode {
         hint.div.innerHTML = "";
         if (matched) {
           const span = document.createElement("span");
-          span.className = "vimium-hint-matched";
+          span.className = "tabi-hint-matched";
           span.textContent = matched;
           hint.div.appendChild(span);
         }
@@ -518,11 +518,11 @@ export class HintMode {
       hint.div.style.setProperty("--poof-y", dy + "px");
     }
 
-    hint.div.classList.add("vimium-hint-active");
+    hint.div.classList.add("tabi-hint-active");
 
     // Focus ring around the full clickable element (not the text target)
     const ring = document.createElement("div");
-    ring.className = "vimium-hint-ring";
+    ring.className = "tabi-hint-ring";
     const ringRect = element.getBoundingClientRect();
     const pos = this.viewportToDocument(ringRect.left, ringRect.top);
     ring.style.left = pos.x - 2 + "px";
@@ -562,7 +562,7 @@ export class HintMode {
       }
 
       // Fade out the ring
-      ring.classList.add("vimium-hint-ring-out");
+      ring.classList.add("tabi-hint-ring-out");
       ring.addEventListener("animationend", () => ring.remove(), { once: true });
     };
 

@@ -154,7 +154,7 @@ describe("TabSearch", () => {
             assert.equal(tabSearch.isActive(), true);
             assert.equal(keyHandler.getMode(), Mode.TAB_SEARCH);
             // Overlay should be appended to body
-            const overlay = env.document.querySelector(".vimium-tab-search-overlay");
+            const overlay = env.document.querySelector(".tabi-tab-search-overlay");
             assert.ok(overlay, "overlay element should exist in DOM");
         });
 
@@ -164,7 +164,7 @@ describe("TabSearch", () => {
             tabSearch.deactivate();
             assert.equal(tabSearch.isActive(), false);
             assert.equal(keyHandler.getMode(), Mode.NORMAL);
-            const overlay = env.document.querySelector(".vimium-tab-search-overlay");
+            const overlay = env.document.querySelector(".tabi-tab-search-overlay");
             assert.equal(overlay, null, "overlay should be removed from DOM");
         });
 
@@ -172,7 +172,7 @@ describe("TabSearch", () => {
         it("ignores double activate", async () => {
             await tabSearch.activate();
             await tabSearch.activate();
-            const overlays = env.document.querySelectorAll(".vimium-tab-search-overlay");
+            const overlays = env.document.querySelectorAll(".tabi-tab-search-overlay");
             assert.equal(overlays.length, 1);
         });
 

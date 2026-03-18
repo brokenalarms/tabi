@@ -125,7 +125,7 @@ export function setupDOM(elements: any[] = []) {
     // Reset body
     doc.body.innerHTML = "";
     // Remove any leftover overlay on documentElement
-    const oldOverlay = doc.documentElement.querySelector(".vimium-hint-overlay");
+    const oldOverlay = doc.documentElement.querySelector(".tabi-hint-overlay");
     if (oldOverlay) oldOverlay.remove();
 
     // Append elements to body, walking up parent chains for unattached roots

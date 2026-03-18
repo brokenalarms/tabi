@@ -41,7 +41,7 @@ async function activateHints(page: import("@playwright/test").Page): Promise<num
       kh.setMode(Mode.NORMAL);
     });
     hm.activate(false);
-    const count = document.querySelectorAll(".vimium-hint").length;
+    const count = document.querySelectorAll(".tabi-hint").length;
     hm.destroy();
     return count;
   });
@@ -114,7 +114,7 @@ test("targets nav text, not aria-hidden badge count", async ({ page }) => {
       kh.setMode(Mode.NORMAL);
     });
     hm.activate(false);
-    const hintDiv = document.querySelector(".vimium-hint") as HTMLElement;
+    const hintDiv = document.querySelector(".tabi-hint") as HTMLElement;
     const top = hintDiv ? parseFloat(hintDiv.style.top) : -1;
     hm.destroy();
     return top;
@@ -166,7 +166,7 @@ test("heading redirect hint sits below h3, not inside it", async ({ page }) => {
 
     const heading = document.getElementById("heading")!;
     const headingRect = heading.getBoundingClientRect();
-    const hints = Array.from(document.querySelectorAll(".vimium-hint")) as HTMLElement[];
+    const hints = Array.from(document.querySelectorAll(".tabi-hint")) as HTMLElement[];
     const hintTops = hints.map(h => parseFloat(h.style.top));
 
     hm.destroy();
@@ -209,7 +209,7 @@ test("multi-line link hint sits below last line", async ({ page }) => {
     const link = document.getElementById("link")!;
     const linkRect = link.getBoundingClientRect();
     const clientRects = link.getClientRects();
-    const hint = document.querySelector(".vimium-hint") as HTMLElement;
+    const hint = document.querySelector(".tabi-hint") as HTMLElement;
     const hintTop = hint ? parseFloat(hint.style.top) : -1;
 
     hm.destroy();
@@ -274,7 +274,7 @@ test("stretched flex link hint centers on content, not full box", async ({ page 
     const contentCenter = contentLeft + (contentRight - contentLeft) / 2;
     const boxCenter = linkRect.left + linkRect.width / 2;
 
-    const hint = document.querySelector(".vimium-hint") as HTMLElement;
+    const hint = document.querySelector(".tabi-hint") as HTMLElement;
     const hintLeft = hint ? parseFloat(hint.style.left) : -1;
 
     hm.destroy();
@@ -316,9 +316,9 @@ test("container element gets glow border and inside-end pill", async ({ page }) 
 
     const item = document.getElementById("item")!;
     const itemRect = item.getBoundingClientRect();
-    const glow = document.querySelector(".vimium-hint-container-glow") as HTMLElement;
-    const hint = document.querySelector(".vimium-hint") as HTMLElement;
-    const tail = document.querySelector(".vimium-hint-tail");
+    const glow = document.querySelector(".tabi-hint-container-glow") as HTMLElement;
+    const hint = document.querySelector(".tabi-hint") as HTMLElement;
+    const tail = document.querySelector(".tabi-hint-tail");
 
     const res = {
       hasGlow: glow !== null,
@@ -374,7 +374,7 @@ test("hint targets button, not visually-hidden 1x1 span inside it", async ({ pag
       kh.setMode(Mode.NORMAL);
     });
     hm.activate(false);
-    const hintDiv = document.querySelector(".vimium-hint") as HTMLElement;
+    const hintDiv = document.querySelector(".tabi-hint") as HTMLElement;
     const top = hintDiv ? parseFloat(hintDiv.style.top) : -1;
     hm.destroy();
     return top;
@@ -570,11 +570,11 @@ test("hint click dispatches after collapse animation completes", async ({ page }
 
   // Inject the hint animation CSS so animationend fires in WebKit
   await page.addStyleTag({ content: `
-    .vimium-hint-active {
+    .tabi-hint-active {
       --poof-x: 0px; --poof-y: 0px;
-      animation: vimium-hint-collapse 150ms ease-in forwards;
+      animation: tabi-hint-collapse 150ms ease-in forwards;
     }
-    @keyframes vimium-hint-collapse {
+    @keyframes tabi-hint-collapse {
       0%   { opacity: 1; transform: scale(1) translate(0,0); }
       100% { opacity: 0; transform: scale(0.3) translate(var(--poof-x), var(--poof-y)); }
     }

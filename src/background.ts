@@ -1,4 +1,4 @@
-// Vimium background service worker
+// Tabi background service worker
 // Handles tab management and messaging with content scripts
 
 // Command names handled by the background service worker
@@ -64,10 +64,10 @@ export async function updateIconState(tabId: number): Promise<void> {
     if (activeTabSet.has(tabId)) {
       await browser.action.enable(tabId);
       await browser.action.setBadgeText({ text: "", tabId });
-      await browser.action.setTitle({ title: "vimium-mac", tabId });
+      await browser.action.setTitle({ title: "tabi", tabId });
     } else {
       await browser.action.disable(tabId);
-      await browser.action.setTitle({ title: "vimium-mac (disabled on this site)", tabId });
+      await browser.action.setTitle({ title: "tabi (disabled on this site)", tabId });
     }
   } catch (_) {
     // browser.action may not be available in all contexts
@@ -242,7 +242,7 @@ export function init(): void {
     handleCommand(msg.command as Command, sender, msg as Record<string, unknown>)
       .then(result => sendResponse(result))
       .catch(err => {
-        console.error("vimium-mac background error:", err);
+        console.error("tabi background error:", err);
         sendResponse({ status: "error", reason: (err as Error).message });
       });
 

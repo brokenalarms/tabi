@@ -149,10 +149,10 @@ export class TabSearch {
 
   private _createOverlay(): void {
     this._overlayEl = document.createElement("div");
-    this._overlayEl.className = "vimium-tab-search-overlay";
+    this._overlayEl.className = "tabi-tab-search-overlay";
 
     const modal = document.createElement("div");
-    modal.className = "vimium-tab-search-modal";
+    modal.className = "tabi-tab-search-modal";
 
     this._inputEl = document.createElement("input");
     this._inputEl.type = "text";
@@ -161,7 +161,7 @@ export class TabSearch {
     this._inputEl.setAttribute("spellcheck", "false");
 
     this._resultsEl = document.createElement("div");
-    this._resultsEl.className = "vimium-tab-search-results";
+    this._resultsEl.className = "tabi-tab-search-results";
 
     modal.appendChild(this._inputEl);
     modal.appendChild(this._resultsEl);
@@ -181,7 +181,7 @@ export class TabSearch {
 
     if (this._filtered.length === 0) {
       const empty = document.createElement("div");
-      empty.className = "vimium-tab-search-empty";
+      empty.className = "tabi-tab-search-empty";
       empty.textContent = this._inputEl && this._inputEl.value
           ? "No matching tabs" : "No other tabs";
       this._resultsEl.appendChild(empty);
@@ -191,17 +191,17 @@ export class TabSearch {
     for (let i = 0; i < this._filtered.length; i++) {
       const tab = this._filtered[i];
       const item = document.createElement("div");
-      item.className = "vimium-tab-search-item";
+      item.className = "tabi-tab-search-item";
       if (i === this._selectedIndex) {
         item.className += " selected";
       }
 
       const title = document.createElement("div");
-      title.className = "vimium-tab-search-item-title";
+      title.className = "tabi-tab-search-item-title";
       title.textContent = tab.title || "(Untitled)";
 
       const url = document.createElement("div");
-      url.className = "vimium-tab-search-item-url";
+      url.className = "tabi-tab-search-item-url";
       url.textContent = tab.url || "";
 
       item.appendChild(title);
