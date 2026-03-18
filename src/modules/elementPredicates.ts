@@ -181,7 +181,7 @@ export function isInNearbySiblingSubtree(el: HTMLElement, cover: HTMLElement): b
   let depth = 0;
   while (anc && depth < SIBLING_DEPTH_LIMIT) {
     if (anc.matches(REPEATING_CONTAINER_SELECTOR)) break;
-    const parent = anc.parentElement;
+    const parent: HTMLElement | null = anc.parentElement;
     if (!parent || parent === document.body || parent === document.documentElement) break;
     if (parent.contains(cover) && !anc.contains(cover)) return true;
     anc = parent;
