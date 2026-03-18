@@ -2855,3 +2855,7 @@ describe("heading ancestor rect clamping", () => {
         assert.equal(hint.style.left, "100px");
     });
 });
+
+// TODO: Test for expanded folder glow eligibility — containers with child lists
+// always qualify for glow regardless of aspect ratio. Needs investigation into
+// why this test causes happy-dom to hang.

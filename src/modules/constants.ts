@@ -8,6 +8,12 @@ export const NATIVE_INTERACTIVE_ELEMENTS = ["a", "button", "input", "textarea", 
 const CLICKABLE_ROLES = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch", "treeitem"];
 const CLICKABLE_ATTRS = ["label[for]", "[onclick]", "[onmousedown]"];
 
+// Site-specific selectors for interactive elements that lack semantic signals.
+// These elements have JS click handlers but no role, onclick attr, or native tag.
+const SITE_CLICKABLE: Array<{ site: string; selectors: string[] }> = [
+  { site: "github.com", selectors: [".PRIVATE_TreeView-item-toggle"] },
+];
+
 /** Tags that act as list boundaries — items on different sides are
  *  at different tree levels for dedup and glow purposes. */
 export const LIST_BOUNDARY_TAGS = new Set(["UL", "OL", "TABLE"]);
@@ -17,6 +23,7 @@ export const CLICKABLE_SELECTOR = [
   ...NATIVE_INTERACTIVE_ELEMENTS,
   ...CLICKABLE_ROLES.map(r => `[role='${r}']`),
   ...CLICKABLE_ATTRS,
+  ...SITE_CLICKABLE.flatMap(s => s.selectors),
 ].join(", ");
 
 export const REPEATING_CONTAINER_SELECTOR = "li, tr";
