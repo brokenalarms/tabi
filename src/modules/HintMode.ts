@@ -105,7 +105,7 @@ export class HintMode {
     // Disqualified immediately if any container has nested discovered
     // links (glow label would clash with their hints). Beyond that,
     // size eligibility is decided by CONTAINER_GLOW_STRATEGY ("any"/"all").
-    type ContainerCandidate = { el: HTMLElement; rect: DOMRect; container: HTMLElement; noNestedLinks: boolean; largeEnough: boolean };
+    type ContainerCandidate = { el: HTMLElement; rect: DOMRect; container: HTMLElement; noNestedLinks: boolean; glowEligible: boolean };
     const containerGroups = new Map<HTMLElement, ContainerCandidate[]>();
 
     for (const el of elements) {
@@ -115,8 +115,9 @@ export class HintMode {
 
       if (container && CONTAINER_GLOW_STRATEGY !== "none") {
         const noNestedLinks = !hasNestedLinks(container, el, elements);
-        const containerRect = container.getBoundingClientRect();
-        const largeEnough = isLargeEnoughForGlow(container, containerRect);
+        const hasChildList = container.querySelector(LIST_BOUNDARY_SELECTOR) !== null;
+        const containerRect = this.getGlowRect(container);
+        const glowEligible = hasChildList || isLargeEnoughForGlow(container, containerRect);
         const parent = container.parentElement || container;
 
         let group = containerGroups.get(parent);
@@ -124,7 +125,7 @@ export class HintMode {
           group = [];
           containerGroups.set(parent, group);
         }
-        group.push({ el, rect, container, noNestedLinks, largeEnough });
+        group.push({ el, rect, container, noNestedLinks, glowEligible });
       } else {
         this.hintPlacementMap.set(el, { style: "pill", rect });
       }
@@ -133,8 +134,8 @@ export class HintMode {
     for (const [, group] of containerGroups) {
       const allFreeOfNestedHints = group.every(g => g.noNestedLinks);
       const groupSized = CONTAINER_GLOW_STRATEGY === "any"
-        ? group.some(g => g.largeEnough)
-        : group.every(g => g.largeEnough);
+        ? group.some(g => g.glowEligible)
+        : group.every(g => g.glowEligible);
       const useGlow = allFreeOfNestedHints && groupSized;
 
       for (const { el, rect, container } of group) {
@@ -375,19 +376,23 @@ export class HintMode {
     return div;
   }
 
-  /** Glow border on repeating container + inside-end pill label. */
-  private positionContainerGlow(div: HTMLDivElement, container: HTMLElement): void {
-    let glowRect = container.getBoundingClientRect();
-
-    // When the container has a nested list, clamp the glow to the header
-    // row above it — don't wrap the entire subtree.
+  /** Container rect clamped to the header row when a nested list exists.
+   *  Without clamping, an expanded folder's rect includes all children. */
+  private getGlowRect(container: HTMLElement): DOMRect {
+    const rect = container.getBoundingClientRect();
     const nestedList = container.querySelector(LIST_BOUNDARY_SELECTOR);
     if (nestedList) {
       const listTop = nestedList.getBoundingClientRect().top;
-      if (listTop > glowRect.top) {
-        glowRect = new DOMRect(glowRect.left, glowRect.top, glowRect.width, listTop - glowRect.top);
+      if (listTop > rect.top) {
+        return new DOMRect(rect.left, rect.top, rect.width, listTop - rect.top);
       }
     }
+    return rect;
+  }
+
+  /** Glow border on repeating container + inside-end pill label. */
+  private positionContainerGlow(div: HTMLDivElement, container: HTMLElement): void {
+    const glowRect = this.getGlowRect(container);
     const glow = document.createElement("div");
     glow.className = "vimium-hint-container-glow";
     const glowPos = this.viewportToDocument(glowRect.left, glowRect.top);
