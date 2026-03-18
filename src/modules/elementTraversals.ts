@@ -52,8 +52,8 @@ export function getChildrenContentRect(el: HTMLElement): DOMRect | null {
 }
 
 /** Content-tight rect for an <a> element. Narrows to children's union rect
- *  when children are present, or subtracts padding-bottom for text-only links.
- *  Returns the original rect unchanged if no narrowing applies. */
+ *  when children are present; for text-only links, subtracts padding-bottom
+ *  and half-leading so the rect bottom aligns with the visual text bottom. */
 export function getLinkContentRect(el: HTMLElement, rect: DOMRect): DOMRect {
   if (el.children.length > 0) {
     return getChildrenContentRect(el) ?? rect;
@@ -63,11 +63,7 @@ export function getLinkContentRect(el: HTMLElement, rect: DOMRect): DOMRect {
   const fontSize = parseFloat(style.fontSize) || 0;
   const lineHeight = parseFloat(style.lineHeight) || 0;
   const halfLeading = lineHeight > fontSize ? (lineHeight - fontSize) / 2 : 0;
-  const shrink = paddingBottom + halfLeading;
-  if (shrink > 0 && rect.height - shrink > 0) {
-    return new DOMRect(rect.left, rect.top, rect.width, rect.height - shrink);
-  }
-  return rect;
+  return new DOMRect(rect.left, rect.top, rect.width, rect.height - paddingBottom - halfLeading);
 }
 
 /** Walk up through single-child ancestors to the nearest repeating container
