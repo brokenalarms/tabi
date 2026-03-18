@@ -5,6 +5,7 @@
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
+import { HINT_HEIGHT } from "./constants";
 import { isContainerSized, isFormControl, getRepeatingContainer, isRedirectableControl, isVisible, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
 import { findAssociatedLabel, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect } from "./elementTraversals";
 
@@ -380,8 +381,7 @@ export class HintMode {
     glow.style.height = glowRect.height + "px";
     if (this.overlay) this.overlay.appendChild(glow);
 
-    const hintHeight = 18; // 12px font × 1.2 line-height + 2px padding + 2px border
-    const verticalInset = (glowRect.height - hintHeight) / 2;
+    const verticalInset = (glowRect.height - HINT_HEIGHT) / 2;
     const insetRight = Math.min(verticalInset, 24);
     const pos = this.viewportToDocument(
       glowRect.right - insetRight,
