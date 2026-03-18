@@ -41,12 +41,30 @@ osascript -e '
     end if
     activate
     delay 1
+    -- Remember the blank window Safari opens on launch
+    set blankWin to missing value
+    try
+      if (count of windows) > 0 then
+        set blankWin to id of front window
+      end if
+    end try
     -- Reopen all tabs from previous session (Cmd+Shift+T)
     tell application "System Events"
       keystroke "t" using {command down, shift down}
     end tell
-    -- Restore window bounds
     delay 0.5
+    -- Close the blank startup window
+    try
+      if blankWin is not missing value then
+        repeat with w in windows
+          if id of w = blankWin then
+            close w
+            exit repeat
+          end if
+        end repeat
+      end if
+    end try
+    -- Restore window bounds
     try
       set winList to windows
       repeat with i from 1 to count of savedBounds
