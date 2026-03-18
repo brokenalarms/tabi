@@ -91,15 +91,6 @@ export function getLinkContentRect(el: HTMLElement, rect: DOMRect): DOMRect {
   return new DOMRect(rect.left, rect.top, rect.width, rect.height - paddingBottom);
 }
 
-/** Half-leading: the space above and below text within a line box.
- *  Line-height distributes (lineHeight - fontSize) / 2 on each side. */
-export function getHalfLeading(el: HTMLElement): number {
-  const style = getComputedStyle(el);
-  const fontSize = parseFloat(style.fontSize) || 0;
-  const lineHeight = parseFloat(style.lineHeight) || 0;
-  return lineHeight > fontSize ? (lineHeight - fontSize) / 2 : 0;
-}
-
 /** Walk up through single-child ancestors to the nearest repeating container
  *  (li, tr) for hint width expansion. Only repeating containers benefit from
  *  expansion — they create vertical lists where aligned hints aid scanning.
