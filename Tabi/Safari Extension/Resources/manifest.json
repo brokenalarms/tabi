@@ -1,6 +1,6 @@
 {
     "manifest_version": 3,
-    "name": "vimium-mac",
+    "name": "tabi",
     "version": "0.1.0",
     "description": "Navigate the web with your keyboard",
     "permissions": [
@@ -39,6 +39,6 @@
             "256": "images/icon-256.png",
             "512": "images/icon-512.png"
         },
-        "default_title": "vimium-mac"
+        "default_title": "tabi"
     }
 }

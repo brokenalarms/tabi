@@ -18,7 +18,7 @@ struct SetupTab: View {
                 .font(.system(size: 64))
                 .foregroundStyle(.secondary)
 
-            Text("vimium-mac")
+            Text("tabi")
                 .font(.largeTitle)
                 .fontWeight(.bold)
 
@@ -35,7 +35,7 @@ struct SetupTab: View {
                         .foregroundStyle(.green)
                         .font(.headline)
 
-                    Text("Click the vimium-mac icon in Safari's toolbar to access settings.")
+                    Text("Click the tabi icon in Safari's toolbar to access settings.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 } else {
@@ -53,16 +53,16 @@ struct SetupTab: View {
         .alert("Could not open Safari Extensions", isPresented: $showPrefsFailedAlert) {
             Button("OK") {}
         } message: {
-            Text("Open Safari, then go to Safari → Settings → Extensions to enable vimium-mac.")
+            Text("Open Safari, then go to Safari → Settings → Extensions to enable tabi.")
         }
     }
 
     private var enableInstructions: some View {
         VStack(spacing: 16) {
-            Text("Enable vimium-mac in Safari to get started:")
+            Text("Enable tabi in Safari to get started:")
                 .font(.headline)
 
-            Text("1. Open Safari → Settings → Extensions\n2. Check the box next to vimium-mac\n3. Grant permission for all websites")
+            Text("1. Open Safari → Settings → Extensions\n2. Check the box next to tabi\n3. Grant permission for all websites")
                 .multilineTextAlignment(.leading)
                 .foregroundStyle(.secondary)
 
@@ -75,7 +75,7 @@ struct SetupTab: View {
 
     private func openExtensionPreferences() {
         SFSafariApplication.showPreferencesForExtension(
-            withIdentifier: "com.brokenalarms.Vimium.Extension"
+            withIdentifier: "com.brokenalarms.Tabi.Extension"
         ) { error in
             if error != nil {
                 DispatchQueue.main.async {
@@ -87,7 +87,7 @@ struct SetupTab: View {
 
     private func checkExtensionState() {
         SFSafariExtensionManager.getStateOfSafariExtension(
-            withIdentifier: "com.brokenalarms.Vimium.Extension"
+            withIdentifier: "com.brokenalarms.Tabi.Extension"
         ) { state, error in
             DispatchQueue.main.async {
                 extensionEnabled = state?.isEnabled ?? false

@@ -6,7 +6,7 @@
  *   VERIFY_URL=https://example.com npm run test:verify
  *   VERIFY_URL=https://example.com VERIFY_SELECTOR="nav" npm run test:verify
  *
- * Debug logging is controlled by VIMIUM_DEBUG=1 in .env (build-time flag).
+ * Debug logging is controlled by TABI_DEBUG=1 in .env (build-time flag).
  *
  * Environment variables:
  *   VERIFY_URL       — URL to navigate to (required)
@@ -91,13 +91,13 @@ test("verify hints on live URL", async ({ page }) => {
     });
     hm.activate(false);
 
-    const hints = Array.from(document.querySelectorAll(".vimium-hint")) as HTMLElement[];
+    const hints = Array.from(document.querySelectorAll(".tabi-hint")) as HTMLElement[];
     const hintData = hints.map((h) => {
       const label = h.textContent ?? "";
       const top = parseFloat(h.style.top);
       const left = parseFloat(h.style.left);
       // Walk up to find the target element
-      const target = h.parentElement?.querySelector("[data-vimium-target]") as HTMLElement | null;
+      const target = h.parentElement?.querySelector("[data-tabi-target]") as HTMLElement | null;
       const targetTag = target?.tagName ?? "unknown";
       const targetText = (target?.textContent ?? "").slice(0, 50).trim();
       return { label, top: Math.round(top), left: Math.round(left), targetTag, targetText };

@@ -12,11 +12,11 @@ npm run build
 xcodegen generate --spec project.yml
 
 echo "→ Cleaning Xcode derived data…"
-xcodebuild -project Vimium.xcodeproj -scheme Vimium -configuration Debug clean 2>&1 | \
+xcodebuild -project Tabi.xcodeproj -scheme Tabi -configuration Debug clean 2>&1 | \
   grep -E '(error:|warning:|CLEAN SUCCEEDED|CLEAN FAILED)' || true
 
 echo "→ Building Xcode project…"
-xcodebuild -project Vimium.xcodeproj -scheme Vimium -configuration Debug build 2>&1 | \
+xcodebuild -project Tabi.xcodeproj -scheme Tabi -configuration Debug build 2>&1 | \
   grep -E '(error:|warning:|BUILD SUCCEEDED|BUILD FAILED)' || true
 
 # Check if build succeeded

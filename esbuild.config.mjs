@@ -1,7 +1,7 @@
 import { build } from "esbuild";
 import "./loadEnv.mjs";
 
-const outDir = "Vimium/Safari Extension/Resources";
+const outDir = "Tabi/Safari Extension/Resources";
 
 await build({
   entryPoints: ["src/content.ts", "src/background.ts"],
@@ -12,6 +12,6 @@ await build({
   sourcemap: false,
   logLevel: "info",
   define: {
-    __VIMIUM_DEBUG__: process.env.VIMIUM_DEBUG === "1" ? "true" : "false",
+    __TABI_DEBUG__: process.env.TABI_DEBUG === "1" ? "true" : "false",
   },
 });

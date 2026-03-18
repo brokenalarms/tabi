@@ -10,7 +10,7 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "outDir": "Vimium/Safari Extension/Resources",
+    "outDir": "Tabi/Safari Extension/Resources",
     "rootDir": "src"
   },
   "include": ["src/**/*.ts"],

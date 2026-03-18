@@ -1,4 +1,4 @@
-// Vimium content script
+// Tabi content script
 // Runs on every page to handle keyboard navigation
 
 import type { KeyBindingMode, ModeValue, Theme } from "./types";
@@ -32,7 +32,7 @@ declare const browser: {
 
 declare global {
   interface Window {
-    __vimiumKeyHandler?: KeyHandler;
+    __tabiKeyHandler?: KeyHandler;
   }
 }
 
@@ -74,9 +74,9 @@ function detectPageBackground(): "dark" | "light" {
 
 function applyTheme(theme: Theme): void {
   if (theme === "auto") {
-    document.documentElement.setAttribute("data-vimium-theme", detectPageBackground());
+    document.documentElement.setAttribute("data-tabi-theme", detectPageBackground());
   } else {
-    document.documentElement.setAttribute("data-vimium-theme", theme);
+    document.documentElement.setAttribute("data-tabi-theme", theme);
   }
 }
 
@@ -226,7 +226,7 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   browser.runtime.sendMessage({ command: "extensionActive" });
 
   // Expose for other modules (TabSearch)
-  window.__vimiumKeyHandler = keyHandler;
+  window.__tabiKeyHandler = keyHandler;
 
   // Suppress unused-variable warnings — these are used via their constructors
   void scrollController;

@@ -1,4 +1,4 @@
-.vimium-tab-search-overlay {
+.tabi-tab-search-overlay {
     position: fixed;
     top: 0;
     left: 0;
@@ -9,16 +9,16 @@
     font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
 }
 
-.vimium-tab-search-modal {
+.tabi-tab-search-modal {
     position: fixed;
     top: 20%;
     left: 50%;
     transform: translateX(-50%);
     width: 420px;
     max-width: 90vw;
-    background: var(--vimium-tab-modal-bg);
+    background: var(--tabi-tab-modal-bg);
     border-radius: 10px;
-    box-shadow: var(--vimium-tab-modal-shadow);
+    box-shadow: var(--tabi-tab-modal-shadow);
     max-height: 60vh;
     overflow: hidden;
     display: flex;
@@ -27,13 +27,13 @@
     -webkit-backdrop-filter: blur(20px);
 }
 
-.vimium-tab-search-modal input {
+.tabi-tab-search-modal input {
     width: 100%;
     padding: 10px 14px;
     border: none;
-    border-bottom: 1px solid var(--vimium-tab-input-border);
-    background: var(--vimium-tab-input-bg);
-    color: var(--vimium-tab-input-color);
+    border-bottom: 1px solid var(--tabi-tab-input-border);
+    background: var(--tabi-tab-input-bg);
+    color: var(--tabi-tab-input-color);
     font-size: 14px;
     font-family: inherit;
     outline: none;
@@ -41,40 +41,40 @@
     flex-shrink: 0;
 }
 
-.vimium-tab-search-modal input::placeholder {
-    color: var(--vimium-tab-placeholder-color);
+.tabi-tab-search-modal input::placeholder {
+    color: var(--tabi-tab-placeholder-color);
 }
 
-.vimium-tab-search-results {
+.tabi-tab-search-results {
     overflow-y: auto;
     flex: 1 1 auto;
 }
 
-.vimium-tab-search-item {
+.tabi-tab-search-item {
     padding: 8px 14px;
     cursor: pointer;
-    border-bottom: 1px solid var(--vimium-tab-item-border);
+    border-bottom: 1px solid var(--tabi-tab-item-border);
     transition: background 0.1s;
 }
 
-.vimium-tab-search-item:last-child {
+.tabi-tab-search-item:last-child {
     border-bottom: none;
 }
 
-.vimium-tab-search-item.selected {
-    background: var(--vimium-tab-item-selected-bg);
+.tabi-tab-search-item.selected {
+    background: var(--tabi-tab-item-selected-bg);
 }
 
-.vimium-tab-search-item-title {
-    color: var(--vimium-tab-title-color);
+.tabi-tab-search-item-title {
+    color: var(--tabi-tab-title-color);
     font-size: 13px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-.vimium-tab-search-item-url {
-    color: var(--vimium-tab-url-color);
+.tabi-tab-search-item-url {
+    color: var(--tabi-tab-url-color);
     font-size: 11px;
     white-space: nowrap;
     overflow: hidden;
@@ -82,9 +82,9 @@
     margin-top: 2px;
 }
 
-.vimium-tab-search-empty {
+.tabi-tab-search-empty {
     padding: 14px;
-    color: var(--vimium-tab-empty-color);
+    color: var(--tabi-tab-empty-color);
     text-align: center;
     font-size: 13px;
 }

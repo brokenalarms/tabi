@@ -1,4 +1,4 @@
-# Vimium Mac
+# Tabi
 
 ## Build & Test
 

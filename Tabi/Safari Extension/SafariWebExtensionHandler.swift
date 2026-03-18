@@ -17,7 +17,7 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
 
         os_log(
             .default,
-            "Vimium extension received message from browser (profile: %@)",
+            "Tabi extension received message from browser (profile: %@)",
             profile?.uuidString ?? "none"
         )
 

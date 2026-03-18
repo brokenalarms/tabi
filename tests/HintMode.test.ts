@@ -452,8 +452,8 @@ describe("HintMode", () => {
             hintMode.activate(false);
             assert.ok(hintMode.isActive());
 
-            const overlay = document.documentElement.querySelector(".vimium-hint-overlay");
-            const hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
+            const overlay = document.documentElement.querySelector(".tabi-hint-overlay");
+            const hint = overlay?.querySelector(".tabi-hint") as HTMLElement;
             assert.ok(hint, "hint div should exist");
             // Pill at children bottom: span.bottom(30) + 2 = 32px, not 82px
             assert.equal(hint.style.top, "32px");
@@ -474,8 +474,8 @@ describe("HintMode", () => {
             hintMode.activate(false);
             assert.ok(hintMode.isActive());
 
-            const overlay = document.documentElement.querySelector(".vimium-hint-overlay");
-            const hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
+            const overlay = document.documentElement.querySelector(".tabi-hint-overlay");
+            const hint = overlay?.querySelector(".tabi-hint") as HTMLElement;
             assert.ok(hint, "hint div should exist");
             // Pill at content edge: (60 - 20) + 2 = 42px, not 62px
             assert.equal(hint.style.top, "42px");
@@ -494,8 +494,8 @@ describe("HintMode", () => {
             const { hintMode } = getState();
             hintMode.activate(false);
 
-            const overlay = document.documentElement.querySelector(".vimium-hint-overlay");
-            const hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
+            const overlay = document.documentElement.querySelector(".tabi-hint-overlay");
+            const hint = overlay?.querySelector(".tabi-hint") as HTMLElement;
             assert.ok(hint);
             assert.equal(hint.style.top, "42px");
         });

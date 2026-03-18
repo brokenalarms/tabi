@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct VimiumApp: App {
+struct TabiApp: App {
     @NSApplicationDelegateAdaptor private var appDelegate: AppDelegate
 
     var body: some Scene {

@@ -1,4 +1,4 @@
-// HelpOverlay — keybinding reference modal for Vimium
+// HelpOverlay — keybinding reference modal for Tabi
 // Shows all NORMAL-mode bindings in a centered overlay.
 // Dismissed on any keypress or mouse click.
 
@@ -43,18 +43,18 @@ export class HelpOverlay {
 
   private _createOverlay(): void {
     this._overlay = document.createElement("div") as HTMLDivElement;
-    this._overlay.className = "vimium-help-overlay";
+    this._overlay.className = "tabi-help-overlay";
 
     const modal = document.createElement("div");
-    modal.className = "vimium-help-modal";
+    modal.className = "tabi-help-modal";
 
     const title = document.createElement("h2");
-    title.className = "vimium-help-title";
-    title.textContent = "vimium-mac keyboard shortcuts";
+    title.className = "tabi-help-title";
+    title.textContent = "tabi keyboard shortcuts";
     modal.appendChild(title);
 
     const grid = document.createElement("div");
-    grid.className = "vimium-help-grid";
+    grid.className = "tabi-help-grid";
 
     const bindings = this._keyHandler.getBindings();
     const normalBindings = bindings.get("NORMAL");
@@ -85,7 +85,7 @@ export class HelpOverlay {
     modal.appendChild(grid);
 
     const hint = document.createElement("p");
-    hint.className = "vimium-help-hint";
+    hint.className = "tabi-help-hint";
     hint.textContent = "Press any key to dismiss";
     modal.appendChild(hint);
 
@@ -95,12 +95,12 @@ export class HelpOverlay {
 
   private static _addRow(grid: HTMLElement, keyText: string, descText: string): void {
     const row = document.createElement("div");
-    row.className = "vimium-help-row";
+    row.className = "tabi-help-row";
     const keyEl = document.createElement("kbd");
-    keyEl.className = "vimium-help-key";
+    keyEl.className = "tabi-help-key";
     keyEl.textContent = keyText;
     const descEl = document.createElement("span");
-    descEl.className = "vimium-help-desc";
+    descEl.className = "tabi-help-desc";
     descEl.textContent = descText;
     row.appendChild(keyEl);
     row.appendChild(descEl);

@@ -1,4 +1,4 @@
-// ScrollController — scroll target detection and scroll commands for Vimium
+// ScrollController — scroll target detection and scroll commands for Tabi
 // Finds the correct scrollable element and performs directional/absolute scrolling.
 // Uses requestAnimationFrame for smooth scrolling, since Safari does not reliably
 // support CSS `behavior: "smooth"` on all elements.

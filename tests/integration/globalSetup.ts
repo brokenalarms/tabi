@@ -10,7 +10,7 @@ export default async function globalSetup() {
     target: "es2020",
     logLevel: "warning",
     define: {
-      __VIMIUM_DEBUG__: process.env.VIMIUM_DEBUG === "1" ? "true" : "false",
+      __TABI_DEBUG__: process.env.TABI_DEBUG === "1" ? "true" : "false",
     },
   });
 }
