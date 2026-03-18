@@ -513,6 +513,54 @@ test("clip on non-positioned ancestor does not prune visible links", async ({ pa
   expect(hintCount).toBe(1);
 });
 
+// Multi-line heading link: inline <a> inside block <h2> has a bounding rect
+// whose bottom corners extend into the adjacent metadata below. The metadata
+// elements (<i>, <a>) are falsely detected as occluders because they appear
+// at the heading link's bottom corners via elementsFromPoint.
+// SITE: angrymetalguy.com — article heading links
+// FIX: Adjacent content in a nearby sibling subtree is not a real occluder.
+test("multi-line link inside heading is not falsely occluded by adjacent content", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await setupPage(page, `
+    <div style="display:flex; gap:20px; padding:20px;">
+      <div style="width:300px; height:300px; background:#ccc;">
+        <a href="/review/">
+          <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"
+               style="width:300px; height:300px;">
+        </a>
+      </div>
+      <div style="width:400px;">
+        <h2 style="font-size:24px; line-height:1.3; margin:0; padding:0;">
+          <a href="/review/" id="heading-link">Decipher – A Very Long Album Title That Wraps to Two Lines</a>
+        </h2>
+        <div id="meta" style="margin-top:-8px; padding:0; font-size:14px; line-height:1.3;">
+          <i>By</i> <a href="/author/">Author Name</a> <i>in</i>
+          <a href="/cat1/">Category One</a>, <a href="/cat2/">Category Two</a>
+        </div>
+      </div>
+    </div>
+  `);
+
+  // Verify precondition: heading link bottom corners overlap with metadata
+  const overlaps = await page.evaluate(() => {
+    const link = document.getElementById("heading-link")!;
+    const rect = link.getBoundingClientRect();
+    const hit = document.elementsFromPoint(rect.left + 2, rect.bottom - 2)[0] as HTMLElement;
+    return !link.contains(hit) && !hit.contains(link);
+  });
+  expect(overlaps).toBe(true);
+
+  const result = await page.evaluate(() => {
+    const { walkerFilter } = window.TestHarness;
+    const headingLink = document.getElementById("heading-link")!;
+    const verdict = walkerFilter(headingLink);
+    return verdict === NodeFilter.FILTER_ACCEPT ? "ACCEPT"
+         : verdict === NodeFilter.FILTER_REJECT ? "REJECT" : "SKIP";
+  });
+
+  expect(result).toBe("ACCEPT");
+});
+
 // Clicking a hint dispatches a click to the target element only after the
 // collapse animation finishes. If deactivation interrupts the animation
 // (e.g. from a layout shift), the click must NOT be dispatched.
