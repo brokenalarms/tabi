@@ -16,12 +16,12 @@ interface TabInfo {
 
 declare const browser: {
   tabs: {
-    create(opts: { url?: string }): Promise<{ id: number }>;
+    create(opts: { url?: string; index?: number }): Promise<{ id: number }>;
     remove(tabId: number): Promise<void>;
     update(tabId: number, props: { active: boolean }): Promise<unknown>;
-    query(opts: { currentWindow: boolean }): Promise<Array<{ id: number; title: string; url: string; active: boolean }>>;
+    query(opts: { currentWindow: boolean }): Promise<Array<{ id: number; title: string; url: string; active: boolean; index?: number }>>;
     onRemoved: { addListener(fn: (tabId: number) => void): void };
-    onUpdated: { addListener(fn: (tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string }) => void): void };
+    onUpdated: { addListener(fn: (tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string; index?: number }) => void): void };
   };
   action: {
     enable(tabId: number): Promise<void>;
@@ -42,14 +42,20 @@ interface MessageSender {
 
 type CommandResponse = { status: string; reason?: string } | TabInfo[];
 
+export interface ClosedTab {
+  url: string;
+  index: number;
+}
+
 export const MAX_CLOSED_TABS = 50;
-export const closedTabStack: string[] = [];
+export const closedTabStack: ClosedTab[] = [];
 
 // Track which tabs have the extension active (not excluded by domain)
 export const activeTabSet = new Set<number>();
 
-// Cache tab URLs so onRemoved can record closed tabs (the tab is already gone by then)
+// Cache tab URLs and indices so onRemoved can record closed tabs (the tab is already gone by then)
 export const tabUrlCache = new Map<number, string>();
+export const tabIndexCache = new Map<number, number>();
 
 export async function updateIconState(tabId: number): Promise<void> {
   try {
@@ -66,15 +72,15 @@ export async function updateIconState(tabId: number): Promise<void> {
   }
 }
 
-export function pushClosedTab(url: string | null | undefined): void {
+export function pushClosedTab(url: string | null | undefined, index: number): void {
   if (!url || url === "about:blank" || url === "about:newtab") return;
-  closedTabStack.push(url);
+  closedTabStack.push({ url, index });
   if (closedTabStack.length > MAX_CLOSED_TABS) {
     closedTabStack.shift();
   }
 }
 
-export function popClosedTab(): string | null {
+export function popClosedTab(): ClosedTab | null {
   return closedTabStack.pop() || null;
 }
 
@@ -93,9 +99,9 @@ export async function handleCommand(command: Command, sender: MessageSender, mes
     }
 
     case "restoreTab": {
-      const url = popClosedTab();
-      if (url) {
-        await browser.tabs.create({ url });
+      const closed = popClosedTab();
+      if (closed) {
+        await browser.tabs.create({ url: closed.url, index: closed.index });
       }
       break;
     }
@@ -187,25 +193,32 @@ export async function handleCommand(command: Command, sender: MessageSender, mes
 // Register listeners and populate caches — called at load time in production,
 // and explicitly from tests after the browser shim is installed.
 export function init(): void {
-  // Track tab URLs for closed-tab restore
-  browser.tabs.onUpdated.addListener((tabId: number, changeInfo: { url?: string }) => {
+  // Track tab URLs and indices for closed-tab restore
+  browser.tabs.onUpdated.addListener((tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string; index?: number }) => {
     if (changeInfo.url) {
       tabUrlCache.set(tabId, changeInfo.url);
+    }
+    if (tab.index !== undefined) {
+      tabIndexCache.set(tabId, tab.index);
     }
   });
 
   // Clean up activeTabSet and record closed tabs for restore
   browser.tabs.onRemoved.addListener((tabId: number) => {
     const url = tabUrlCache.get(tabId);
-    if (url) pushClosedTab(url);
+    const index = tabIndexCache.get(tabId) ?? 0;
+    if (url) pushClosedTab(url, index);
     tabUrlCache.delete(tabId);
+    tabIndexCache.delete(tabId);
     activeTabSet.delete(tabId);
   });
 
-  // Populate URL cache on startup
+  // Populate URL and index caches on startup
   browser.tabs.query({ currentWindow: true }).then(tabs => {
-    for (const tab of tabs) {
+    for (let i = 0; i < tabs.length; i++) {
+      const tab = tabs[i];
       if (tab.url) tabUrlCache.set(tab.id, tab.url);
+      tabIndexCache.set(tab.id, tab.index ?? i);
     }
   }).catch(() => {});
 

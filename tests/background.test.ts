@@ -14,7 +14,7 @@ let removedTabIds: number[];
 let activatedTabId: number | null;
 let actionState: Record<number, Record<string, unknown>>;
 let tabRemovedListeners: Array<(tabId: number) => void>;
-let tabUpdatedListeners: Array<(tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string }) => void>;
+let tabUpdatedListeners: Array<(tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string; index?: number }) => void>;
 
 function resetBrowserShim() {
     mockTabs = [
@@ -98,6 +98,7 @@ import {
     MAX_CLOSED_TABS,
     activeTabSet,
     tabUrlCache,
+    tabIndexCache,
     init,
 } from "../src/background";
 
@@ -107,6 +108,7 @@ describe("background.ts tab management", () => {
         closedTabStack.length = 0;
         activeTabSet.clear();
         tabUrlCache.clear();
+        tabIndexCache.clear();
         init();
     });
 
@@ -114,30 +116,31 @@ describe("background.ts tab management", () => {
         // Verifies that closing tabs pushes URLs onto the stack and
         // restoring pops them in LIFO order.
         it("pushes URLs and pops in LIFO order", () => {
-            pushClosedTab("https://a.com");
-            pushClosedTab("https://b.com");
-            assert.equal(popClosedTab(), "https://b.com");
-            assert.equal(popClosedTab(), "https://a.com");
+            pushClosedTab("https://a.com", 0);
+            pushClosedTab("https://b.com", 1);
+            assert.deepEqual(popClosedTab(), { url: "https://b.com", index: 1 });
+            assert.deepEqual(popClosedTab(), { url: "https://a.com", index: 0 });
             assert.equal(popClosedTab(), null);
         });
 
         // Verifies that blank/empty URLs are not pushed onto the stack.
         it("ignores blank and empty URLs", () => {
-            pushClosedTab("");
-            pushClosedTab("about:blank");
-            pushClosedTab("about:newtab");
-            pushClosedTab(null);
+            pushClosedTab("", 0);
+            pushClosedTab("about:blank", 0);
+            pushClosedTab("about:newtab", 0);
+            pushClosedTab(null, 0);
             assert.equal(closedTabStack.length, 0);
         });
 
         // Verifies that the stack enforces a maximum size of 50 entries.
         it("enforces max size of 50", () => {
             for (let i = 0; i < 60; i++) {
-                pushClosedTab(`https://example.com/${i}`);
+                pushClosedTab(`https://example.com/${i}`, i);
             }
             assert.equal(closedTabStack.length, MAX_CLOSED_TABS);
             // Oldest entries should have been evicted
-            assert.equal(popClosedTab(), "https://example.com/59");
+            const popped = popClosedTab();
+            assert.equal(popped?.url, "https://example.com/59");
         });
     });
 
@@ -154,15 +157,16 @@ describe("background.ts tab management", () => {
         // Verifies that closing a tab removes it. URL tracking is handled by onRemoved listener.
         it("removes the sender tab", async () => {
             const sender = makeSender(2);
-            // Simulate onUpdated having cached the URL
+            // Simulate onUpdated having cached the URL and index
             tabUrlCache.set(2, "https://example.com/2");
+            tabIndexCache.set(2, 1);
             const result = await handleCommand("closeTab", sender);
             assert.equal(result.status, "ok");
             assert.deepEqual(removedTabIds, [2]);
-            // onRemoved listener records the URL
+            // onRemoved listener records the URL and index
             for (const fn of tabRemovedListeners) fn(2);
             assert.equal(closedTabStack.length, 1);
-            assert.equal(closedTabStack[0], "https://example.com/2");
+            assert.deepEqual(closedTabStack[0], { url: "https://example.com/2", index: 1 });
         });
 
         // Verifies that closeTab is a no-op when there is no sender tab.
@@ -174,13 +178,14 @@ describe("background.ts tab management", () => {
     });
 
     describe("restoreTab command", () => {
-        // Verifies that restoring a tab creates one with the last closed URL.
-        it("creates a tab with the last closed URL", async () => {
-            pushClosedTab("https://restored.com");
+        // Verifies that restoring a tab creates one with the last closed URL at the original index.
+        it("creates a tab with the last closed URL at original index", async () => {
+            pushClosedTab("https://restored.com", 2);
             const result = await handleCommand("restoreTab", {});
             assert.equal(result.status, "ok");
             assert.equal(createdTabs.length, 1);
             assert.equal(createdTabs[0].url, "https://restored.com");
+            assert.equal(createdTabs[0].index, 2);
             assert.equal(closedTabStack.length, 0);
         });
 
