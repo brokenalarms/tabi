@@ -3,7 +3,7 @@
 // Used by both ElementGatherer and HintMode.
 
 import { HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR } from "./constants";
-import { hasBox } from "./elementPredicates";
+import { hasBox, isVisible, isSubtreeRemoved } from "./elementPredicates";
 
 /** Find the label associated with a form control (via for= or ancestor <label>). */
 export function findAssociatedLabel(el: HTMLElement): HTMLElement | null {
@@ -14,6 +14,18 @@ export function findAssociatedLabel(el: HTMLElement): HTMLElement | null {
   const parent = el.closest("label");
   if (parent) return parent as HTMLElement;
   return null;
+}
+
+/** Find a label-wrapped checkbox/radio inside an element.
+ *  Returns the input if visible; otherwise returns the label (which wraps
+ *  the visual control icon). Used to redirect <a> hints to the checkbox area. */
+export function findEmbeddedControl(el: HTMLElement): HTMLElement | null {
+  const label = el.querySelector("label") as HTMLElement | null;
+  if (!label) return null;
+  const input = label.querySelector("input[type='checkbox'], input[type='radio']") as HTMLInputElement | null;
+  if (!input) return null;
+  if (isVisible(input) && !isSubtreeRemoved(input)) return input;
+  return label;
 }
 
 /** Return the first child with non-zero dimensions, or null. */

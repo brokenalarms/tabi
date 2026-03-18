@@ -7,7 +7,7 @@ import { DEFAULTS } from "../types";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
 import { HINT_HEIGHT } from "./constants";
 import { isContainerSized, isFormControl, getRepeatingContainer, isNestedRepeatingContainer, isRedirectableControl, isVisible, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
-import { findAssociatedLabel, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHalfLeading } from "./elementTraversals";
+import { findAssociatedLabel, findEmbeddedControl, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHalfLeading } from "./elementTraversals";
 
 import { Mode } from "../commands";
 
@@ -265,6 +265,11 @@ export class HintMode {
     if (isZeroSizeAnchor(el, rect)) {
       const child = findVisibleChild(el);
       if (child) return child;
+    }
+    // Link containing a label-wrapped checkbox/radio — redirect to the control area
+    if (el.tagName.toLowerCase() === "a") {
+      const control = findEmbeddedControl(el);
+      if (control) return control;
     }
     if (shouldRedirectToHeading(el)) {
       return getHeading(el)!;
