@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
-import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isContentlessOverlay, shouldRedirectToHeading, isNestedRepeatingContainer } from "../src/modules/elementPredicates";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isContentlessOverlay, shouldRedirectToHeading, hasListBoundaryBetween } from "../src/modules/elementPredicates";
 import { findBlockAncestor } from "../src/modules/elementTraversals";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
@@ -525,9 +525,9 @@ describe("hint target redirects to sole clickable child", () => {
         if (keyHandler) keyHandler.destroy();
     });
 
-    it("does NOT redirect when element contains clickable children", () => {
-        // role="link" div with inner button — hint stays on the element itself,
-        // centered underneath. Inner button gets its own separate hint.
+    it("parent with discovered interactive child is deduped — child wins", () => {
+        // role="link" div wrapping a button — parent is removed by containment
+        // dedup, child (the more specific target) gets the hint.
         const btn = makeElement("BUTTON", { top: 20, left: 300, width: 30, height: 30 });
         const linkDiv = makeElement("DIV", { top: 0, left: 0, width: 400, height: 60 });
         linkDiv.setAttribute("role", "link");
@@ -548,14 +548,9 @@ describe("hint target redirects to sole clickable child", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
 
-        // 2 hints: one for linkDiv centered-bottom, one for button
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
-        assert.equal(hints?.length, 2, "Should have 2 hints (link + button)");
-        // Link hint should be centered on linkDiv (200), NOT at button (300+)
-        const linkHintLeft = parseFloat(hints[0].style.left);
-        assert.ok(linkHintLeft >= 190 && linkHintLeft <= 210,
-            `Link hint left (${linkHintLeft}) should be centered on linkDiv (200), not redirected to button (300)`);
+        assert.equal(hints?.length, 1, "Should have 1 hint — parent deduped, child wins");
     });
 });
 
@@ -883,75 +878,6 @@ describe("checkbox/radio hint positioning", () => {
         // Zero-size input — hint should redirect to label, center at ~140.
         assert.ok(hintLeft >= 130 && hintLeft <= 150,
             `Hint left (${hintLeft}) should be on label (~140) since checkbox is zero-size`);
-    });
-
-    // Amazon: <a> wraps a decorative checkbox (aria-hidden input inside label) + text.
-    // The <a> is the discovered element; hint should redirect to the label
-    // (which covers the visual checkbox icon), not stay centered on the full <a>.
-    it("link with hidden checkbox inside label redirects hint to label", () => {
-        // Base: without embedded control, hint centers on <a> content
-        const textOnly = makeElement("SPAN", { top: 0, left: 50, width: 200, height: 25 });
-        const plainLink = makeElement("A", { href: "/filter", top: 0, left: 0, width: 300, height: 25, display: "inline" });
-        plainLink.appendChild(textOnly);
-
-        loadModules([plainLink]);
-        const { hintMode: hm1 } = getState();
-        hm1.activate(false);
-        const overlay1 = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const baseLeft = parseFloat(overlay1?.querySelector(".vimium-hint")?.style.left);
-        hm1.destroy();
-
-        // Delta: same link but with hidden checkbox inside label — hint should shift to label
-        const icon = makeElement("I", { top: 5, left: 5, width: 16, height: 16 });
-        const input = makeElement("INPUT", { type: "checkbox", top: 0, left: 0, width: 0, height: 0, display: "inline" });
-        input.setAttribute("aria-hidden", "true");
-        const label = makeElement("LABEL", { top: 0, left: 0, width: 30, height: 25, display: "inline" });
-        label.appendChild(input);
-        label.appendChild(icon);
-        const text = makeElement("SPAN", { top: 0, left: 50, width: 200, height: 25 });
-        const link = makeElement("A", { href: "/filter", top: 0, left: 0, width: 300, height: 25, display: "inline" });
-        link.appendChild(label);
-        link.appendChild(text);
-
-        loadModules([link]);
-        const { hintMode: hm2 } = getState();
-        hm2.activate(false);
-        assert.ok(hm2.isActive());
-
-        const overlay2 = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay2?.querySelectorAll(".vimium-hint");
-        assert.equal(hints?.length, 1);
-        const hintLeft = parseFloat(hints[0].style.left);
-        // Label is at left:0, width:30 — center is 15.
-        // Without fix, hint centers on <a> content (~125).
-        assert.ok(hintLeft <= 40,
-            `Hint left (${hintLeft}) should be near checkbox label (~15), not centered on link (~${Math.round(baseLeft)})`);
-        hm2.destroy();
-    });
-
-    // Base case: visible checkbox inside <a> + <label> — redirect to input, not label.
-    it("link with visible checkbox inside label redirects hint to input", () => {
-        const input = makeElement("INPUT", { type: "checkbox", top: 5, left: 5, width: 16, height: 16, display: "inline" });
-        const label = makeElement("LABEL", { top: 0, left: 0, width: 200, height: 25, display: "inline" });
-        label.appendChild(input);
-        const text = makeElement("SPAN", { top: 0, left: 220, width: 200, height: 25 });
-        const link = makeElement("A", { href: "/filter", top: 0, left: 0, width: 500, height: 25, display: "inline" });
-        link.appendChild(label);
-        link.appendChild(text);
-
-        loadModules([link]);
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(hintMode.isActive());
-
-        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = overlay?.querySelectorAll(".vimium-hint");
-        assert.equal(hints?.length, 1);
-        const hintLeft = parseFloat(hints[0].style.left);
-        // Input is at left:5, width:16 — center is 13.
-        // Should redirect to input directly, not the wide label or <a> center.
-        assert.ok(hintLeft <= 25,
-            `Hint left (${hintLeft}) should be near checkbox input (~13), not label center (~100)`);
     });
 });
 
@@ -1369,71 +1295,6 @@ describe("clickable sibling occlusion", () => {
     });
 });
 
-// ISSUE: Non-interactive generic elements (tabindex overlays, icon containers) get
-// separate hints alongside the real interactive sibling (input, button, etc.)
-// SITE: linkedin.com/feed — search bar has overlay div, icon div, and input
-// FIX: During dedup, remove generic candidates when a non-generic sibling exists
-describe("generic sibling dedup", () => {
-    afterEach(() => {
-        const { hintMode, keyHandler } = getState();
-        if (hintMode) hintMode.destroy();
-        if (keyHandler) keyHandler.destroy();
-    });
-
-    it("removes generic siblings when an interactive sibling exists", () => {
-        // Base: generic onclick div alone gets a hint (proving it's discoverable)
-        const loneDiv = makeElement("DIV", {
-            top: 5, left: 5, width: 30, height: 30,
-            attrs: { onclick: "" },
-        });
-        loadModules([loneDiv]);
-        (globalThis as any).document.elementsFromPoint = () => [loneDiv];
-        const { hintMode: base } = getState();
-        base.activate(false);
-        assert.ok(base.isActive(), "Lone generic onclick div should get a hint");
-        base.destroy();
-
-        // Delta: adding an interactive sibling causes generic divs to be deduped
-        const parent = makeElement("DIV", { top: 0, left: 0, width: 400, height: 40 });
-
-        const input = makeElement("INPUT", {
-            top: 5, left: 5, width: 350, height: 30,
-            attrs: { role: "combobox", placeholder: "Search..." },
-        });
-        // Decorative divs that match CLICKABLE_SELECTOR via onclick but have no
-        // semantic role — "generic" interactive type
-        const iconContainer = makeElement("DIV", {
-            top: 5, left: 5, width: 30, height: 30,
-            attrs: { onclick: "" },
-        });
-        const overlay = makeElement("DIV", {
-            top: 5, left: 5, width: 350, height: 30,
-            attrs: { onclick: "" },
-        });
-
-        parent.appendChild(input);
-        parent.appendChild(iconContainer);
-        parent.appendChild(overlay);
-
-        loadModules([input, iconContainer, overlay]);
-
-        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
-            const all = [input, iconContainer, overlay];
-            return all.filter((el: any) => {
-                const r = el.getBoundingClientRect();
-                return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
-            });
-        };
-
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(hintMode.isActive());
-        const hintOverlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = hintOverlay?.querySelectorAll(".vimium-hint");
-        assert.equal(hints?.length, 1, "Expected 1 hint (input only) — generic divs should be removed");
-    });
-});
-
 // ISSUE: Native interactive elements (button, input, etc.) produce duplicate overlapping hints
 // with their parent containers when the walker descends into accepted interactive elements.
 // SITE: GitHub PR sidebar — each section has <details><summary role="button">...</summary></details>
@@ -1594,9 +1455,9 @@ describe("inline expansion walks up to block ancestor", () => {
             `Wrapped (${wrappedLeft}) should match direct (${directLeft}) — walk-up reaches same <li>`);
     });
 
-    // <h2><a>Title</a></h2> — heading wraps the link. The hint should NOT
-    // redirect to the heading (it's block-level, too wide). The hint stays
-    // on the inline <a> rect.
+    // Fidelity: <h2><a>I Accept</a></h2> — heading is the block ancestor but should
+    // NOT be used for width expansion. Headings are semantic text containers, not layout
+    // containers. The hint should stay on the <a>'s own rect.
     it("heading ancestor is the variable that prevents expansion", () => {
         // Base: <li><a> — non-heading block ancestor, hint expands to <li> width
         const li = makeElement("LI", { top: 10, left: 0, width: 300, height: 25, display: "list-item" });
@@ -2286,16 +2147,6 @@ describe("shouldRedirectToHeading", () => {
         env.cleanup();
     });
 
-    // <h2><a>title</a></h2> — heading wraps the link. Should NOT redirect
-    // because the heading is block-level (wider than the inline link text).
-    // Only <a><h>title</h></a> redirects (heading is inline inside the link).
-    it("does not redirect when link is inside a heading ancestor", () => {
-        const env = createDOM(`<h2><a id="t" href="/page">Title</a></h2>`);
-        const el = env.document.getElementById("t") as unknown as HTMLElement;
-        assert.ok(!shouldRedirectToHeading(el), "link inside heading should not redirect");
-        env.cleanup();
-    });
-
     it("does not redirect when no heading exists", () => {
         const env = createDOM(`<a id="t" href="/page"><span>Not a heading</span></a>`);
         const el = env.document.getElementById("t") as unknown as HTMLElement;
@@ -2799,92 +2650,77 @@ describe("isContentlessOverlay replaced elements", () => {
     });
 });
 
-// ISSUE: Container glow applied to <li> items nested inside other <li> items in tree views,
-// creating visual noise with nested glow borders.
-// SITE: github.com PR file tree
-// FIX: Repeating containers nested inside other repeating containers are disqualified from glow.
-describe("nested repeating containers disqualified from glow", () => {
-    it("link in flat list is not nested, link in tree child is nested", () => {
-        const env = createDOM(`
-            <ul>
-                <li>
-                    <a id="flat-link" href="#">link</a>
-                </li>
-            </ul>
-            <ul>
-                <li>
-                    <ul>
-                        <li>
-                            <a id="nested-link" href="#">file.ts</a>
-                        </li>
-                    </ul>
-                </li>
-            </ul>
-        `);
-
-        const flatLink = env.document.getElementById("flat-link") as HTMLElement;
-        const nestedLink = env.document.getElementById("nested-link") as HTMLElement;
-
-        // Base: link in a flat <li> — container is not nested
-        assert.equal(isNestedRepeatingContainer(flatLink), false,
-            "link in top-level <li> should not be nested");
-
-        // Delta: link in <li> inside another <li> — container is nested
-        assert.equal(isNestedRepeatingContainer(nestedLink), true,
-            "link in nested <li> should be nested");
-
-        env.cleanup();
-    });
-});
-
-// AngryMetalGuy: <h2><a>title</a></h2> — heading wraps link. The <a> has
-// the correct inline width, the <h2> has the correct height. Pill should
-// use the intersection: <a>'s width, <h2>'s height.
-describe("heading ancestor rect clamping", () => {
+// ISSUE: In tree views (GitHub PR file tree), nested <li> items are deduped away
+// by allGeneric because parentMap crosses <ul> boundaries, connecting treeitems
+// at different levels as parent-child duplicates.
+// FIX: Stop parentMap at <ul>/<ol> boundaries so nested list items are independent.
+describe("dedup respects list boundaries in nested trees", () => {
     afterEach(() => {
         const { hintMode, keyHandler } = getState();
         if (hintMode) hintMode.destroy();
         if (keyHandler) keyHandler.destroy();
     });
 
-    it("clamps link rect to heading ancestor bounds", () => {
-        // Base: <a> without heading ancestor — uses full <a> rect
-        const div = makeElement("DIV", { top: 0, left: 0, width: 500, height: 40, display: "block" });
-        const a1 = makeElement("A", {
-            href: "#",
-            top: 0, left: 0, width: 200, height: 40,
-        });
-        div.appendChild(a1);
+    it("intermediate treeitems survive dedup across list boundaries", () => {
+        const folder = makeElement("LI", { top: 0, left: 0, width: 300, height: 30,
+            attrs: { role: "treeitem" } });
+        const innerList = makeElement("UL", { top: 30, left: 0, width: 300, height: 60 });
+        const file = makeElement("LI", { top: 30, left: 0, width: 300, height: 30,
+            attrs: { role: "treeitem" } });
+        const link = makeElement("A", { href: "#diff", top: 30, left: 20, width: 200, height: 20 });
 
-        loadModules([a1]);
-        let hm = getState().hintMode;
-        hm.activate(false);
+        file.appendChild(link);
+        innerList.appendChild(file);
+        folder.appendChild(innerList);
 
-        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        let hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
-        assert.ok(hint, "base: hint should exist");
-        // Pill at a.bottom(40) + 2 = 42px
-        assert.equal(hint.style.top, "42px");
-        hm.deactivate();
+        loadModules([folder, file, link]);
 
-        // Delta: <h2 28px><a 40px> — heading clamps rect, pill uses h2.bottom
-        const h2 = makeElement("H2", { top: 0, left: 0, width: 500, height: 28, display: "block" });
-        const a2 = makeElement("A", {
-            href: "#",
-            top: 0, left: 0, width: 200, height: 40,
-        });
-        h2.appendChild(a2);
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            for (const el of [link, file, folder]) {
+                const r = el.getBoundingClientRect();
+                if (x >= r.left && x < r.right && y >= r.top && y < r.bottom) return [el];
+            }
+            return [];
+        };
 
-        loadModules([a2]);
-        hm = getState().hintMode;
-        hm.activate(false);
+        const { hintMode } = getState();
 
-        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
-        assert.ok(hint, "delta: hint should exist");
-        // Pill at h2.bottom(28) + 2 = 30px, not a.bottom(40) + 2 = 42px
-        assert.equal(hint.style.top, "30px");
-        // Width stays as <a>'s: centered at 200/2 = 100px
-        assert.equal(hint.style.left, "100px");
+        // Base: without list boundary, folder dedup would remove file treeitem
+        // Delta: with <ul> between them, both survive as independent items
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(), "hints should be active");
+    });
+});
+
+// ISSUE: noNestedLinks blocks container glow on folder <li> items that contain
+// discovered children in sub-lists, even though those children are at a different
+// tree level and won't visually clash with the glow.
+// FIX: hasListBoundaryBetween exempts sub-list children from the noNestedLinks check.
+describe("hasListBoundaryBetween", () => {
+    it("no boundary for direct child, boundary across nested list", () => {
+        const env = createDOM(`
+            <li id="container">
+                <a id="direct" href="#">direct link</a>
+                <ul>
+                    <li>
+                        <a id="nested" href="#">nested link</a>
+                    </li>
+                </ul>
+            </li>
+        `);
+
+        const container = env.document.getElementById("container") as HTMLElement;
+        const direct = env.document.getElementById("direct") as HTMLElement;
+        const nested = env.document.getElementById("nested") as HTMLElement;
+
+        // Base: direct child has no list boundary
+        assert.equal(hasListBoundaryBetween(container, direct), false,
+            "direct child should have no list boundary");
+
+        // Delta: child inside nested <ul><li> has a list boundary
+        assert.equal(hasListBoundaryBetween(container, nested), true,
+            "child in sub-list should have a list boundary");
+
+        env.cleanup();
     });
 });

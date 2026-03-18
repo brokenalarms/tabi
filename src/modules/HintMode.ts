@@ -6,8 +6,8 @@ import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
 import { HINT_HEIGHT } from "./constants";
-import { isContainerSized, isFormControl, getRepeatingContainer, isNestedRepeatingContainer, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
-import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect } from "./elementTraversals";
+import { isLargeEnoughForGlow, isFormControl, getRepeatingContainer, hasNestedLinks, isRedirectableControl, isVisible, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
+import { findAssociatedLabel, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect } from "./elementTraversals";
 
 import { Mode } from "../commands";
 
@@ -104,19 +104,18 @@ export class HintMode {
     // Disqualified immediately if any container has nested discovered
     // links (glow label would clash with their hints). Beyond that,
     // size eligibility is decided by CONTAINER_GLOW_STRATEGY ("any"/"all").
-    type ContainerCandidate = { el: HTMLElement; rect: DOMRect; container: HTMLElement; noNestedLinks: boolean; sized: boolean };
+    type ContainerCandidate = { el: HTMLElement; rect: DOMRect; container: HTMLElement; noNestedLinks: boolean; largeEnough: boolean };
     const containerGroups = new Map<HTMLElement, ContainerCandidate[]>();
 
     for (const el of elements) {
       const rect = this.getHintRect(el);
       const target = this.getHintTargetElement(el);
-      const container = target === el && !isNestedRepeatingContainer(el)
-        ? getRepeatingContainer(el) : null;
+      const container = target === el ? getRepeatingContainer(el) : null;
 
       if (container && CONTAINER_GLOW_STRATEGY !== "none") {
-        const noNestedLinks = !elements.some(other => other !== el && container.contains(other));
+        const noNestedLinks = !hasNestedLinks(container, el, elements);
         const containerRect = container.getBoundingClientRect();
-        const sized = isContainerSized(container, containerRect);
+        const largeEnough = isLargeEnoughForGlow(container, containerRect);
         const parent = container.parentElement || container;
 
         let group = containerGroups.get(parent);
@@ -124,7 +123,7 @@ export class HintMode {
           group = [];
           containerGroups.set(parent, group);
         }
-        group.push({ el, rect, container, noNestedLinks, sized });
+        group.push({ el, rect, container, noNestedLinks, largeEnough });
       } else {
         this.hintPlacementMap.set(el, { style: "pill", rect });
       }
@@ -133,8 +132,8 @@ export class HintMode {
     for (const [, group] of containerGroups) {
       const allFreeOfNestedHints = group.every(g => g.noNestedLinks);
       const groupSized = CONTAINER_GLOW_STRATEGY === "any"
-        ? group.some(g => g.sized)
-        : group.every(g => g.sized);
+        ? group.some(g => g.largeEnough)
+        : group.every(g => g.largeEnough);
       const useGlow = allFreeOfNestedHints && groupSized;
 
       for (const { el, rect, container } of group) {
@@ -258,9 +257,10 @@ export class HintMode {
   private getHintTargetElement(el: HTMLElement): HTMLElement {
     const rect = el.getBoundingClientRect();
 
-    const controlTarget = findControlTarget(el);
-    if (controlTarget) return controlTarget;
-
+    if (isRedirectableControl(el) && !isVisible(el, rect)) {
+      const label = findAssociatedLabel(el);
+      if (label) return label;
+    }
     if (isZeroSizeAnchor(el, rect)) {
       const child = findVisibleChild(el);
       if (child) return child;
@@ -280,12 +280,6 @@ export class HintMode {
     if (el === target && el.tagName.toLowerCase() === "a") {
       rect = getLinkContentRect(target, rect);
     }
-
-    // Clamp to heading ancestor bounds when <a> is inside <h1>–<h6>.
-    // The heading's block rect has the correct height; the <a>'s inline
-    // rect has the correct width. The intersection gives both.
-    const headingRect = getHeadingAncestorRect(target);
-    if (headingRect) rect = clampRect(rect, headingRect);
 
     // Expand width to repeating container ancestor for aligned hints in lists.
     if (!isFormControl(target)) {
@@ -387,7 +381,7 @@ export class HintMode {
     glow.style.height = glowRect.height + "px";
     if (this.overlay) this.overlay.appendChild(glow);
 
-    const verticalInset = (glowRect.height - HINT_HEIGHT) / 3;
+    const verticalInset = (glowRect.height - HINT_HEIGHT) / 2;
     const insetRight = Math.min(verticalInset, 24);
     const pos = this.viewportToDocument(
       glowRect.right - insetRight,
