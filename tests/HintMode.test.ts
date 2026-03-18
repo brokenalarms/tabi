@@ -500,4 +500,5 @@ describe("HintMode", () => {
             assert.equal(hint.style.top, "42px");
         });
     });
+
 });

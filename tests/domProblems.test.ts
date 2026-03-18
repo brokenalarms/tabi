@@ -2836,3 +2836,55 @@ describe("nested repeating containers disqualified from glow", () => {
         env.cleanup();
     });
 });
+
+// AngryMetalGuy: <h2><a>title</a></h2> — heading wraps link. The <a> has
+// the correct inline width, the <h2> has the correct height. Pill should
+// use the intersection: <a>'s width, <h2>'s height.
+describe("heading ancestor rect clamping", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("clamps link rect to heading ancestor bounds", () => {
+        // Base: <a> without heading ancestor — uses full <a> rect
+        const div = makeElement("DIV", { top: 0, left: 0, width: 500, height: 40, display: "block" });
+        const a1 = makeElement("A", {
+            href: "#",
+            top: 0, left: 0, width: 200, height: 40,
+        });
+        div.appendChild(a1);
+
+        loadModules([a1]);
+        let hm = getState().hintMode;
+        hm.activate(false);
+
+        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        let hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
+        assert.ok(hint, "base: hint should exist");
+        // Pill at a.bottom(40) + 2 = 42px
+        assert.equal(hint.style.top, "42px");
+        hm.deactivate();
+
+        // Delta: <h2 28px><a 40px> — heading clamps rect, pill uses h2.bottom
+        const h2 = makeElement("H2", { top: 0, left: 0, width: 500, height: 28, display: "block" });
+        const a2 = makeElement("A", {
+            href: "#",
+            top: 0, left: 0, width: 200, height: 40,
+        });
+        h2.appendChild(a2);
+
+        loadModules([a2]);
+        hm = getState().hintMode;
+        hm.activate(false);
+
+        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
+        assert.ok(hint, "delta: hint should exist");
+        // Pill at h2.bottom(28) + 2 = 30px, not a.bottom(40) + 2 = 42px
+        assert.equal(hint.style.top, "30px");
+        // Width stays as <a>'s: centered at 200/2 = 100px
+        assert.equal(hint.style.left, "100px");
+    });
+});

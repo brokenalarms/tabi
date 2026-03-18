@@ -7,7 +7,7 @@ import { DEFAULTS } from "../types";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
 import { HINT_HEIGHT } from "./constants";
 import { isContainerSized, isFormControl, getRepeatingContainer, isNestedRepeatingContainer, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
-import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect } from "./elementTraversals";
+import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect } from "./elementTraversals";
 
 import { Mode } from "../commands";
 
@@ -280,6 +280,12 @@ export class HintMode {
     if (el === target && el.tagName.toLowerCase() === "a") {
       rect = getLinkContentRect(target, rect);
     }
+
+    // Clamp to heading ancestor bounds when <a> is inside <h1>–<h6>.
+    // The heading's block rect has the correct height; the <a>'s inline
+    // rect has the correct width. The intersection gives both.
+    const headingRect = getHeadingAncestorRect(target);
+    if (headingRect) rect = clampRect(rect, headingRect);
 
     // Expand width to repeating container ancestor for aligned hints in lists.
     if (!isFormControl(target)) {
