@@ -140,3 +140,21 @@ export function getBlockAncestorRect(el: HTMLElement, rect: DOMRect): DOMRect | 
   const ancestorRect = ancestor.getBoundingClientRect();
   return new DOMRect(ancestorRect.left, rect.top, ancestorRect.width, rect.height);
 }
+
+/** Retry a failed aria-expanded toggle by clicking the first child.
+ *  Some frameworks attach the toggle handler on a child container rather
+ *  than the aria-expanded element itself. Checks after a frame whether
+ *  the attribute changed; if not, dispatches a click on the first child. */
+export function retryExpandedToggle(element: HTMLElement): void {
+  const expandedBefore = element.getAttribute("aria-expanded");
+  if (expandedBefore === null || !element.firstElementChild) return;
+  requestAnimationFrame(() => {
+    if (element.getAttribute("aria-expanded") === expandedBefore) {
+      const child = element.firstElementChild as HTMLElement;
+      const opts = { bubbles: true, cancelable: true, view: window };
+      child.dispatchEvent(new MouseEvent("mousedown", opts));
+      child.dispatchEvent(new MouseEvent("mouseup", opts));
+      child.click();
+    }
+  });
+}
