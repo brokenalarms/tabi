@@ -14,7 +14,7 @@ let removedTabIds: number[];
 let activatedTabId: number | null;
 let actionState: Record<number, Record<string, unknown>>;
 let tabRemovedListeners: Array<(tabId: number) => void>;
-let tabUpdatedListeners: Array<(tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string; index?: number }) => void>;
+let tabUpdatedListeners: Array<(tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string }) => void>;
 
 function resetBrowserShim() {
     mockTabs = [
@@ -98,7 +98,7 @@ import {
     MAX_CLOSED_TABS,
     activeTabSet,
     tabUrlCache,
-    tabIndexCache,
+    tabOrder,
     init,
 } from "../src/background";
 
@@ -108,27 +108,27 @@ describe("background.ts tab management", () => {
         closedTabStack.length = 0;
         activeTabSet.clear();
         tabUrlCache.clear();
-        tabIndexCache.clear();
+        tabOrder.length = 0;
         init();
     });
 
     describe("closed-tab stack", () => {
-        // Verifies that closing tabs pushes URLs onto the stack and
+        // Verifies that closing tabs pushes entries onto the stack and
         // restoring pops them in LIFO order.
-        it("pushes URLs and pops in LIFO order", () => {
-            pushClosedTab("https://a.com", 0);
+        it("pushes entries and pops in LIFO order", () => {
+            pushClosedTab("https://a.com", null);
             pushClosedTab("https://b.com", 1);
-            assert.deepEqual(popClosedTab(), { url: "https://b.com", index: 1 });
-            assert.deepEqual(popClosedTab(), { url: "https://a.com", index: 0 });
+            assert.deepEqual(popClosedTab(), { url: "https://b.com", leftNeighborId: 1 });
+            assert.deepEqual(popClosedTab(), { url: "https://a.com", leftNeighborId: null });
             assert.equal(popClosedTab(), null);
         });
 
         // Verifies that blank/empty URLs are not pushed onto the stack.
         it("ignores blank and empty URLs", () => {
-            pushClosedTab("", 0);
-            pushClosedTab("about:blank", 0);
-            pushClosedTab("about:newtab", 0);
-            pushClosedTab(null, 0);
+            pushClosedTab("", null);
+            pushClosedTab("about:blank", null);
+            pushClosedTab("about:newtab", null);
+            pushClosedTab(null, null);
             assert.equal(closedTabStack.length, 0);
         });
 
@@ -154,19 +154,19 @@ describe("background.ts tab management", () => {
     });
 
     describe("closeTab command", () => {
-        // Verifies that closing a tab removes it. URL tracking is handled by onRemoved listener.
-        it("removes the sender tab", async () => {
+        // Verifies that closing a tab removes it and records its left neighbor.
+        it("removes the sender tab and records left neighbor", async () => {
             const sender = makeSender(2);
-            // Simulate onUpdated having cached the URL and index
+            // Simulate onUpdated having cached the URL; tabOrder populated by init()
             tabUrlCache.set(2, "https://example.com/2");
-            tabIndexCache.set(2, 1);
+            // tabOrder is [1, 2, 3] from init() — tab 2's left neighbor is tab 1
             const result = await handleCommand("closeTab", sender);
             assert.equal(result.status, "ok");
             assert.deepEqual(removedTabIds, [2]);
-            // onRemoved listener records the URL and index
+            // onRemoved listener records the URL and left neighbor
             for (const fn of tabRemovedListeners) fn(2);
             assert.equal(closedTabStack.length, 1);
-            assert.deepEqual(closedTabStack[0], { url: "https://example.com/2", index: 1 });
+            assert.deepEqual(closedTabStack[0], { url: "https://example.com/2", leftNeighborId: 1 });
         });
 
         // Verifies that closeTab is a no-op when there is no sender tab.
@@ -178,15 +178,32 @@ describe("background.ts tab management", () => {
     });
 
     describe("restoreTab command", () => {
-        // Verifies that restoring a tab creates one with the last closed URL at the original index.
-        it("creates a tab with the last closed URL at original index", async () => {
-            pushClosedTab("https://restored.com", 2);
+        // Verifies that restoring a tab inserts it after its left neighbor.
+        // mockTabs: [1, 2, 3] — if left neighbor is tab 1, restored tab goes at index 1 (after tab 1).
+        it("restores tab after its left neighbor", async () => {
+            pushClosedTab("https://restored.com", 1);
             const result = await handleCommand("restoreTab", {});
             assert.equal(result.status, "ok");
             assert.equal(createdTabs.length, 1);
             assert.equal(createdTabs[0].url, "https://restored.com");
-            assert.equal(createdTabs[0].index, 2);
+            assert.equal(createdTabs[0].index, 1);
             assert.equal(closedTabStack.length, 0);
+        });
+
+        // Verifies that a tab with no left neighbor (was first) restores at index 0.
+        it("restores at start when left neighbor is null", async () => {
+            pushClosedTab("https://first.com", null);
+            const result = await handleCommand("restoreTab", {});
+            assert.equal(result.status, "ok");
+            assert.equal(createdTabs[0].index, 0);
+        });
+
+        // Verifies that if the left neighbor was also closed, the tab goes to the end.
+        it("restores at end when left neighbor no longer exists", async () => {
+            pushClosedTab("https://orphan.com", 99);
+            const result = await handleCommand("restoreTab", {});
+            assert.equal(result.status, "ok");
+            assert.equal(createdTabs[0].index, 3); // mockTabs has 3 tabs
         });
 
         // Verifies that restoring with an empty stack is a no-op.
