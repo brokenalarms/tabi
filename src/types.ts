@@ -7,15 +7,17 @@ export interface VimiumSettings {
   keyBindingMode: KeyBindingMode;
   theme: Theme;
   animate: boolean;
-  debug: boolean;
 }
 
 export const DEFAULTS: VimiumSettings = {
   theme: "auto",
   keyBindingMode: "location",
   animate: true,
-  debug: false,
 };
+
+/** Build-time debug flag — set via VIMIUM_DEBUG=1 in .env or environment. */
+declare const __VIMIUM_DEBUG__: boolean;
+export const DEBUG: boolean = typeof __VIMIUM_DEBUG__ !== "undefined" ? __VIMIUM_DEBUG__ : false;
 
 export function resolveSettings(storage: Record<string, unknown>): VimiumSettings {
   return {
@@ -23,7 +25,6 @@ export function resolveSettings(storage: Record<string, unknown>): VimiumSetting
     ...(storage.keyBindingMode !== undefined && { keyBindingMode: storage.keyBindingMode as KeyBindingMode }),
     ...(storage.theme !== undefined && { theme: storage.theme as Theme }),
     ...(storage.animate !== undefined && { animate: storage.animate as boolean }),
-    ...(storage.debug !== undefined && { debug: storage.debug as boolean }),
   };
 }
 

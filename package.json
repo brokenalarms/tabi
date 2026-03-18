@@ -7,6 +7,7 @@
     "typecheck": "tsc --noEmit",
     "test": "tsx --test --test-reporter=dot --test-force-exit tests/*.test.ts",
     "test:integration": "playwright test",
+    "test:verify": "playwright test --config playwright.verify.config.ts",
     "safari": "bash scripts/safari.sh"
   },
   "devDependencies": {

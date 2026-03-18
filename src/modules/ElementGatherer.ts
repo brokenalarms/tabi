@@ -10,10 +10,10 @@ import {
   isAnchorToLabelTarget, hasJsactionClick,
 } from "./elementPredicates";
 import { findAssociatedLabel } from "./elementTraversals";
-import { DEFAULTS } from "../types";
+import { DEBUG } from "../types";
 
 // --- Debug dots ---
-// When DEFAULTS.debug is true, draws colored dots on all <a> elements into
+// When DEBUG is true, draws colored dots on all <a> elements into
 // the provided overlay (the hint overlay).  Dots disappear automatically
 // when the overlay is removed on deactivation.
 //   green  = discovered (in final result after dedup)
@@ -21,7 +21,7 @@ import { DEFAULTS } from "../types";
 //   red    = filtered out by walker (SKIP or REJECT)
 
 export function renderDebugDots(overlay: HTMLElement, result: HTMLElement[]): void {
-  if (!DEFAULTS.debug) return;
+  if (!DEBUG) return;
   const resultSet = new Set(result);
   for (const a of document.querySelectorAll("a[href]")) {
     const r = (a as HTMLElement).getBoundingClientRect();
@@ -37,7 +37,7 @@ export function renderDebugDots(overlay: HTMLElement, result: HTMLElement[]): vo
   }
 }
 
-// --- Debug logging (gated behind DEFAULTS.debug) ---
+// --- Debug logging (gated behind DEBUG) ---
 
 function elId(el: HTMLElement): string {
   const href = (el.getAttribute("href") || "").slice(0, 40);
@@ -142,25 +142,25 @@ export function walkerFilter(node: Node): number {
         if (label && isVisible(label)) return NodeFilter.FILTER_ACCEPT;
       }
     }
-    if (DEFAULTS.debug) logSkip(el, "opacity:0");
+    if (DEBUG) logSkip(el, "opacity:0");
     return NodeFilter.FILTER_SKIP;
   }
 
   // visibility:hidden, remaining invisibility — children may override
   if (!isVisible(el, rect)) {
-    if (DEFAULTS.debug) logSkip(el, "invisible");
+    if (DEBUG) logSkip(el, "invisible");
     return NodeFilter.FILTER_SKIP;
   }
 
   // Overflow clipping
   if (isClippedByOverflow(el, rect)) {
-    if (DEFAULTS.debug) logSkip(el, "clipped " + Math.round(rect.width) + "x" + Math.round(rect.height));
+    if (DEBUG) logSkip(el, "clipped " + Math.round(rect.width) + "x" + Math.round(rect.height));
     return NodeFilter.FILTER_SKIP;
   }
 
   // Covered by another element at any corner
   if (isOccluded(el, rect)) {
-    if (DEFAULTS.debug) logOccluded(el, rect);
+    if (DEBUG) logOccluded(el, rect);
     return NodeFilter.FILTER_SKIP;
   }
 

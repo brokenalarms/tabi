@@ -18,6 +18,9 @@ Vimium/Safari Extension/Resources/**/*.js
 tests/integration/harness.js
 test-results/
 
+# Environment
+.env
+
 # Node
 node_modules/
 
