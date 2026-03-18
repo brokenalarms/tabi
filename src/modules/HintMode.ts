@@ -8,7 +8,7 @@ import { discoverElements, renderDebugDots } from "./ElementGatherer";
 import { HINT_HEIGHT } from "./constants";
 import { isLargeEnoughForGlow, isFormControl, getRepeatingContainer, hasNestedLinks, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
 import { LIST_BOUNDARY_SELECTOR } from "./constants";
-import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect } from "./elementTraversals";
+import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect, retryExpandedToggle } from "./elementTraversals";
 
 import { Mode } from "../commands";
 
@@ -558,6 +558,7 @@ export class HintMode {
         element.dispatchEvent(new MouseEvent("mousedown", opts));
         element.dispatchEvent(new MouseEvent("mouseup", opts));
         element.click();
+        retryExpandedToggle(element);
       }
 
       // Fade out the ring
