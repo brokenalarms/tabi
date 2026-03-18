@@ -3,6 +3,7 @@
 // and hint positioning, which require a real layout engine.
 
 import { test, expect } from "@playwright/test";
+import { NodeFilter } from "happy-dom";
 import path from "path";
 
 const HARNESS_PATH = path.resolve(__dirname, "harness.js");
@@ -550,15 +551,12 @@ test("multi-line link inside heading is not falsely occluded by adjacent content
   });
   expect(overlaps).toBe(true);
 
-  const result = await page.evaluate(() => {
+  const verdict = await page.evaluate(() => {
     const { walkerFilter } = window.TestHarness;
-    const headingLink = document.getElementById("heading-link")!;
-    const verdict = walkerFilter(headingLink);
-    return verdict === NodeFilter.FILTER_ACCEPT ? "ACCEPT"
-         : verdict === NodeFilter.FILTER_REJECT ? "REJECT" : "SKIP";
+    return walkerFilter(document.getElementById("heading-link")!);
   });
 
-  expect(result).toBe("ACCEPT");
+  expect(verdict).toBe(NodeFilter.FILTER_ACCEPT);
 });
 
 // Clicking a hint dispatches a click to the target element only after the
