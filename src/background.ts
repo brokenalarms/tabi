@@ -16,7 +16,7 @@ interface TabInfo {
 
 declare const browser: {
   tabs: {
-    create(opts: { url?: string }): Promise<{ id: number }>;
+    create(opts: { url?: string; index?: number }): Promise<{ id: number }>;
     remove(tabId: number): Promise<void>;
     update(tabId: number, props: { active: boolean }): Promise<unknown>;
     query(opts: { currentWindow: boolean }): Promise<Array<{ id: number; title: string; url: string; active: boolean }>>;
@@ -42,14 +42,22 @@ interface MessageSender {
 
 type CommandResponse = { status: string; reason?: string } | TabInfo[];
 
+export interface ClosedTab {
+  url: string;
+  leftNeighborId: number | null;
+}
+
 export const MAX_CLOSED_TABS = 50;
-export const closedTabStack: string[] = [];
+export const closedTabStack: ClosedTab[] = [];
 
 // Track which tabs have the extension active (not excluded by domain)
 export const activeTabSet = new Set<number>();
 
 // Cache tab URLs so onRemoved can record closed tabs (the tab is already gone by then)
 export const tabUrlCache = new Map<number, string>();
+
+// Ordered list of tab IDs so we can find left neighbors when a tab is closed
+export const tabOrder: number[] = [];
 
 export async function updateIconState(tabId: number): Promise<void> {
   try {
@@ -66,15 +74,15 @@ export async function updateIconState(tabId: number): Promise<void> {
   }
 }
 
-export function pushClosedTab(url: string | null | undefined): void {
+export function pushClosedTab(url: string | null | undefined, leftNeighborId: number | null): void {
   if (!url || url === "about:blank" || url === "about:newtab") return;
-  closedTabStack.push(url);
+  closedTabStack.push({ url, leftNeighborId });
   if (closedTabStack.length > MAX_CLOSED_TABS) {
     closedTabStack.shift();
   }
 }
 
-export function popClosedTab(): string | null {
+export function popClosedTab(): ClosedTab | null {
   return closedTabStack.pop() || null;
 }
 
@@ -93,9 +101,15 @@ export async function handleCommand(command: Command, sender: MessageSender, mes
     }
 
     case "restoreTab": {
-      const url = popClosedTab();
-      if (url) {
-        await browser.tabs.create({ url });
+      const closed = popClosedTab();
+      if (closed) {
+        const tabs = await browser.tabs.query({ currentWindow: true });
+        let index = 0;
+        if (closed.leftNeighborId !== null) {
+          const neighborIdx = tabs.findIndex(t => t.id === closed.leftNeighborId);
+          index = neighborIdx >= 0 ? neighborIdx + 1 : tabs.length;
+        }
+        await browser.tabs.create({ url: closed.url, index });
       }
       break;
     }
@@ -192,18 +206,27 @@ export function init(): void {
     if (changeInfo.url) {
       tabUrlCache.set(tabId, changeInfo.url);
     }
+    // Ensure new tabs appear in tabOrder
+    if (!tabOrder.includes(tabId)) {
+      tabOrder.push(tabId);
+    }
   });
 
-  // Clean up activeTabSet and record closed tabs for restore
+  // Record closed tab with its left neighbor, then clean up caches
   browser.tabs.onRemoved.addListener((tabId: number) => {
     const url = tabUrlCache.get(tabId);
-    if (url) pushClosedTab(url);
+    const idx = tabOrder.indexOf(tabId);
+    const leftNeighborId = idx > 0 ? tabOrder[idx - 1] : null;
+    if (url) pushClosedTab(url, leftNeighborId);
+    if (idx >= 0) tabOrder.splice(idx, 1);
     tabUrlCache.delete(tabId);
     activeTabSet.delete(tabId);
   });
 
-  // Populate URL cache on startup
+  // Populate caches on startup
   browser.tabs.query({ currentWindow: true }).then(tabs => {
+    tabOrder.length = 0;
+    tabOrder.push(...tabs.map(t => t.id));
     for (const tab of tabs) {
       if (tab.url) tabUrlCache.set(tab.id, tab.url);
     }
