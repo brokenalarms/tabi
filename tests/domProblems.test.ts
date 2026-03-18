@@ -7,7 +7,7 @@ import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from ".
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
 import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isContentlessOverlay, shouldRedirectToHeading, isNestedRepeatingContainer } from "../src/modules/elementPredicates";
-import { findBlockAncestor, getHeading } from "../src/modules/elementTraversals";
+import { findBlockAncestor } from "../src/modules/elementTraversals";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
 describe("element discovery", () => {
@@ -1594,9 +1594,10 @@ describe("inline expansion walks up to block ancestor", () => {
             `Wrapped (${wrappedLeft}) should match direct (${directLeft}) — walk-up reaches same <li>`);
     });
 
-    // <h2><a>Title</a></h2> — the heading wraps the link. The hint should
-    // redirect to the heading and use its rect for positioning.
-    it("heading ancestor is the variable that redirects hint target", () => {
+    // <h2><a>Title</a></h2> — heading wraps the link. The hint should NOT
+    // redirect to the heading (it's block-level, too wide). The hint stays
+    // on the inline <a> rect.
+    it("heading ancestor is the variable that prevents expansion", () => {
         // Base: <li><a> — non-heading block ancestor, hint expands to <li> width
         const li = makeElement("LI", { top: 10, left: 0, width: 300, height: 25, display: "list-item" });
         const a1 = makeElement("A", { href: "/item", top: 10, left: 50, width: 100, height: 20, display: "inline" });
@@ -1613,7 +1614,7 @@ describe("inline expansion walks up to block ancestor", () => {
             `Inside <li>: hint should center on <li> (150)`);
         hintMode.deactivate();
 
-        // Delta: <h2><a> — heading ancestor, hint redirects to <h2> and centers on it
+        // Delta: <h2><a> — heading block ancestor, hint stays on <a>
         const h2 = makeElement("H2", { top: 10, left: 0, width: 300, height: 25, display: "block" });
         const a2 = makeElement("A", { href: "/accept", top: 10, left: 50, width: 100, height: 20, display: "inline" });
         h2.appendChild(a2);
@@ -1623,9 +1624,9 @@ describe("inline expansion walks up to block ancestor", () => {
         assert.ok(hintMode.isActive());
         overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         hints = overlay?.querySelectorAll(".vimium-hint");
-        const headingLeft = parseFloat(hints[0].style.left);
-        assert.equal(headingLeft, 150, // 0 + 300/2 = centers on <h2>
-            `Inside <h2>: hint should center on <h2> (150)`);
+        const noExpansionLeft = parseFloat(hints[0].style.left);
+        assert.equal(noExpansionLeft, 100, // 50 + 100/2 = centers on <a>
+            `Inside <h2>: hint should center on <a> (100), not expand to <h2> (150)`);
     });
 
     it("stops walk-up at parent with multiple children", () => {
@@ -2285,21 +2286,14 @@ describe("shouldRedirectToHeading", () => {
         env.cleanup();
     });
 
-    // AngryMetalGuy: <h2><a>title</a></h2> — the heading wraps the link.
-    // The <a>'s rect is larger than the <h2>'s, so the pill should use
-    // the heading's tighter rect for positioning.
-    it("redirects when link is inside a heading ancestor", () => {
-        // Base: link without heading ancestor does not redirect
-        const env1 = createDOM(`<div><a id="t1" href="/page">Title</a></div>`);
-        const el1 = env1.document.getElementById("t1") as unknown as HTMLElement;
-        assert.ok(!shouldRedirectToHeading(el1), "link without heading should not redirect");
-        env1.cleanup();
-
-        // Delta: link inside heading should redirect
-        const env2 = createDOM(`<h2><a id="t2" href="/page">Title</a></h2>`);
-        const el2 = env2.document.getElementById("t2") as unknown as HTMLElement;
-        assert.ok(shouldRedirectToHeading(el2), "link inside heading should redirect");
-        env2.cleanup();
+    // <h2><a>title</a></h2> — heading wraps the link. Should NOT redirect
+    // because the heading is block-level (wider than the inline link text).
+    // Only <a><h>title</h></a> redirects (heading is inline inside the link).
+    it("does not redirect when link is inside a heading ancestor", () => {
+        const env = createDOM(`<h2><a id="t" href="/page">Title</a></h2>`);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.ok(!shouldRedirectToHeading(el), "link inside heading should not redirect");
+        env.cleanup();
     });
 
     it("does not redirect when no heading exists", () => {
@@ -2840,5 +2834,57 @@ describe("nested repeating containers disqualified from glow", () => {
             "link in nested <li> should be nested");
 
         env.cleanup();
+    });
+});
+
+// AngryMetalGuy: <h2><a>title</a></h2> — heading wraps link. The <a> has
+// the correct inline width, the <h2> has the correct height. Pill should
+// use the intersection: <a>'s width, <h2>'s height.
+describe("heading ancestor rect clamping", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("clamps link rect to heading ancestor bounds", () => {
+        // Base: <a> without heading ancestor — uses full <a> rect
+        const div = makeElement("DIV", { top: 0, left: 0, width: 500, height: 40, display: "block" });
+        const a1 = makeElement("A", {
+            href: "#",
+            top: 0, left: 0, width: 200, height: 40,
+        });
+        div.appendChild(a1);
+
+        loadModules([a1]);
+        let hm = getState().hintMode;
+        hm.activate(false);
+
+        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        let hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
+        assert.ok(hint, "base: hint should exist");
+        // Pill at a.bottom(40) + 2 = 42px
+        assert.equal(hint.style.top, "42px");
+        hm.deactivate();
+
+        // Delta: <h2 28px><a 40px> — heading clamps rect, pill uses h2.bottom
+        const h2 = makeElement("H2", { top: 0, left: 0, width: 500, height: 28, display: "block" });
+        const a2 = makeElement("A", {
+            href: "#",
+            top: 0, left: 0, width: 200, height: 40,
+        });
+        h2.appendChild(a2);
+
+        loadModules([a2]);
+        hm = getState().hintMode;
+        hm.activate(false);
+
+        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
+        assert.ok(hint, "delta: hint should exist");
+        // Pill at h2.bottom(28) + 2 = 30px, not a.bottom(40) + 2 = 42px
+        assert.equal(hint.style.top, "30px");
+        // Width stays as <a>'s: centered at 200/2 = 100px
+        assert.equal(hint.style.left, "100px");
     });
 });

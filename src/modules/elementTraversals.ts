@@ -56,8 +56,25 @@ export function findVisibleChild(el: HTMLElement): HTMLElement | null {
 
 /** Return the first heading descendant (h1–h6), or null. */
 export function getHeading(el: HTMLElement): HTMLElement | null {
-  return el.querySelector(HEADING_SELECTOR) as HTMLElement | null
-    ?? el.closest(HEADING_SELECTOR) as HTMLElement | null;
+  return el.querySelector(HEADING_SELECTOR) as HTMLElement | null;
+}
+
+/** If el is inside a heading, return the heading's rect to clamp against.
+ *  The heading's block rect has the correct height (tighter line-height),
+ *  while the inline <a> has the correct width. */
+export function getHeadingAncestorRect(el: HTMLElement): DOMRect | null {
+  const heading = el.closest(HEADING_SELECTOR) as HTMLElement | null;
+  return heading ? heading.getBoundingClientRect() : null;
+}
+
+/** Clamp rect to the bounds of a container rect — takes the intersection
+ *  so each edge uses whichever is tighter. */
+export function clampRect(rect: DOMRect, bounds: DOMRect): DOMRect {
+  const left = Math.max(rect.left, bounds.left);
+  const top = Math.max(rect.top, bounds.top);
+  const right = Math.min(rect.right, bounds.right);
+  const bottom = Math.min(rect.bottom, bounds.bottom);
+  return new DOMRect(left, top, Math.max(0, right - left), Math.max(0, bottom - top));
 }
 
 // --- Hint rect helpers ---
