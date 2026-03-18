@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
-import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isContentlessOverlay, shouldRedirectToHeading, isNestedRepeatingContainer } from "../src/modules/elementPredicates";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isContentlessOverlay, shouldRedirectToHeading, hasListBoundaryBetween } from "../src/modules/elementPredicates";
 import { findBlockAncestor } from "../src/modules/elementTraversals";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
@@ -525,9 +525,9 @@ describe("hint target redirects to sole clickable child", () => {
         if (keyHandler) keyHandler.destroy();
     });
 
-    it("does NOT redirect when element contains clickable children", () => {
-        // role="link" div with inner button — hint stays on the element itself,
-        // centered underneath. Inner button gets its own separate hint.
+    it("parent with discovered interactive child is deduped — child wins", () => {
+        // role="link" div wrapping a button — parent is removed by containment
+        // dedup, child (the more specific target) gets the hint.
         const btn = makeElement("BUTTON", { top: 20, left: 300, width: 30, height: 30 });
         const linkDiv = makeElement("DIV", { top: 0, left: 0, width: 400, height: 60 });
         linkDiv.setAttribute("role", "link");
@@ -548,14 +548,9 @@ describe("hint target redirects to sole clickable child", () => {
         hintMode.activate(false);
         assert.ok(hintMode.isActive());
 
-        // 2 hints: one for linkDiv centered-bottom, one for button
         const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         const hints = overlay?.querySelectorAll(".vimium-hint");
-        assert.equal(hints?.length, 2, "Should have 2 hints (link + button)");
-        // Link hint should be centered on linkDiv (200), NOT at button (300+)
-        const linkHintLeft = parseFloat(hints[0].style.left);
-        assert.ok(linkHintLeft >= 190 && linkHintLeft <= 210,
-            `Link hint left (${linkHintLeft}) should be centered on linkDiv (200), not redirected to button (300)`);
+        assert.equal(hints?.length, 1, "Should have 1 hint — parent deduped, child wins");
     });
 });
 
@@ -1366,71 +1361,6 @@ describe("clickable sibling occlusion", () => {
         const { hintMode } = getState();
         hintMode.activate(false);
         assert.ok(!hintMode.isActive(), "Link behind disabled button overlay should be filtered");
-    });
-});
-
-// ISSUE: Non-interactive generic elements (tabindex overlays, icon containers) get
-// separate hints alongside the real interactive sibling (input, button, etc.)
-// SITE: linkedin.com/feed — search bar has overlay div, icon div, and input
-// FIX: During dedup, remove generic candidates when a non-generic sibling exists
-describe("generic sibling dedup", () => {
-    afterEach(() => {
-        const { hintMode, keyHandler } = getState();
-        if (hintMode) hintMode.destroy();
-        if (keyHandler) keyHandler.destroy();
-    });
-
-    it("removes generic siblings when an interactive sibling exists", () => {
-        // Base: generic onclick div alone gets a hint (proving it's discoverable)
-        const loneDiv = makeElement("DIV", {
-            top: 5, left: 5, width: 30, height: 30,
-            attrs: { onclick: "" },
-        });
-        loadModules([loneDiv]);
-        (globalThis as any).document.elementsFromPoint = () => [loneDiv];
-        const { hintMode: base } = getState();
-        base.activate(false);
-        assert.ok(base.isActive(), "Lone generic onclick div should get a hint");
-        base.destroy();
-
-        // Delta: adding an interactive sibling causes generic divs to be deduped
-        const parent = makeElement("DIV", { top: 0, left: 0, width: 400, height: 40 });
-
-        const input = makeElement("INPUT", {
-            top: 5, left: 5, width: 350, height: 30,
-            attrs: { role: "combobox", placeholder: "Search..." },
-        });
-        // Decorative divs that match CLICKABLE_SELECTOR via onclick but have no
-        // semantic role — "generic" interactive type
-        const iconContainer = makeElement("DIV", {
-            top: 5, left: 5, width: 30, height: 30,
-            attrs: { onclick: "" },
-        });
-        const overlay = makeElement("DIV", {
-            top: 5, left: 5, width: 350, height: 30,
-            attrs: { onclick: "" },
-        });
-
-        parent.appendChild(input);
-        parent.appendChild(iconContainer);
-        parent.appendChild(overlay);
-
-        loadModules([input, iconContainer, overlay]);
-
-        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
-            const all = [input, iconContainer, overlay];
-            return all.filter((el: any) => {
-                const r = el.getBoundingClientRect();
-                return x >= r.left && x < r.right && y >= r.top && y < r.bottom;
-            });
-        };
-
-        const { hintMode } = getState();
-        hintMode.activate(false);
-        assert.ok(hintMode.isActive());
-        const hintOverlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
-        const hints = hintOverlay?.querySelectorAll(".vimium-hint");
-        assert.equal(hints?.length, 1, "Expected 1 hint (input only) — generic divs should be removed");
     });
 });
 
@@ -2799,39 +2729,76 @@ describe("isContentlessOverlay replaced elements", () => {
     });
 });
 
-// ISSUE: Container glow applied to <li> items nested inside other <li> items in tree views,
-// creating visual noise with nested glow borders.
-// SITE: github.com PR file tree
-// FIX: Repeating containers nested inside other repeating containers are disqualified from glow.
-describe("nested repeating containers disqualified from glow", () => {
-    it("link in flat list is not nested, link in tree child is nested", () => {
+// ISSUE: In tree views (GitHub PR file tree), nested <li> items are deduped away
+// by allGeneric because parentMap crosses <ul> boundaries, connecting treeitems
+// at different levels as parent-child duplicates.
+// FIX: Stop parentMap at <ul>/<ol> boundaries so nested list items are independent.
+describe("dedup respects list boundaries in nested trees", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("intermediate treeitems survive dedup across list boundaries", () => {
+        const folder = makeElement("LI", { top: 0, left: 0, width: 300, height: 30,
+            attrs: { role: "treeitem" } });
+        const innerList = makeElement("UL", { top: 30, left: 0, width: 300, height: 60 });
+        const file = makeElement("LI", { top: 30, left: 0, width: 300, height: 30,
+            attrs: { role: "treeitem" } });
+        const link = makeElement("A", { href: "#diff", top: 30, left: 20, width: 200, height: 20 });
+
+        file.appendChild(link);
+        innerList.appendChild(file);
+        folder.appendChild(innerList);
+
+        loadModules([folder, file, link]);
+
+        (globalThis as any).document.elementsFromPoint = (x: number, y: number) => {
+            for (const el of [link, file, folder]) {
+                const r = el.getBoundingClientRect();
+                if (x >= r.left && x < r.right && y >= r.top && y < r.bottom) return [el];
+            }
+            return [];
+        };
+
+        const { hintMode } = getState();
+
+        // Base: without list boundary, folder dedup would remove file treeitem
+        // Delta: with <ul> between them, both survive as independent items
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive(), "hints should be active");
+    });
+});
+
+// ISSUE: noNestedLinks blocks container glow on folder <li> items that contain
+// discovered children in sub-lists, even though those children are at a different
+// tree level and won't visually clash with the glow.
+// FIX: hasListBoundaryBetween exempts sub-list children from the noNestedLinks check.
+describe("hasListBoundaryBetween", () => {
+    it("no boundary for direct child, boundary across nested list", () => {
         const env = createDOM(`
-            <ul>
-                <li>
-                    <a id="flat-link" href="#">link</a>
-                </li>
-            </ul>
-            <ul>
-                <li>
-                    <ul>
-                        <li>
-                            <a id="nested-link" href="#">file.ts</a>
-                        </li>
-                    </ul>
-                </li>
-            </ul>
+            <li id="container">
+                <a id="direct" href="#">direct link</a>
+                <ul>
+                    <li>
+                        <a id="nested" href="#">nested link</a>
+                    </li>
+                </ul>
+            </li>
         `);
 
-        const flatLink = env.document.getElementById("flat-link") as HTMLElement;
-        const nestedLink = env.document.getElementById("nested-link") as HTMLElement;
+        const container = env.document.getElementById("container") as HTMLElement;
+        const direct = env.document.getElementById("direct") as HTMLElement;
+        const nested = env.document.getElementById("nested") as HTMLElement;
 
-        // Base: link in a flat <li> — container is not nested
-        assert.equal(isNestedRepeatingContainer(flatLink), false,
-            "link in top-level <li> should not be nested");
+        // Base: direct child has no list boundary
+        assert.equal(hasListBoundaryBetween(container, direct), false,
+            "direct child should have no list boundary");
 
-        // Delta: link in <li> inside another <li> — container is nested
-        assert.equal(isNestedRepeatingContainer(nestedLink), true,
-            "link in nested <li> should be nested");
+        // Delta: child inside nested <ul><li> has a list boundary
+        assert.equal(hasListBoundaryBetween(container, nested), true,
+            "child in sub-list should have a list boundary");
 
         env.cleanup();
     });

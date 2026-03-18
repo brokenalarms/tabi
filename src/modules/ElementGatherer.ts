@@ -3,7 +3,7 @@
 // non-clickable nodes, and yield visible clickable elements, then deduplicates
 // via containment analysis.
 
-import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_SELECTOR } from "./constants";
+import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_SELECTOR, LIST_BOUNDARY_TAGS } from "./constants";
 import {
   isExcludedByIntent, childrenCannotBeVisible, isOnScreen, isVisible,
   isClippedByOverflow, isOccluded, isZeroSizeAnchor, isRedirectableControl,
@@ -167,19 +167,6 @@ export function walkerFilter(node: Node): number {
   return NodeFilter.FILTER_ACCEPT;
 }
 
-// --- Interactive type ---
-
-function interactiveType(el: HTMLElement): string {
-  const tag = el.tagName.toLowerCase();
-  const role = el.getAttribute("role")?.toLowerCase();
-  if (tag === "a" || role === "link") return "link";
-  if (tag === "button" || role === "button" || role === "menuitem") return "action";
-  if (tag === "input" || tag === "textarea" || tag === "select" ||
-      role === "checkbox" || role === "radio" || role === "switch" || role === "option") return "form";
-  if (tag === "summary" || tag === "details" || role === "tab") return "disclosure";
-  return "generic";
-}
-
 // --- Element discovery ---
 // Uses TreeWalker with walkerFilter to discover clickable, visible elements.
 // The walker prunes invisible subtrees (REJECT), skips non-clickable nodes
@@ -237,11 +224,14 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
   const resultSet = new Set(result);
   const toRemove = new Set<HTMLElement>();
 
-  // Build parentMap: each candidate → its nearest candidate ancestor
+  // Build parentMap: each candidate → its nearest candidate ancestor.
+  // Stop at <ul>/<ol> boundaries — items in nested lists are at different
+  // tree levels and should not be deduped against ancestor-list items.
   const parentMap = new Map<HTMLElement, HTMLElement>();
   for (const el of result) {
     let anc = el.parentElement;
     while (anc) {
+      if (LIST_BOUNDARY_TAGS.has(anc.tagName)) break;
       if (anc !== el && resultSet.has(anc as HTMLElement)) {
         parentMap.set(el, anc as HTMLElement);
         break;
@@ -261,20 +251,10 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
     list.push(child);
   }
 
-  // Resolve each group
-  for (const [root, descendants] of childrenOf) {
-    const rootType = interactiveType(root);
-    const allSameType = descendants.every(d => interactiveType(d) === rootType);
-    const allGeneric = descendants.every(d => interactiveType(d) === "generic");
-
-    if (allGeneric) {
-      for (const d of descendants) toRemove.add(d);
-    } else if (rootType === "generic") {
-      toRemove.add(root);
-    } else if (allSameType) {
-      toRemove.add(root);
-    }
-    // Mixed specific types — keep both
+  // Remove parents that have discovered interactive children — the children
+  // are more specific targets.
+  for (const [root] of childrenOf) {
+    toRemove.add(root);
   }
 
   // Label-for dedup
@@ -294,23 +274,6 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
     for (const el of result) {
       if (isAnchorToLabelTarget(el, labelForIds)) {
         toRemove.add(el);
-      }
-    }
-  }
-
-  // Sibling dedup: remove generic candidates when a non-generic sibling exists.
-  // Decorative divs (e.g. onclick) alongside real interactive elements
-  // (input, button, link) shouldn't get their own hints.
-  for (const el of result) {
-    if (toRemove.has(el)) continue;
-    if (interactiveType(el) !== "generic") continue;
-    const parent = el.parentElement;
-    if (!parent) continue;
-    for (const other of result) {
-      if (other === el || toRemove.has(other)) continue;
-      if (other.parentElement === parent && interactiveType(other) !== "generic") {
-        toRemove.add(el);
-        break;
       }
     }
   }

@@ -8,6 +8,10 @@ export const NATIVE_INTERACTIVE_ELEMENTS = ["a", "button", "input", "textarea", 
 const CLICKABLE_ROLES = ["button", "link", "tab", "menuitem", "option", "checkbox", "radio", "switch", "treeitem"];
 const CLICKABLE_ATTRS = ["label[for]", "[onclick]", "[onmousedown]"];
 
+/** Tags that act as list container boundaries — items in nested lists
+ *  are at different tree levels for dedup and glow purposes. */
+export const LIST_BOUNDARY_TAGS = new Set(["UL", "OL", "TABLE"]);
+
 export const CLICKABLE_SELECTOR = [
   ...NATIVE_INTERACTIVE_ELEMENTS,
   ...CLICKABLE_ROLES.map(r => `[role='${r}']`),

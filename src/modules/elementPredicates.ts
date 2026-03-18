@@ -1,7 +1,7 @@
 // Stateless element predicates — each answers one question about an element.
 // Used by walkerFilter (ElementGatherer) and hint positioning (HintMode).
 
-import { CLICKABLE_SELECTOR, HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER_HEIGHT, MINIMUM_CONTAINER_WIDTH } from "./constants";
+import { CLICKABLE_SELECTOR, HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER_HEIGHT, MINIMUM_CONTAINER_WIDTH, LIST_BOUNDARY_TAGS } from "./constants";
 
 // --- Visibility & geometry ---
 
@@ -218,10 +218,9 @@ export function isBlockLevel(el: HTMLElement): boolean {
 /** Minimum number of repeating siblings to count as a repeating pattern. */
 const MINIMUM_REPEATING_SIBLINGS = 3;
 
-/** Is this element inside a semantic list container (li, tr) that generates a box?
- *  Starts from parentElement — a container is an ancestor, never self. */
+/** Is this element inside a semantic list container (li, tr) that generates a box? */
 function isInListContainer(el: HTMLElement): HTMLElement | null {
-  const container = el.parentElement?.closest(REPEATING_CONTAINER_SELECTOR) as HTMLElement | null ?? null;
+  const container = el.closest(REPEATING_CONTAINER_SELECTOR) as HTMLElement | null;
   return container !== null && hasBox(container) ? container : null;
 }
 
@@ -269,17 +268,32 @@ export function isInRepeatingContainer(el: HTMLElement): boolean {
   return getRepeatingContainer(el) !== null;
 }
 
-/** Is this repeating container nested inside another repeating container?
- *  Nested containers (e.g. <li> inside <li> in tree views) shouldn't get
- *  container glow — the parent container already owns the visual region. */
-export function isNestedRepeatingContainer(el: HTMLElement): boolean {
-  const container = getRepeatingContainer(el);
-  return container !== null && isInRepeatingContainer(container);
+/** Is there a list container boundary (<ul> or <ol>) between ancestor and descendant?
+ *  Used to exempt sub-list children from the noNestedLinks check — discovered
+ *  elements behind a list boundary are at a different tree level and won't
+ *  visually clash with the ancestor's container glow. */
+export function hasListBoundaryBetween(ancestor: HTMLElement, descendant: HTMLElement): boolean {
+  let node: HTMLElement | null = descendant.parentElement;
+  while (node && node !== ancestor) {
+    if (LIST_BOUNDARY_TAGS.has(node.tagName)) return true;
+    node = node.parentElement;
+  }
+  return false;
 }
+
+/** Does this container have other discovered elements inside it?
+ *  Elements behind a list boundary are at a different tree level and are
+ *  exempt — they won't visually clash with the container's glow. */
+export function hasNestedLinks(container: HTMLElement, el: HTMLElement, elements: HTMLElement[]): boolean {
+  return elements.some(other =>
+    other !== el && container.contains(other) &&
+    !hasListBoundaryBetween(container, other));
+}
+
 
 /** Is this element large and rectangular enough for container-style hint placement?
  *  Checks minimum width, aspect ratio or viewport fraction, and box generation. */
-export function isContainerSized(el: HTMLElement, rect: DOMRect): boolean {
+export function isLargeEnoughForGlow(el: HTMLElement, rect: DOMRect): boolean {
   if (!hasBox(el)) return false;
   if (rect.width <= MINIMUM_CONTAINER_WIDTH) return false;
   if (rect.height < MINIMUM_CONTAINER_HEIGHT) return false;
@@ -337,9 +351,7 @@ export function isAnchorToLabelTarget(el: HTMLElement, labelForIds: Set<string>)
 /** Should this element's hint redirect to its heading descendant?
  *  True for any <a> with a heading inside it, unless it has a repeating
  *  container ancestor, which uses container glow instead.
- *  Only applies when <a> wraps <h> — the heading is inline inside the link
- *  and has the tighter rect. The inverse (<h> wraps <a>) is NOT redirected
- *  because the heading is block-level and wider than the inline link text. */
+ *  Positions the hint on the heading text rather than the link's full extent. */
 export function shouldRedirectToHeading(el: HTMLElement): boolean {
   return el.tagName.toLowerCase() === "a" &&
     hasHeadingContent(el) && !isInRepeatingContainer(el);
