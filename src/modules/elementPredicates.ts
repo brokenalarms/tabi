@@ -124,6 +124,7 @@ export function isOccluded(el: HTMLElement, rect: DOMRect): boolean {
     if (isContentlessOverlay(cover)) return false;
     if (isSiblingInRepeatingContainer(el, cover)) return false;
     if (isInSameLabel(el, cover)) return false;
+    if (isInNearbySiblingSubtree(el, cover)) return false;
     return true;
   };
 
@@ -164,6 +165,29 @@ export function isSiblingInRepeatingContainer(a: HTMLElement, b: HTMLElement): b
   return aItem !== null && bItem !== null &&
          aItem !== bItem &&
          aItem.parentElement === bItem.parentElement;
+}
+
+/** Maximum ancestor levels to walk when checking for nearby sibling subtrees. */
+const SIBLING_DEPTH_LIMIT = 4;
+
+/** Is the cover in a nearby sibling subtree of the target?
+ *  Walks up from the target a bounded number of levels. If an ancestor's parent
+ *  contains the cover (but the ancestor itself doesn't), they're in adjacent
+ *  subtrees under the same parent — adjacent flow content, not a real overlay.
+ *  Stops at body/html and at repeating containers (li, tr) to avoid exempting
+ *  content that bleeds across list boundaries. */
+export function isInNearbySiblingSubtree(el: HTMLElement, cover: HTMLElement): boolean {
+  let anc: HTMLElement | null = el;
+  let depth = 0;
+  while (anc && depth < SIBLING_DEPTH_LIMIT) {
+    if (anc.matches(REPEATING_CONTAINER_SELECTOR)) break;
+    const parent: HTMLElement | null = anc.parentElement;
+    if (!parent || parent === document.body || parent === document.documentElement) break;
+    if (parent.contains(cover) && !anc.contains(cover)) return true;
+    anc = parent;
+    depth++;
+  }
+  return false;
 }
 
 /** Is this element a contentless overlay that can't visually block anything?
