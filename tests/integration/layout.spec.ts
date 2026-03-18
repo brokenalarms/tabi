@@ -624,13 +624,8 @@ test("hint click dispatches after collapse animation completes", async ({ page }
 
 // ISSUE: Sibling <tr> rows in a table should get consistent container glow
 // (all-or-none). If one row gets glow, all sibling rows must too.
-// The second row has a tall card-image section in a different <td> column.
-// isOccluded + isInNearbySiblingSubtree might incorrectly filter the button
-// because the sibling walk breaks at <tr> before exempting same-row <td> siblings.
 // SITE: Macquarie banking — account list table with clickable rows
 // Container glow propagates to sibling rows without discovered elements.
-// Row 1 has a button (gets glow). Row 2 has no interactive elements but
-// should still get glow because it's a sibling <tr> in the same <tbody>.
 test("glow propagates to sibling <tr> without discovered elements", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 768 });
   await setupPage(page, `
