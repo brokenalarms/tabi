@@ -1,7 +1,7 @@
 // Stateless element predicates — each answers one question about an element.
 // Used by walkerFilter (ElementGatherer) and hint positioning (HintMode).
 
-import { CLICKABLE_SELECTOR, HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER_HEIGHT, MINIMUM_CONTAINER_WIDTH, LIST_CONTAINER_TAGS } from "./constants";
+import { CLICKABLE_SELECTOR, HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER_HEIGHT, MINIMUM_CONTAINER_WIDTH, LIST_BOUNDARY_TAGS } from "./constants";
 
 // --- Visibility & geometry ---
 
@@ -275,7 +275,7 @@ export function isInRepeatingContainer(el: HTMLElement): boolean {
 export function hasListBoundaryBetween(ancestor: HTMLElement, descendant: HTMLElement): boolean {
   let node: HTMLElement | null = descendant.parentElement;
   while (node && node !== ancestor) {
-    if (LIST_CONTAINER_TAGS.has(node.tagName)) return true;
+    if (LIST_BOUNDARY_TAGS.has(node.tagName)) return true;
     node = node.parentElement;
   }
   return false;

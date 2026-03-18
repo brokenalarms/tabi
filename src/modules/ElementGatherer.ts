@@ -3,7 +3,7 @@
 // non-clickable nodes, and yield visible clickable elements, then deduplicates
 // via containment analysis.
 
-import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_SELECTOR, LIST_CONTAINER_TAGS } from "./constants";
+import { NATIVE_INTERACTIVE_ELEMENTS, CLICKABLE_SELECTOR, LIST_BOUNDARY_TAGS } from "./constants";
 import {
   isExcludedByIntent, childrenCannotBeVisible, isOnScreen, isVisible,
   isClippedByOverflow, isOccluded, isZeroSizeAnchor, isRedirectableControl,
@@ -231,7 +231,7 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
   for (const el of result) {
     let anc = el.parentElement;
     while (anc) {
-      if (LIST_CONTAINER_TAGS.has(anc.tagName)) break;
+      if (LIST_BOUNDARY_TAGS.has(anc.tagName)) break;
       if (anc !== el && resultSet.has(anc as HTMLElement)) {
         parentMap.set(el, anc as HTMLElement);
         break;

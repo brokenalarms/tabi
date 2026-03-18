@@ -879,6 +879,75 @@ describe("checkbox/radio hint positioning", () => {
         assert.ok(hintLeft >= 130 && hintLeft <= 150,
             `Hint left (${hintLeft}) should be on label (~140) since checkbox is zero-size`);
     });
+
+    // Amazon: <a> wraps a decorative checkbox (aria-hidden input inside label) + text.
+    // The <a> is the discovered element; hint should redirect to the label
+    // (which covers the visual checkbox icon), not stay centered on the full <a>.
+    it("link with hidden checkbox inside label redirects hint to label", () => {
+        // Base: without embedded control, hint centers on <a> content
+        const textOnly = makeElement("SPAN", { top: 0, left: 50, width: 200, height: 25 });
+        const plainLink = makeElement("A", { href: "/filter", top: 0, left: 0, width: 300, height: 25, display: "inline" });
+        plainLink.appendChild(textOnly);
+
+        loadModules([plainLink]);
+        const { hintMode: hm1 } = getState();
+        hm1.activate(false);
+        const overlay1 = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const baseLeft = parseFloat(overlay1?.querySelector(".vimium-hint")?.style.left);
+        hm1.destroy();
+
+        // Delta: same link but with hidden checkbox inside label — hint should shift to label
+        const icon = makeElement("I", { top: 5, left: 5, width: 16, height: 16 });
+        const input = makeElement("INPUT", { type: "checkbox", top: 0, left: 0, width: 0, height: 0, display: "inline" });
+        input.setAttribute("aria-hidden", "true");
+        const label = makeElement("LABEL", { top: 0, left: 0, width: 30, height: 25, display: "inline" });
+        label.appendChild(input);
+        label.appendChild(icon);
+        const text = makeElement("SPAN", { top: 0, left: 50, width: 200, height: 25 });
+        const link = makeElement("A", { href: "/filter", top: 0, left: 0, width: 300, height: 25, display: "inline" });
+        link.appendChild(label);
+        link.appendChild(text);
+
+        loadModules([link]);
+        const { hintMode: hm2 } = getState();
+        hm2.activate(false);
+        assert.ok(hm2.isActive());
+
+        const overlay2 = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay2?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        const hintLeft = parseFloat(hints[0].style.left);
+        // Label is at left:0, width:30 — center is 15.
+        // Without fix, hint centers on <a> content (~125).
+        assert.ok(hintLeft <= 40,
+            `Hint left (${hintLeft}) should be near checkbox label (~15), not centered on link (~${Math.round(baseLeft)})`);
+        hm2.destroy();
+    });
+
+    // Base case: visible checkbox inside <a> + <label> — redirect to input, not label.
+    it("link with visible checkbox inside label redirects hint to input", () => {
+        const input = makeElement("INPUT", { type: "checkbox", top: 5, left: 5, width: 16, height: 16, display: "inline" });
+        const label = makeElement("LABEL", { top: 0, left: 0, width: 200, height: 25, display: "inline" });
+        label.appendChild(input);
+        const text = makeElement("SPAN", { top: 0, left: 220, width: 200, height: 25 });
+        const link = makeElement("A", { href: "/filter", top: 0, left: 0, width: 500, height: 25, display: "inline" });
+        link.appendChild(label);
+        link.appendChild(text);
+
+        loadModules([link]);
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        const hints = overlay?.querySelectorAll(".vimium-hint");
+        assert.equal(hints?.length, 1);
+        const hintLeft = parseFloat(hints[0].style.left);
+        // Input is at left:5, width:16 — center is 13.
+        // Should redirect to input directly, not the wide label or <a> center.
+        assert.ok(hintLeft <= 25,
+            `Hint left (${hintLeft}) should be near checkbox input (~13), not label center (~100)`);
+    });
 });
 
 // ISSUE: Inline centering logic widens hint to full parent <p> width for an <a> that's
@@ -1455,9 +1524,9 @@ describe("inline expansion walks up to block ancestor", () => {
             `Wrapped (${wrappedLeft}) should match direct (${directLeft}) — walk-up reaches same <li>`);
     });
 
-    // Fidelity: <h2><a>I Accept</a></h2> — heading is the block ancestor but should
-    // NOT be used for width expansion. Headings are semantic text containers, not layout
-    // containers. The hint should stay on the <a>'s own rect.
+    // <h2><a>Title</a></h2> — heading wraps the link. The hint should NOT
+    // redirect to the heading (it's block-level, too wide). The hint stays
+    // on the inline <a> rect.
     it("heading ancestor is the variable that prevents expansion", () => {
         // Base: <li><a> — non-heading block ancestor, hint expands to <li> width
         const li = makeElement("LI", { top: 10, left: 0, width: 300, height: 25, display: "list-item" });
@@ -2147,6 +2216,16 @@ describe("shouldRedirectToHeading", () => {
         env.cleanup();
     });
 
+    // <h2><a>title</a></h2> — heading wraps the link. Should NOT redirect
+    // because the heading is block-level (wider than the inline link text).
+    // Only <a><h>title</h></a> redirects (heading is inline inside the link).
+    it("does not redirect when link is inside a heading ancestor", () => {
+        const env = createDOM(`<h2><a id="t" href="/page">Title</a></h2>`);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.ok(!shouldRedirectToHeading(el), "link inside heading should not redirect");
+        env.cleanup();
+    });
+
     it("does not redirect when no heading exists", () => {
         const env = createDOM(`<a id="t" href="/page"><span>Not a heading</span></a>`);
         const el = env.document.getElementById("t") as unknown as HTMLElement;
@@ -2722,5 +2801,57 @@ describe("hasListBoundaryBetween", () => {
             "child in sub-list should have a list boundary");
 
         env.cleanup();
+    });
+});
+
+// AngryMetalGuy: <h2><a>title</a></h2> — heading wraps link. The <a> has
+// the correct inline width, the <h2> has the correct height. Pill should
+// use the intersection: <a>'s width, <h2>'s height.
+describe("heading ancestor rect clamping", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("clamps link rect to heading ancestor bounds", () => {
+        // Base: <a> without heading ancestor — uses full <a> rect
+        const div = makeElement("DIV", { top: 0, left: 0, width: 500, height: 40, display: "block" });
+        const a1 = makeElement("A", {
+            href: "#",
+            top: 0, left: 0, width: 200, height: 40,
+        });
+        div.appendChild(a1);
+
+        loadModules([a1]);
+        let hm = getState().hintMode;
+        hm.activate(false);
+
+        let overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        let hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
+        assert.ok(hint, "base: hint should exist");
+        // Pill at a.bottom(40) + 2 = 42px
+        assert.equal(hint.style.top, "42px");
+        hm.deactivate();
+
+        // Delta: <h2 28px><a 40px> — heading clamps rect, pill uses h2.bottom
+        const h2 = makeElement("H2", { top: 0, left: 0, width: 500, height: 28, display: "block" });
+        const a2 = makeElement("A", {
+            href: "#",
+            top: 0, left: 0, width: 200, height: 40,
+        });
+        h2.appendChild(a2);
+
+        loadModules([a2]);
+        hm = getState().hintMode;
+        hm.activate(false);
+
+        overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
+        hint = overlay?.querySelector(".vimium-hint") as HTMLElement;
+        assert.ok(hint, "delta: hint should exist");
+        // Pill at h2.bottom(28) + 2 = 30px, not a.bottom(40) + 2 = 42px
+        assert.equal(hint.style.top, "30px");
+        // Width stays as <a>'s: centered at 200/2 = 100px
+        assert.equal(hint.style.left, "100px");
     });
 });
