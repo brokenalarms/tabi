@@ -58,9 +58,14 @@ export function getLinkContentRect(el: HTMLElement, rect: DOMRect): DOMRect {
   if (el.children.length > 0) {
     return getChildrenContentRect(el) ?? rect;
   }
-  const paddingBottom = parseFloat(getComputedStyle(el).paddingBottom) || 0;
-  if (paddingBottom > 0) {
-    return new DOMRect(rect.left, rect.top, rect.width, rect.height - paddingBottom);
+  const style = getComputedStyle(el);
+  const paddingBottom = parseFloat(style.paddingBottom) || 0;
+  const fontSize = parseFloat(style.fontSize) || 0;
+  const lineHeight = parseFloat(style.lineHeight) || 0;
+  const halfLeading = lineHeight > fontSize ? (lineHeight - fontSize) / 2 : 0;
+  const shrink = paddingBottom + halfLeading;
+  if (shrink > 0 && rect.height - shrink > 0) {
+    return new DOMRect(rect.left, rect.top, rect.width, rect.height - shrink);
   }
   return rect;
 }

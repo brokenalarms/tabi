@@ -208,6 +208,10 @@ test("multi-line link hint sits below last line", async ({ page }) => {
     const link = document.getElementById("link")!;
     const linkRect = link.getBoundingClientRect();
     const clientRects = link.getClientRects();
+    const style = getComputedStyle(link);
+    const fontSize = parseFloat(style.fontSize) || 0;
+    const lineHeight = parseFloat(style.lineHeight) || 0;
+    const halfLeading = lineHeight > fontSize ? (lineHeight - fontSize) / 2 : 0;
     const hint = document.querySelector(".vimium-hint") as HTMLElement;
     const hintTop = hint ? parseFloat(hint.style.top) : -1;
 
@@ -216,15 +220,15 @@ test("multi-line link hint sits below last line", async ({ page }) => {
       linkBottom: linkRect.bottom,
       firstLineBottom: clientRects[0]?.bottom ?? -1,
       lineCount: clientRects.length,
+      halfLeading,
       hintTop,
     };
   });
 
   // Verify the link actually wraps (test precondition)
   expect(result.lineCount).toBeGreaterThan(1);
-  // Pill is placed at rect.bottom + 2; the 4px tail intrudes into the text.
-  // hintTop should be exactly linkBottom + 2.
-  expect(result.hintTop).toBe(result.linkBottom + 2);
+  // Pill is placed at rect.bottom - halfLeading + 2, tightened to text bottom.
+  expect(result.hintTop).toBe(result.linkBottom - result.halfLeading + 2);
 });
 
 // Reddit "1 more reply": flex <a> is stretched to full grid width (~520px)

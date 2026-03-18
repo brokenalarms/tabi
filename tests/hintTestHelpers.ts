@@ -75,6 +75,8 @@ export function makeElement(tag: string, opts: any = {}) {
     if (opts.overflowY && opts.overflowY !== "visible") el.style.overflowY = opts.overflowY;
     if (opts.paddingTop && opts.paddingTop !== "0px") el.style.paddingTop = opts.paddingTop;
     if (opts.paddingBottom && opts.paddingBottom !== "0px") el.style.paddingBottom = opts.paddingBottom;
+    if (opts.fontSize) el.style.fontSize = opts.fontSize;
+    if (opts.lineHeight) el.style.lineHeight = opts.lineHeight;
 
     // HTML attributes
     if (opts.attrs) {
