@@ -1,4 +1,5 @@
 import { build } from "esbuild";
+import "../../loadEnv.mjs";
 
 export default async function globalSetup() {
   await build({
@@ -8,5 +9,8 @@ export default async function globalSetup() {
     format: "iife",
     target: "es2020",
     logLevel: "warning",
+    define: {
+      __VIMIUM_DEBUG__: process.env.VIMIUM_DEBUG === "1" ? "true" : "false",
+    },
   });
 }

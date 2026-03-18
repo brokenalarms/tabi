@@ -1,4 +1,5 @@
 import { build } from "esbuild";
+import "./loadEnv.mjs";
 
 const outDir = "Vimium/Safari Extension/Resources";
 
@@ -10,4 +11,7 @@ await build({
   target: "es2020",
   sourcemap: false,
   logLevel: "info",
+  define: {
+    __VIMIUM_DEBUG__: process.env.VIMIUM_DEBUG === "1" ? "true" : "false",
+  },
 });

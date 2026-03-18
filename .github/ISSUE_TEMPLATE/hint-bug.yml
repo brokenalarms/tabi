@@ -1,0 +1,52 @@
+name: Hint mode bug
+description: Report a hint placement, duplicate hint, or missing hint issue
+labels: ["bug", "hints"]
+body:
+  - type: input
+    id: url
+    attributes:
+      label: URL
+      description: The page URL where the issue occurs
+      placeholder: https://example.com/page
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot
+      description: Screenshot showing the incorrect hint behavior. Drag and drop the image here.
+    validations:
+      required: true
+
+  - type: textarea
+    id: dom
+    attributes:
+      label: DOM snippet
+      description: |
+        The relevant DOM subtree (right-click → Inspect → Copy → Copy outerHTML).
+        Trim to the minimal structure that shows the problem.
+      render: html
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: Which elements should or shouldn't get hints, or where hints should be positioned.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Issue type
+      options:
+        - Duplicate hints
+        - Missing hint
+        - Hint on wrong element
+        - Hint positioned incorrectly
+        - Other
+    validations:
+      required: true
