@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
-import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isContentlessOverlay, shouldRedirectToHeading } from "../src/modules/elementPredicates";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isContentlessOverlay, shouldRedirectToHeading, isNestedRepeatingContainer } from "../src/modules/elementPredicates";
 import { findBlockAncestor } from "../src/modules/elementTraversals";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
@@ -2715,6 +2715,44 @@ describe("isContentlessOverlay replaced elements", () => {
 
         assert.equal(isContentlessOverlay(obj), false);
         assert.equal(isContentlessOverlay(emb), false);
+
+        env.cleanup();
+    });
+});
+
+// ISSUE: Container glow applied to <li> items nested inside other <li> items in tree views,
+// creating visual noise with nested glow borders.
+// SITE: github.com PR file tree
+// FIX: Repeating containers nested inside other repeating containers are disqualified from glow.
+describe("nested repeating containers disqualified from glow", () => {
+    it("link in flat list is not nested, link in tree child is nested", () => {
+        const env = createDOM(`
+            <ul>
+                <li>
+                    <a id="flat-link" href="#">link</a>
+                </li>
+            </ul>
+            <ul>
+                <li>
+                    <ul>
+                        <li>
+                            <a id="nested-link" href="#">file.ts</a>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+        `);
+
+        const flatLink = env.document.getElementById("flat-link") as HTMLElement;
+        const nestedLink = env.document.getElementById("nested-link") as HTMLElement;
+
+        // Base: link in a flat <li> — container is not nested
+        assert.equal(isNestedRepeatingContainer(flatLink), false,
+            "link in top-level <li> should not be nested");
+
+        // Delta: link in <li> inside another <li> — container is nested
+        assert.equal(isNestedRepeatingContainer(nestedLink), true,
+            "link in nested <li> should be nested");
 
         env.cleanup();
     });
