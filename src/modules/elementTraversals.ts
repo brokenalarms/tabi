@@ -3,9 +3,12 @@
 // Used by both ElementGatherer and HintMode.
 
 import { HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR } from "./constants";
-import { hasBox } from "./elementPredicates";
+import { hasBox, isVisible, isSubtreeRemoved, isRedirectableControl } from "./elementPredicates";
 
-/** Find the label associated with a form control (via for= or ancestor <label>). */
+/** Find the label associated with a form control (via for= or ancestor <label>).
+ *  Used by ElementGatherer for discovery (label rect as fallback for zero-size
+ *  inputs) and dedup (removing duplicate label when input is also discovered).
+ *  Hint positioning uses findControlTarget instead. */
 export function findAssociatedLabel(el: HTMLElement): HTMLElement | null {
   if (el.id) {
     const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
@@ -14,6 +17,32 @@ export function findAssociatedLabel(el: HTMLElement): HTMLElement | null {
   const parent = el.closest("label");
   if (parent) return parent as HTMLElement;
   return null;
+}
+
+/** Resolve a label+input pair to the right hint target element.
+ *  Handles two configurations:
+ *  1. Element IS a checkbox/radio — looks up for its associated label
+ *  2. Element CONTAINS a label wrapping a checkbox/radio — looks down
+ *  In both cases: visible input → input, hidden input → label.
+ *  Used by HintMode for positioning — decides WHERE the hint lands,
+ *  not whether the element is discovered (that's ElementGatherer's job). */
+export function findControlTarget(el: HTMLElement): HTMLElement | null {
+  let input: HTMLElement | null = null;
+  let label: HTMLElement | null = null;
+
+  if (isRedirectableControl(el)) {
+    input = el;
+    label = findAssociatedLabel(el);
+  } else {
+    label = el.querySelector("label") as HTMLElement | null;
+    if (label) {
+      input = label.querySelector("input[type='checkbox'], input[type='radio']") as HTMLElement | null;
+    }
+  }
+
+  if (!input || !label) return null;
+  if (isVisible(input) && !isSubtreeRemoved(input)) return input;
+  return label;
 }
 
 /** Return the first child with non-zero dimensions, or null. */
