@@ -75,7 +75,7 @@ struct SetupTab: View {
 
     private func openExtensionPreferences() {
         SFSafariApplication.showPreferencesForExtension(
-            withIdentifier: "com.brokenalarms.Tabi.Extension"
+            withIdentifier: "com.brokenalarms.tabi.Extension"
         ) { error in
             if error != nil {
                 DispatchQueue.main.async {
@@ -87,7 +87,7 @@ struct SetupTab: View {
 
     private func checkExtensionState() {
         SFSafariExtensionManager.getStateOfSafariExtension(
-            withIdentifier: "com.brokenalarms.Tabi.Extension"
+            withIdentifier: "com.brokenalarms.tabi.Extension"
         ) { state, error in
             DispatchQueue.main.async {
                 extensionEnabled = state?.isEnabled ?? false

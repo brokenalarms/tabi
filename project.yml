@@ -29,7 +29,7 @@ targets:
       - path: Tabi/Shared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.brokenalarms.Tabi
+        PRODUCT_BUNDLE_IDENTIFIER: com.brokenalarms.tabi
         CODE_SIGN_ENTITLEMENTS: Tabi/Host App/Tabi.entitlements
         CODE_SIGN_STYLE: Automatic
         INFOPLIST_KEY_CFBundleDisplayName: Tabi
@@ -53,7 +53,7 @@ targets:
       - path: Tabi/Shared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.brokenalarms.Tabi.Extension
+        PRODUCT_BUNDLE_IDENTIFIER: com.brokenalarms.tabi.Extension
         CODE_SIGN_ENTITLEMENTS: Tabi/Safari Extension/TabiExtension.entitlements
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: true
