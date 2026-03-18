@@ -7,7 +7,7 @@ import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from ".
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
 import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isContentlessOverlay, shouldRedirectToHeading, isNestedRepeatingContainer } from "../src/modules/elementPredicates";
-import { findBlockAncestor } from "../src/modules/elementTraversals";
+import { findBlockAncestor, getHeading } from "../src/modules/elementTraversals";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
 describe("element discovery", () => {
@@ -1594,10 +1594,9 @@ describe("inline expansion walks up to block ancestor", () => {
             `Wrapped (${wrappedLeft}) should match direct (${directLeft}) — walk-up reaches same <li>`);
     });
 
-    // Fidelity: <h2><a>I Accept</a></h2> — heading is the block ancestor but should
-    // NOT be used for width expansion. Headings are semantic text containers, not layout
-    // containers. The hint should stay on the <a>'s own rect.
-    it("heading ancestor is the variable that prevents expansion", () => {
+    // <h2><a>Title</a></h2> — the heading wraps the link. The hint should
+    // redirect to the heading and use its rect for positioning.
+    it("heading ancestor is the variable that redirects hint target", () => {
         // Base: <li><a> — non-heading block ancestor, hint expands to <li> width
         const li = makeElement("LI", { top: 10, left: 0, width: 300, height: 25, display: "list-item" });
         const a1 = makeElement("A", { href: "/item", top: 10, left: 50, width: 100, height: 20, display: "inline" });
@@ -1614,7 +1613,7 @@ describe("inline expansion walks up to block ancestor", () => {
             `Inside <li>: hint should center on <li> (150)`);
         hintMode.deactivate();
 
-        // Delta: <h2><a> — heading block ancestor, hint stays on <a>
+        // Delta: <h2><a> — heading ancestor, hint redirects to <h2> and centers on it
         const h2 = makeElement("H2", { top: 10, left: 0, width: 300, height: 25, display: "block" });
         const a2 = makeElement("A", { href: "/accept", top: 10, left: 50, width: 100, height: 20, display: "inline" });
         h2.appendChild(a2);
@@ -1624,9 +1623,9 @@ describe("inline expansion walks up to block ancestor", () => {
         assert.ok(hintMode.isActive());
         overlay = (globalThis as any).document.documentElement.querySelector(".vimium-hint-overlay");
         hints = overlay?.querySelectorAll(".vimium-hint");
-        const noExpansionLeft = parseFloat(hints[0].style.left);
-        assert.equal(noExpansionLeft, 100, // 50 + 100/2 = centers on <a>
-            `Inside <h2>: hint should center on <a> (100), not expand to <h2> (150)`);
+        const headingLeft = parseFloat(hints[0].style.left);
+        assert.equal(headingLeft, 150, // 0 + 300/2 = centers on <h2>
+            `Inside <h2>: hint should center on <h2> (150)`);
     });
 
     it("stops walk-up at parent with multiple children", () => {
@@ -2284,6 +2283,23 @@ describe("shouldRedirectToHeading", () => {
         const el = env.document.getElementById("t") as unknown as HTMLElement;
         assert.ok(!shouldRedirectToHeading(el), "link in <li> should not redirect to heading");
         env.cleanup();
+    });
+
+    // AngryMetalGuy: <h2><a>title</a></h2> — the heading wraps the link.
+    // The <a>'s rect is larger than the <h2>'s, so the pill should use
+    // the heading's tighter rect for positioning.
+    it("redirects when link is inside a heading ancestor", () => {
+        // Base: link without heading ancestor does not redirect
+        const env1 = createDOM(`<div><a id="t1" href="/page">Title</a></div>`);
+        const el1 = env1.document.getElementById("t1") as unknown as HTMLElement;
+        assert.ok(!shouldRedirectToHeading(el1), "link without heading should not redirect");
+        env1.cleanup();
+
+        // Delta: link inside heading should redirect
+        const env2 = createDOM(`<h2><a id="t2" href="/page">Title</a></h2>`);
+        const el2 = env2.document.getElementById("t2") as unknown as HTMLElement;
+        assert.ok(shouldRedirectToHeading(el2), "link inside heading should redirect");
+        env2.cleanup();
     });
 
     it("does not redirect when no heading exists", () => {
