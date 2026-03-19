@@ -269,6 +269,23 @@ export async function handleCommand(command: Command, sender: MessageSender, mes
   return { status: "ok" };
 }
 
+// Fetch settings from the native Safari extension handler and persist to
+// browser.storage.local so content scripts and the popup can read them.
+// Currently syncs the detected keyboard layout (read-only from Carbon TIS).
+export async function syncNativeSettings(): Promise<void> {
+  try {
+    const response = await browser.runtime.sendNativeMessage(
+      "com.brokenalarms.tabi.Extension",
+      { command: "getSettings" },
+    );
+    if (response && typeof response.keyboardLayout === "string") {
+      await browser.storage.local.set({ keyboardLayout: response.keyboardLayout });
+    }
+  } catch (_) {
+    // Native messaging may not be available (e.g. in tests)
+  }
+}
+
 // Register listeners and populate caches — called at load time in production,
 // and explicitly from tests after the browser shim is installed.
 export function init(): void {
@@ -334,4 +351,5 @@ export function init(): void {
 // Auto-init when running in the browser extension context
 if (typeof browser !== "undefined") {
   init();
+  syncNativeSettings();
 }
