@@ -83,8 +83,13 @@ h1 {
   font-size: 12px;
   font-weight: 500;
   font-family: inherit;
+<<<<<<< HEAD
   border: none;
   background: transparent;
+=======
+  border: 1px solid var(--tabi-segmented-border);
+  background: var(--tabi-segmented-bg);
+>>>>>>> c34dde9 (Extract shared tabi-theme.css design tokens)
   color: var(--tabi-segmented-color);
   cursor: pointer;
   border-radius: 6px;
@@ -92,11 +97,19 @@ h1 {
 }
 
 .segmented button:hover {
+<<<<<<< HEAD
   color: var(--tabi-color);
+=======
+  background: var(--tabi-segmented-hover);
+>>>>>>> c34dde9 (Extract shared tabi-theme.css design tokens)
 }
 
 .segmented button.active {
   background: var(--tabi-accent);
+<<<<<<< HEAD
+=======
+  border-color: var(--tabi-accent);
+>>>>>>> c34dde9 (Extract shared tabi-theme.css design tokens)
   color: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
 }
@@ -111,12 +124,17 @@ h1 {
   margin-top: 6px;
   font-size: 11px;
   color: var(--tabi-color-secondary);
+<<<<<<< HEAD
   line-height: 1.5;
+=======
+  line-height: 1.4;
+>>>>>>> c34dde9 (Extract shared tabi-theme.css design tokens)
 }
 
 hr {
   border: none;
   border-top: 1px solid var(--tabi-separator);
+<<<<<<< HEAD
   margin: 14px 0;
 }
 
@@ -141,4 +159,7 @@ hr {
 
 .settings-link:hover {
   color: var(--tabi-muted);
+=======
+  margin: 12px 0;
+>>>>>>> c34dde9 (Extract shared tabi-theme.css design tokens)
 }
