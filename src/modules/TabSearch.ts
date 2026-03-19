@@ -71,14 +71,13 @@ export class TabSearch {
     if (!this._active) return;
     this._active = false;
     this._keyHandler.clearModeKeyDelegate();
-    // Removing the focused input from the DOM causes the browser to move
-    // focus to <body> and scroll to the top. Preserve scroll position.
-    const scrollX = window.scrollX;
-    const scrollY = window.scrollY;
+    // Move focus away before removing the overlay so the browser doesn't
+    // implicitly shift focus to <body> and scroll to the top.
+    if (this._inputEl) this._inputEl.hidden = true;
+    document.body.focus({ preventScroll: true });
     if (this._overlayEl && this._overlayEl.parentNode) {
       this._overlayEl.parentNode.removeChild(this._overlayEl);
     }
-    window.scrollTo(scrollX, scrollY);
     this._overlayEl = null;
     this._inputEl = null;
     this._resultsEl = null;
