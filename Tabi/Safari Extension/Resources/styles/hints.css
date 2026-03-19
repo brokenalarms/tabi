@@ -102,9 +102,8 @@
 
 .tabi-mode-bar {
     position: fixed;
-    bottom: 12px;
-    left: 50%;
-    transform: translateX(-50%);
+    bottom: 16px;
+    right: 16px;
     z-index: 2147483647;
     padding: 10px 24px;
     border-radius: 10px;
