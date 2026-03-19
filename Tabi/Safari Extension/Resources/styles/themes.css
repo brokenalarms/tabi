@@ -50,6 +50,60 @@
     --tabi-premium-accent: #e2a73a;
 }
 
+/* ── Yank mode hint theme (cyan) ─────────────────────────────────────── */
+
+.tabi-hint-overlay[data-hint-mode="yank"] .tabi-hint {
+    --tabi-hint-bg: linear-gradient(to bottom, #85f0ff, #42c5d6);
+    --tabi-hint-border: #228a96;
+    --tabi-hint-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --tabi-hint-color: #0a2525;
+    --tabi-hint-bar-line: rgba(34, 138, 150, 0.4);
+    --tabi-hint-bar-glow: rgba(34, 138, 150, 0.15);
+}
+
+[data-tabi-theme="dark"] .tabi-hint-overlay[data-hint-mode="yank"] .tabi-hint {
+    --tabi-hint-bg: linear-gradient(to bottom, #2a6b73, #1a4a50);
+    --tabi-hint-border: #4a9aa3;
+    --tabi-hint-color: #c5f0f5;
+    --tabi-hint-bar-line: rgba(74, 154, 163, 0.4);
+    --tabi-hint-bar-glow: rgba(74, 154, 163, 0.15);
+}
+
+[data-tabi-theme="light"] .tabi-hint-overlay[data-hint-mode="yank"] .tabi-hint {
+    --tabi-hint-bg: linear-gradient(to bottom, #d4f5f8, #a8e6ec);
+    --tabi-hint-border: #6ec0c9;
+    --tabi-hint-color: #0a2525;
+    --tabi-hint-bar-line: rgba(110, 192, 201, 0.4);
+    --tabi-hint-bar-glow: rgba(110, 192, 201, 0.15);
+}
+
+/* ── Multi-select mode hint theme (green) ────────────────────────────── */
+
+.tabi-hint-overlay[data-hint-mode="multi"] .tabi-hint {
+    --tabi-hint-bg: linear-gradient(to bottom, #85ff9a, #42d65a);
+    --tabi-hint-border: #22962e;
+    --tabi-hint-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    --tabi-hint-color: #0a250d;
+    --tabi-hint-bar-line: rgba(34, 150, 46, 0.4);
+    --tabi-hint-bar-glow: rgba(34, 150, 46, 0.15);
+}
+
+[data-tabi-theme="dark"] .tabi-hint-overlay[data-hint-mode="multi"] .tabi-hint {
+    --tabi-hint-bg: linear-gradient(to bottom, #2a732e, #1a501d);
+    --tabi-hint-border: #4aa350;
+    --tabi-hint-color: #c5f5c9;
+    --tabi-hint-bar-line: rgba(74, 163, 80, 0.4);
+    --tabi-hint-bar-glow: rgba(74, 163, 80, 0.15);
+}
+
+[data-tabi-theme="light"] .tabi-hint-overlay[data-hint-mode="multi"] .tabi-hint {
+    --tabi-hint-bg: linear-gradient(to bottom, #d4f8d6, #a8eca8);
+    --tabi-hint-border: #6ec96e;
+    --tabi-hint-color: #0a250d;
+    --tabi-hint-bar-line: rgba(110, 201, 110, 0.4);
+    --tabi-hint-bar-glow: rgba(110, 201, 110, 0.15);
+}
+
 /* ── Shared panel theme (dark default) ────────────────────────────────── */
 
 .tabi-panel {

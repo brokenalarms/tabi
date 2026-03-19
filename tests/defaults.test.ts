@@ -1,6 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { DEFAULTS, resolveSettings } from "../src/types.js";
+import { PRESETS, bindingsForPreset, isLayoutPremium } from "../src/keybindings.js";
 
 describe("resolveSettings", () => {
   // Empty storage should produce all default values
@@ -11,15 +12,56 @@ describe("resolveSettings", () => {
 
   // Stored values should override DEFAULTS
   it("overrides DEFAULTS with stored values", () => {
-    const resolved = resolveSettings({ theme: "dark", keyBindingMode: "character" });
+    const resolved = resolveSettings({ theme: "dark", keyBindingMode: "character", keyLayout: "vim" });
     assert.equal(resolved.theme, "dark");
     assert.equal(resolved.keyBindingMode, "character");
+    assert.equal(resolved.keyLayout, "vim");
   });
 
   // Explicit undefined from storage should not clobber DEFAULTS
   it("ignores undefined storage values", () => {
-    const resolved = resolveSettings({ theme: undefined, keyBindingMode: undefined });
+    const resolved = resolveSettings({ theme: undefined, keyBindingMode: undefined, keyLayout: undefined });
     assert.equal(resolved.theme, "auto");
     assert.equal(resolved.keyBindingMode, "location");
+    assert.equal(resolved.keyLayout, "optimized");
+  });
+
+  // keyLayout defaults to "optimized" for new users
+  it("defaults keyLayout to optimized", () => {
+    const resolved = resolveSettings({});
+    assert.equal(resolved.keyLayout, "optimized");
+  });
+});
+
+describe("Key layouts", () => {
+  // Premium gating: leftHand and rightHand are premium, optimized and vim are free
+  it("gates leftHand and rightHand behind premium", () => {
+    assert.equal(isLayoutPremium("optimized"), false);
+    assert.equal(isLayoutPremium("vim"), false);
+    assert.equal(isLayoutPremium("leftHand"), true);
+    assert.equal(isLayoutPremium("rightHand"), true);
+  });
+
+  // All four layouts should have non-empty bindings
+  it("all layouts have bindings", () => {
+    for (const layout of ["optimized", "vim", "leftHand", "rightHand"] as const) {
+      const bindings = bindingsForPreset(layout);
+      assert.ok(bindings.length > 0, `${layout} should have bindings`);
+    }
+  });
+
+  // leftHand layout uses WASD for scrolling instead of HJKL
+  it("leftHand uses WASD for scrolling", () => {
+    const bindings = new Map(bindingsForPreset("leftHand"));
+    assert.equal(bindings.get("KeyW"), "scrollUp");
+    assert.equal(bindings.get("KeyS"), "scrollDown");
+    assert.equal(bindings.get("KeyA"), "scrollLeft");
+    assert.equal(bindings.get("KeyD"), "scrollRight");
+  });
+
+  // rightHand layout uses Semicolon for hint activation
+  it("rightHand uses Semicolon for activateHints", () => {
+    const bindings = new Map(bindingsForPreset("rightHand"));
+    assert.equal(bindings.get("Semicolon"), "activateHints");
   });
 });

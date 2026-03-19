@@ -18,6 +18,7 @@ declare const browser: {
 };
 
 const SETTINGS: { id: string; key: string; fallback: string }[] = [
+  { id: "keyLayout", key: "keyLayout", fallback: "optimized" },
   { id: "keyBindingMode", key: "keyBindingMode", fallback: "location" },
   { id: "theme", key: "theme", fallback: "auto" },
 ];
@@ -44,6 +45,16 @@ async function init(): Promise<void> {
     updatePremiumPill(pill, stored.isPremium === true);
   }
 
+  const isPremium = stored.isPremium === true;
+
+  // Gate premium buttons
+  for (const btn of document.querySelectorAll<HTMLButtonElement>("button[data-premium]")) {
+    if (!isPremium) {
+      btn.disabled = true;
+      btn.title = "Premium feature";
+    }
+  }
+
   // Segmented controls
   for (const { id, key, fallback } of SETTINGS) {
     const container = document.getElementById(id);
@@ -54,7 +65,7 @@ async function init(): Promise<void> {
 
     container.addEventListener("click", (e) => {
       const btn = (e.target as HTMLElement).closest("button");
-      if (!btn || !btn.dataset.value) return;
+      if (!btn || !btn.dataset.value || btn.disabled) return;
       activateButton(container, btn.dataset.value);
       browser.storage.local.set({ [key]: btn.dataset.value });
     });

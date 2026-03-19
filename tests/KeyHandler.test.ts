@@ -436,4 +436,77 @@ describe("KeyHandler", () => {
             assert.ok(called, "scrollDown should fire for physical KeyJ in location mode");
         });
     });
+
+    describe("Layout switching via setLayout()", () => {
+        // Verifies that setLayout() clears old bindings and applies new ones,
+        // allowing users to switch between key layout presets at runtime.
+
+        it("switches from optimized to vim layout", () => {
+            // Base: optimized layout has J bound to scrollDown
+            let scrollDownCalled = false;
+            keyHandler.on("scrollDown", () => { scrollDownCalled = true; });
+            fireKeyDown(makeKeyEvent("KeyJ"));
+            assert.ok(scrollDownCalled, "J dispatches scrollDown in optimized layout");
+
+            // Delta: switch to vim — J should still dispatch scrollDown (same key)
+            scrollDownCalled = false;
+            keyHandler.setLayout("vim");
+            fireKeyDown(makeKeyEvent("KeyJ"));
+            assert.ok(scrollDownCalled, "J dispatches scrollDown in vim layout too");
+        });
+
+        it("switches to leftHand layout — WASD replaces HJKL", () => {
+            // Base: optimized layout — S is not bound
+            let scrollDownCalled = false;
+            keyHandler.on("scrollDown", () => { scrollDownCalled = true; });
+            const evS = makeKeyEvent("KeyS");
+            fireKeyDown(evS);
+            assert.ok(!scrollDownCalled, "S should not dispatch scrollDown in optimized layout");
+
+            // Delta: leftHand layout — S dispatches scrollDown (WASD scheme)
+            keyHandler.setLayout("leftHand");
+            fireKeyDown(makeKeyEvent("KeyS"));
+            assert.ok(scrollDownCalled, "S dispatches scrollDown in leftHand layout");
+        });
+
+        it("switches to rightHand layout — semicolon activates hints", () => {
+            // Base: optimized layout — Semicolon is not bound
+            let hintsCalled = false;
+            keyHandler.on("activateHints", () => { hintsCalled = true; });
+            const evSemi = makeKeyEvent("Semicolon");
+            fireKeyDown(evSemi);
+            assert.ok(!hintsCalled, "Semicolon should not dispatch activateHints in optimized layout");
+
+            // Delta: rightHand layout — Semicolon dispatches activateHints
+            keyHandler.setLayout("rightHand");
+            fireKeyDown(makeKeyEvent("Semicolon"));
+            assert.ok(hintsCalled, "Semicolon dispatches activateHints in rightHand layout");
+        });
+
+        it("clears old bindings when switching layouts", () => {
+            // Base: optimized layout — F activates hints
+            let hintsCalled = false;
+            keyHandler.on("activateHints", () => { hintsCalled = true; });
+            fireKeyDown(makeKeyEvent("KeyF"));
+            assert.ok(hintsCalled, "F dispatches activateHints in optimized layout");
+
+            // Delta: rightHand layout — F is no longer bound
+            hintsCalled = false;
+            keyHandler.setLayout("rightHand");
+            const ev = makeKeyEvent("KeyF");
+            fireKeyDown(ev);
+            assert.ok(!hintsCalled, "F should not dispatch activateHints in rightHand layout");
+            assert.ok(!ev.defaultPrevented, "F should not be consumed in rightHand layout");
+        });
+
+        it("preserves Escape binding after layout switch", () => {
+            // Escape should work in all modes regardless of layout
+            keyHandler.setLayout("leftHand");
+            let exitCalled = false;
+            keyHandler.on("exitToNormal", () => { exitCalled = true; });
+            keyHandler.setMode(Mode.INSERT);
+            fireKeyDown(makeKeyEvent("Escape"));
+            assert.ok(exitCalled, "Escape still exits INSERT after layout switch");
+        });
+    });
 });

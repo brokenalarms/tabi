@@ -424,6 +424,7 @@ export class HintMode {
 
     this.overlay = document.createElement("div");
     this.overlay.className = `tabi-hint-overlay${DEFAULTS.animate ? " tabi-hint-animate" : ""}`;
+    this.overlay.dataset.hintMode = this.modeType;
     document.documentElement.appendChild(this.overlay);
     void this.overlay.offsetHeight;
     this.overlay.classList.add("visible");

@@ -1,13 +1,13 @@
 import './how-it-works.css'
 import { PRESETS, displayForCommand } from '../../../src/keybindings'
-import type { KeyPreset } from '../../../src/keybindings'
+import type { KeyLayout } from '../../../src/types'
 
 export function createHowItWorks(): HTMLElement {
   const section = document.createElement('section')
   section.className = 'how-it-works'
   section.id = 'how-it-works'
 
-  let activePreset: KeyPreset = 'homerow'
+  let activePreset: KeyLayout = 'optimized'
 
   function render(): void {
     const d = (cmd: string) => displayForCommand(activePreset, cmd)
@@ -17,8 +17,8 @@ export function createHowItWorks(): HTMLElement {
         <h2 class="section-heading" data-reveal>Three keystrokes. That's it.</h2>
 
         <div class="preset-toggle" data-reveal>
-          <button class="preset-btn ${activePreset === 'homerow' ? 'preset-btn--active' : ''}" data-preset="homerow">
-            ${PRESETS.homerow.label}
+          <button class="preset-btn ${activePreset === 'optimized' ? 'preset-btn--active' : ''}" data-preset="optimized">
+            ${PRESETS.optimized.label}
           </button>
           <button class="preset-btn ${activePreset === 'vim' ? 'preset-btn--active' : ''}" data-preset="vim">
             ${PRESETS.vim.label}
@@ -61,7 +61,7 @@ export function createHowItWorks(): HTMLElement {
     // Wire toggle buttons
     section.querySelectorAll<HTMLButtonElement>('.preset-btn').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const preset = btn.dataset.preset as KeyPreset
+        const preset = btn.dataset.preset as KeyLayout
         if (preset === activePreset) return
         activePreset = preset
         render()

@@ -1,10 +1,9 @@
 // KeyHandler — mode-aware keyboard event router for Tabi
 // Uses event.code for positional key bindings (layout-independent).
 
-import type { KeyBindingMode, ModeValue } from "../types";
+import type { KeyBindingMode, KeyLayout, ModeValue } from "../types";
 import { Mode, COMMANDS } from "../commands";
 import { bindingsForPreset } from "../keybindings";
-import type { KeyPreset } from "../keybindings";
 
 const INPUT_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
 const NON_TEXT_INPUT_TYPES = new Set([
@@ -103,6 +102,14 @@ export class KeyHandler {
     this.resetKeyBuffer();
   }
 
+  setLayout(layout: KeyLayout): void {
+    // Clear all NORMAL mode bindings and re-register from the new layout
+    this.bindings.delete(Mode.NORMAL);
+    this.prefixes.delete(Mode.NORMAL);
+    this.initDefaultBindings(layout);
+    this.resetKeyBuffer();
+  }
+
   setModeKeyDelegate(handler: (event: KeyboardEvent) => boolean): void {
     this.modeKeyDelegate = handler;
   }
@@ -190,11 +197,11 @@ export class KeyHandler {
 
   // --- Internals ---
 
-  private initDefaultBindings(preset: KeyPreset = "homerow"): void {
+  private initDefaultBindings(layout: KeyLayout = "optimized"): void {
     const n = Mode.NORMAL;
 
-    // Load bindings from the shared preset
-    for (const [seq, cmd] of bindingsForPreset(preset)) {
+    // Load bindings from the shared layout
+    for (const [seq, cmd] of bindingsForPreset(layout)) {
       if (!(cmd in COMMANDS)) {
         console.warn(`[Tabi] Unknown command "${cmd}" — not in COMMANDS`);
       }
