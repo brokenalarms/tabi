@@ -2,8 +2,8 @@
 // a different element, or compute derived rects from the DOM.
 // Used by both ElementGatherer and HintMode.
 
-import { HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR } from "./constants";
-import { hasBox, isVisible, isSubtreeRemoved, isRedirectableControl } from "./elementPredicates";
+import { HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR, LIST_BOUNDARY_TAGS } from "./constants";
+import { hasBox, isVisible, isSubtreeRemoved, isRedirectableControl, isEmpty } from "./elementPredicates";
 
 /** Find the label associated with a form control (via for= or ancestor <label>).
  *  Used by ElementGatherer for discovery (label rect as fallback for zero-size
@@ -141,20 +141,61 @@ export function getBlockAncestorRect(el: HTMLElement, rect: DOMRect): DOMRect | 
   return new DOMRect(ancestorRect.left, rect.top, ancestorRect.width, rect.height);
 }
 
-/** Retry a failed aria-expanded toggle by clicking the first child.
- *  Some frameworks attach the toggle handler on a child container rather
- *  than the aria-expanded element itself. Checks after a frame whether
- *  the attribute changed; if not, dispatches a click on the first child. */
-export function retryExpandedToggle(element: HTMLElement): void {
-  const expandedBefore = element.getAttribute("aria-expanded");
-  if (expandedBefore === null || !element.firstElementChild) return;
-  requestAnimationFrame(() => {
-    if (element.getAttribute("aria-expanded") === expandedBefore) {
-      const child = element.firstElementChild as HTMLElement;
-      const opts = { bubbles: true, cancelable: true, view: window };
-      child.dispatchEvent(new MouseEvent("mousedown", opts));
-      child.dispatchEvent(new MouseEvent("mouseup", opts));
-      child.click();
-    }
-  });
+// --- Click retry strategies ---
+// When clicking an element with aria-expanded doesn't toggle it, these
+// strategies try alternative click targets. Each returns true if it
+// found a target to click.
+
+/** Find the first non-empty descendant by walking children.
+ *  Skips contentless elements and list boundaries. If only one
+ *  non-empty child exists at a level, recurses into it (it's a wrapper).
+ *  If multiple exist, returns the first (the likely interactive target). */
+function findFirstContentChild(el: HTMLElement): HTMLElement | null {
+  const children = Array.from(el.children) as HTMLElement[];
+  const first = children.find(c => !LIST_BOUNDARY_TAGS.has(c.tagName) && !isEmpty(c));
+  if (!first) return null;
+  return findFirstContentChild(first) ?? first;
+}
+
+// --- Click retry strategies ---
+// Each strategy is a factory: given an element, returns { didChange, retry }
+// if applicable, or null if not. The closure captures initial state.
+
+type RetryStrategy = (el: HTMLElement) => {
+  didChange: () => boolean;
+  retry: () => void;
+} | null;
+
+/** For elements with aria-expanded: click the first non-empty descendant
+ *  (e.g. a toggle chevron inside a treeitem). */
+const retryExpandedToggle: RetryStrategy = (el) => {
+  const before = el.getAttribute("aria-expanded");
+  if (before === null) return null;
+  return {
+    didChange: () => el.getAttribute("aria-expanded") !== before,
+    retry: () => {
+      const target = findFirstContentChild(el);
+      if (target) target.click();
+    },
+  };
+};
+
+const RETRY_STRATEGIES: RetryStrategy[] = [retryExpandedToggle];
+
+const nextFrame = (): Promise<void> =>
+  new Promise(resolve => requestAnimationFrame(() => resolve()));
+
+/** After a click, try each applicable retry strategy in sequence,
+ *  waiting a frame between each to let the previous attempt take effect. */
+export async function retryClick(element: HTMLElement, strategies = RETRY_STRATEGIES): Promise<void> {
+  if (strategies.length === 0) return;
+  const [current, ...remaining] = strategies;
+  const result = current(element);
+  if (!result) return retryClick(element, remaining);
+  await nextFrame();
+  if (result.didChange()) return;
+  result.retry();
+  await nextFrame();
+  if (result.didChange()) return;
+  return retryClick(element, remaining);
 }

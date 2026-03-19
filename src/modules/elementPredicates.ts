@@ -1,7 +1,7 @@
 // Stateless element predicates — each answers one question about an element.
 // Used by walkerFilter (ElementGatherer) and hint positioning (HintMode).
 
-import { CLICKABLE_SELECTOR, HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER_HEIGHT, MINIMUM_CONTAINER_WIDTH, LIST_BOUNDARY_TAGS } from "./constants";
+import { CLICKABLE_SELECTOR, HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER_HEIGHT, MINIMUM_CONTAINER_WIDTH, LIST_BOUNDARY_TAGS, EMBEDDED_CONTENT_ELEMENTS } from "./constants";
 
 // --- Visibility & geometry ---
 
@@ -121,7 +121,7 @@ export function isOccluded(el: HTMLElement, rect: DOMRect): boolean {
   const isCover = (cover: HTMLElement): boolean => {
     if (composedContains(el, cover) || composedContains(cover, el)) return false;
     if (isSubtreeRemoved(cover)) return false;
-    if (isContentlessOverlay(cover)) return false;
+    if (isEmpty(cover)) return false;
     if (isSiblingInRepeatingContainer(el, cover)) return false;
     if (isInSameLabel(el, cover)) return false;
     if (isInNearbySiblingSubtree(el, cover)) return false;
@@ -190,14 +190,11 @@ export function isInNearbySiblingSubtree(el: HTMLElement, cover: HTMLElement): b
   return false;
 }
 
-/** Is this element a contentless overlay that can't visually block anything?
- *  True for elements with no text and no visual children (img, svg, etc.).
- *  Covers stretched-link card overlays, custom scrollbar tracks, and hover
- *  effect layers — anything with no visible DOM content is transparent to
- *  the user regardless of tag or role. */
-export function isContentlessOverlay(el: HTMLElement): boolean {
-  const tag = el.tagName.toLowerCase();
-  if (tag === "iframe" || tag === "object" || tag === "embed") return false;
+/** Is this element empty — no text and no visual descendants (img, svg, etc.)?
+ *  Checks the full subtree via textContent and querySelector.
+ *  Embedded content (iframe, object, embed) is never empty. */
+export function isEmpty(el: HTMLElement): boolean {
+  if (EMBEDDED_CONTENT_ELEMENTS.has(el.tagName.toLowerCase())) return false;
   if ((el.textContent || "").trim()) return false;
   if (el.querySelector("img, svg, picture, video, canvas")) return false;
   return true;

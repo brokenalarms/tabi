@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
-import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isContentlessOverlay, shouldRedirectToHeading, hasListBoundaryBetween } from "../src/modules/elementPredicates";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isEmpty, shouldRedirectToHeading, hasListBoundaryBetween } from "../src/modules/elementPredicates";
 import { findBlockAncestor } from "../src/modules/elementTraversals";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
@@ -1238,7 +1238,7 @@ describe("overlay occlusion", () => {
 });
 
 // Overlay <a> elements (stretched-link card pattern) should get hints — they're real
-// navigation targets. Previously these were skipped via isContentlessOverlay(), but
+// navigation targets. Previously these were skipped via isEmpty(), but
 // that caused hints to land on non-interactive siblings (images) instead. The overlay
 // is exempt from occluding sibling interactive elements (e.g. comment links with
 // higher z-index) so both the overlay and sibling links get hints.
@@ -2686,11 +2686,11 @@ describe("jsaction click discovery", () => {
 });
 
 // ISSUE: Replaced elements (iframe, object, embed) render opaque external content
-// but have no DOM children — isContentlessOverlay incorrectly exempts them from
+// but have no DOM children — isEmpty incorrectly exempts them from
 // occluding elements behind them, so hints shine through.
 // SITE: Google Drive — callout popup iframe covers page elements
-// FIX: isContentlessOverlay returns false for replaced elements that render external content
-describe("isContentlessOverlay replaced elements", () => {
+// FIX: isEmpty returns false for replaced elements that render external content
+describe("isEmpty replaced elements", () => {
     it("iframe is not a contentless overlay despite having no DOM children", () => {
         const env = createDOM(`
             <div>
@@ -2703,10 +2703,10 @@ describe("isContentlessOverlay replaced elements", () => {
         const frame = env.document.getElementById("frame") as unknown as HTMLElement;
 
         // Base: an empty div IS a contentless overlay
-        assert.equal(isContentlessOverlay(empty), true);
+        assert.equal(isEmpty(empty), true);
 
         // Delta: an iframe is NOT — it renders external content
-        assert.equal(isContentlessOverlay(frame), false);
+        assert.equal(isEmpty(frame), false);
 
         env.cleanup();
     });
@@ -2722,8 +2722,8 @@ describe("isContentlessOverlay replaced elements", () => {
         const obj = env.document.getElementById("obj") as unknown as HTMLElement;
         const emb = env.document.getElementById("emb") as unknown as HTMLElement;
 
-        assert.equal(isContentlessOverlay(obj), false);
-        assert.equal(isContentlessOverlay(emb), false);
+        assert.equal(isEmpty(obj), false);
+        assert.equal(isEmpty(emb), false);
 
         env.cleanup();
     });

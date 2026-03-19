@@ -151,6 +151,8 @@ export function setupDOM(elements: any[] = []) {
     (globalThis as any).HTMLElement = (w as any).HTMLElement;
     (globalThis as any).MouseEvent = (w as any).MouseEvent;
     (globalThis as any).clearTimeout = globalThis.clearTimeout;
+    // happy-dom's rAF never fires — no-op so retryExpandedToggle doesn't hang
+    (globalThis as any).requestAnimationFrame = () => 0;
 
     // Mock elementsFromPoint/elementFromPoint (happy-dom has no layout)
     const testElements = elements;
