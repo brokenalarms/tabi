@@ -1,0 +1,13 @@
+name: Auto Update PR Branches
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: AdityaGarg8/auto-update-prs@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
