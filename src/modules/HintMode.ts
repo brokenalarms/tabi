@@ -202,7 +202,9 @@ export class HintMode {
       return { element: el, label, div };
     });
 
-    this.createStatusBar();
+    if (mode === "multi") {
+      this.createStatusBar();
+    }
 
     this.keyHandler.setModeKeyDelegate(this.handleKey.bind(this));
     document.addEventListener("mousedown", this.onMouseDown, true);
@@ -353,19 +355,6 @@ export class HintMode {
     }
 
     return rect;
-  }
-
-  // --- Clipboard ---
-
-  static copyToClipboard(text: string): void {
-    const textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.style.position = "fixed";
-    textarea.style.opacity = "0";
-    document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand("copy");
-    textarea.remove();
   }
 
   // --- Label generation ---
@@ -555,13 +544,7 @@ export class HintMode {
       if (event.shiftKey) {
         this.willOpenNewTab = true;
       }
-      if (this.modeType === "yank") {
-        // Copy immediately while still inside the user-gesture event chain
-        // so Safari doesn't block execCommand('copy') as click-jacking.
-        const url = (match.element as HTMLAnchorElement).href;
-        HintMode.copyToClipboard(url);
-        this.deactivate();
-      } else if (this.modeType === "multi") {
+      if (this.modeType === "multi") {
         this.selectForMulti(match);
       } else {
         this.activateHint(match);
@@ -598,6 +581,7 @@ export class HintMode {
   private activateHint(hint: Hint): void {
     const element = hint.element;
     const newTab = this.willOpenNewTab;
+    const yank = this.modeType === "yank";
     this.activating = true;
 
     for (const h of this.hints) {
@@ -639,23 +623,28 @@ export class HintMode {
         return;
       }
 
-      const isLink = element.tagName.toLowerCase() === "a" && (element as HTMLAnchorElement).href;
-      const opensNewWindow = isLink && (newTab || (element as HTMLAnchorElement).target === "_blank");
-
-      if (opensNewWindow) {
-        browser.runtime.sendMessage({
-          command: "createTab",
-          url: (element as HTMLAnchorElement).href,
-        });
+      if (yank) {
+        const url = (element as HTMLAnchorElement).href;
+        navigator.clipboard.writeText(url);
       } else {
-        element.focus();
-        element.style.outline = "none";
-        element.addEventListener("blur", () => { element.style.outline = ""; }, { once: true });
-        const opts = { bubbles: true, cancelable: true, view: window };
-        element.dispatchEvent(new MouseEvent("mousedown", opts));
-        element.dispatchEvent(new MouseEvent("mouseup", opts));
-        element.click();
-        retryClick(element);
+        const isLink = element.tagName.toLowerCase() === "a" && (element as HTMLAnchorElement).href;
+        const opensNewWindow = isLink && (newTab || (element as HTMLAnchorElement).target === "_blank");
+
+        if (opensNewWindow) {
+          browser.runtime.sendMessage({
+            command: "createTab",
+            url: (element as HTMLAnchorElement).href,
+          });
+        } else {
+          element.focus();
+          element.style.outline = "none";
+          element.addEventListener("blur", () => { element.style.outline = ""; }, { once: true });
+          const opts = { bubbles: true, cancelable: true, view: window };
+          element.dispatchEvent(new MouseEvent("mousedown", opts));
+          element.dispatchEvent(new MouseEvent("mouseup", opts));
+          element.click();
+          retryClick(element);
+        }
       }
 
       // Fade out the ring
@@ -707,27 +696,16 @@ export class HintMode {
     }
   }
 
-  private static readonly MODE_LABELS: Record<HintModeType, string> = {
-    click: "Hint mode",
-    yank: "Link copy mode",
-    multi: "Multi-select mode",
-  };
-
   private createStatusBar(): void {
     this.statusBar = document.createElement("div");
-    this.statusBar.className = "tabi-mode-bar";
+    this.statusBar.className = "tabi-multi-status";
     this.updateStatusBar();
     document.documentElement.appendChild(this.statusBar);
   }
 
   private updateStatusBar(): void {
     if (!this.statusBar) return;
-    const label = HintMode.MODE_LABELS[this.modeType];
-    if (this.modeType === "multi") {
-      const count = this.multiSelections.length;
-      this.statusBar.textContent = `${label} — ${count} selected, Space to open`;
-    } else {
-      this.statusBar.textContent = label;
-    }
+    const count = this.multiSelections.length;
+    this.statusBar.textContent = `${count} selected — press Space to open`;
   }
 }
