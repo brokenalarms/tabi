@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
-import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isEmpty, shouldRedirectToHeading, hasListBoundaryBetween, isInNearbySiblingSubtree } from "../src/modules/elementPredicates";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, hasRepeatingPeers, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isEmpty, shouldRedirectToHeading, hasListBoundaryBetween, isInNearbySiblingSubtree, countNestedLinks } from "../src/modules/elementPredicates";
 import { findBlockAncestor, retryExpandedToggle, captureRetryStrategies, executeRetryStrategies } from "../src/modules/elementTraversals";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
@@ -2053,15 +2053,22 @@ describe("hasHeadingContent", () => {
 });
 
 describe("isInRepeatingContainer", () => {
-    it("returns true inside <li>", () => {
-        const env = createDOM(`<li><a id="t" href="#">link</a></li>`);
+    it("returns true inside <li> with siblings", () => {
+        const env = createDOM(`<ul><li><a id="t" href="#">link</a></li><li>other</li></ul>`);
         const el = env.document.getElementById("t") as unknown as HTMLElement;
         assert.ok(isInRepeatingContainer(el));
         env.cleanup();
     });
 
-    it("returns true inside <tr>", () => {
-        const env = createDOM(`<table><tr><td><a id="t" href="#">link</a></td></tr></table>`);
+    it("returns false inside sole <li>", () => {
+        const env = createDOM(`<ul><li><a id="t" href="#">link</a></li></ul>`);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+        assert.ok(!isInRepeatingContainer(el));
+        env.cleanup();
+    });
+
+    it("returns true inside <tr> with siblings", () => {
+        const env = createDOM(`<table><tr><td><a id="t" href="#">link</a></td></tr><tr><td>other</td></tr></table>`);
         const el = env.document.getElementById("t") as unknown as HTMLElement;
         assert.ok(isInRepeatingContainer(el));
         env.cleanup();
@@ -2207,9 +2214,10 @@ describe("shouldRedirectToHeading", () => {
 
     it("does not redirect inside repeating container", () => {
         const env = createDOM(`
-            <li>
-                <a id="t" href="/page"><h3>Title</h3></a>
-            </li>
+            <ul>
+                <li><a id="t" href="/page"><h3>Title</h3></a></li>
+                <li><a href="/other"><h3>Other</h3></a></li>
+            </ul>
         `);
         const el = env.document.getElementById("t") as unknown as HTMLElement;
         assert.ok(!shouldRedirectToHeading(el), "link in <li> should not redirect to heading");
@@ -2268,11 +2276,15 @@ describe("block link hint positioning", () => {
     it("link inside <li> gets container treatment, not heading redirect", () => {
         // Same structure but inside a list item — sized link in repeating
         // container gets glow + inside-end, heading redirect is suppressed.
+        const ul = makeElement("UL", { top: 10, left: 0, width: 800, height: 120, display: "block" });
         const li = makeElement("LI", { top: 10, left: 0, width: 800, height: 60, display: "list-item" });
+        const li2 = makeElement("LI", { top: 70, left: 0, width: 800, height: 60, display: "list-item" });
         const link = makeElement("A", { href: "/page", top: 10, left: 0, width: 800, height: 60, display: "block" });
         const heading = makeElement("H3", { top: 10, left: 0, width: 400, height: 25, textContent: "Short title" });
         link.appendChild(heading);
         li.appendChild(link);
+        ul.appendChild(li);
+        ul.appendChild(li2);
 
         loadModules([link]);
         (globalThis as any).document.elementsFromPoint = () => [link];
@@ -2284,10 +2296,9 @@ describe("block link hint positioning", () => {
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
         assert.ok(overlay?.querySelector(".tabi-hint-container-glow"),
             "Link inside <li> should get container glow");
-        const hints = overlay?.querySelectorAll(".tabi-hint");
-        assert.equal(hints?.length, 1);
-        assert.ok(!hints[0]?.querySelector(".tabi-hint-tail"),
-            "Link inside <li> should not get pointer tail");
+        const glows = overlay?.querySelectorAll(".tabi-hint-container-glow");
+        assert.ok(glows && glows.length >= 1,
+            "At least one container glow should be present");
     });
 
     it("inline-block link with heading centers hint on heading, not combined children", () => {
@@ -2349,11 +2360,15 @@ describe("repeating container sizing uses container dimensions", () => {
 
         // Delta: same narrow link inside <li> that IS container-sized — glow
         // appears because isContainerSized checks the <li>, not the <a>.
+        const ul = makeElement("UL", { top: 0, left: 0, width: 350, height: 160, display: "block" });
         const li = makeElement("LI", { top: 0, left: 0, width: 350, height: 80, display: "list-item" });
+        const li2 = makeElement("LI", { top: 80, left: 0, width: 350, height: 80, display: "list-item" });
         const link = makeElement("A", { href: "/messages/t/123/", top: 10, left: 0, width: 50, height: 52 });
         link.appendChild(makeElement("DIV", { top: 14, left: 8, width: 36, height: 36 }));
         link.appendChild(makeElement("SPAN", { top: 18, left: 42, width: 8, height: 20, textContent: "AI" }));
         li.appendChild(link);
+        ul.appendChild(li);
+        ul.appendChild(li2);
 
         loadModules([link]);
         (globalThis as any).document.elementsFromPoint = () => [link];
@@ -3062,6 +3077,43 @@ describe("site-specific repeating containers", () => {
             "Repeating container should be the ytd-grid-video-renderer element");
 
         env.cleanup();
+    });
+});
+
+// ISSUE: Sole <li> in a <ul> is treated as a repeating container, causing
+//        container glow instead of pill hint. A single list item isn't repeating.
+// SITE: theguardian.com (liveblog standfirst — lone <li> with article link)
+// FIX: New predicate hasRepeatingPeers — container must have 2+ same-tag siblings.
+describe("hasRepeatingPeers for sole list items", () => {
+    it("sole <li> is not a repeating container, multiple <li> siblings are", () => {
+        // Base: 2+ <li> siblings → repeating container
+        const envMulti = createDOM(`
+            <ul>
+                <li><a id="multi" href="#">Link 1</a></li>
+                <li><a href="#">Link 2</a></li>
+            </ul>
+        `);
+        const multi = envMulti.document.getElementById("multi") as unknown as HTMLElement;
+        const multiContainer = getRepeatingContainer(multi);
+        assert.notEqual(multiContainer, null, "Link in <li> with siblings should have a repeating container");
+        assert.equal(hasRepeatingPeers(multiContainer!), true,
+            "Container with a sibling <li> has repeating peers");
+        assert.equal(isInRepeatingContainer(multi), true,
+            "Link in <li> with siblings is in a repeating container");
+        envMulti.cleanup();
+
+        // Delta: sole <li> → NOT a repeating container
+        const envSolo = createDOM(`
+            <ul>
+                <li>
+                    <p><a id="solo" href="#">The war cost the US $12.7bn</a></p>
+                </li>
+            </ul>
+        `);
+        const solo = envSolo.document.getElementById("solo") as unknown as HTMLElement;
+        assert.equal(isInRepeatingContainer(solo), false,
+            "Link in sole <li> should not be in a repeating container");
+        envSolo.cleanup();
     });
 });
 

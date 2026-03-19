@@ -299,6 +299,11 @@ test("container element gets glow border and inside-end pill", async ({ page }) 
           <span>Description text here</span>
         </a>
       </li>
+      <li style="width:400px; height:80px; padding:10px;">
+        <a href="/other" style="display:block; width:100%; height:100%; text-decoration:none;">
+          <span>Other Article</span>
+        </a>
+      </li>
     </ul>
   `);
 

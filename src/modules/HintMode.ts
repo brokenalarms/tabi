@@ -6,8 +6,8 @@ import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
 import { HINT_HEIGHT } from "./constants";
-import { isLargeEnoughForGlow, isFormControl, getRepeatingContainer, hasNestedLinks, isZeroSizeAnchor, shouldRedirectToHeading, hasBox } from "./elementPredicates";
-import { LIST_BOUNDARY_SELECTOR, REPEATING_CONTAINER_SELECTOR } from "./constants";
+import { isLargeEnoughForGlow, isFormControl, getRepeatingContainer, countNestedLinks, isZeroSizeAnchor, shouldRedirectToHeading, hasBox } from "./elementPredicates";
+import { LIST_BOUNDARY_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER_HEIGHT } from "./constants";
 import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect, captureRetryStrategies, executeRetryStrategies } from "./elementTraversals";
 
 import { Mode } from "../commands";
@@ -138,11 +138,13 @@ export class HintMode {
       const container = target === el ? getRepeatingContainer(el) : null;
 
       if (container && CONTAINER_GLOW_STRATEGY !== "none") {
-        const noNestedLinks = !hasNestedLinks(container, el, discoveredSet);
         const nestedList = container.querySelector(LIST_BOUNDARY_SELECTOR);
         const containerRect = nestedList
           ? this.clampRectToHeader(container.getBoundingClientRect(), nestedList as HTMLElement)
           : container.getBoundingClientRect();
+        const heightMultiplier = Math.floor(containerRect.height / MINIMUM_CONTAINER_HEIGHT);
+        const maxNested = Math.min(heightMultiplier >= 2 ? heightMultiplier : 0, 3);
+        const noNestedLinks = countNestedLinks(container, el, discoveredSet) <= maxNested;
         const glowEligible = nestedList !== null || isLargeEnoughForGlow(container, containerRect);
         const parent = container.parentElement || container;
 
@@ -220,6 +222,7 @@ export class HintMode {
     this.modeType = "click";
     this.activating = false;
     this.multiSelections = [];
+    this.glowRendered.clear();
     this.keyHandler.clearModeKeyDelegate();
     document.removeEventListener("mousedown", this.onMouseDown, true);
     window.removeEventListener("scroll", this.onScroll, true);
@@ -437,7 +440,7 @@ export class HintMode {
     if (placement) {
       switch (placement.style) {
         case "containerGlow":
-          this.positionContainerGlow(div, placement.container);
+          this.positionContainerGlow(div, placement.container, placement.rect);
           break;
         case "pill":
           this.positionPill(div, placement.rect);
@@ -458,31 +461,44 @@ export class HintMode {
     return rect;
   }
 
-  /** Glow border on repeating container + inside-end pill label. */
-  private positionContainerGlow(div: HTMLDivElement, container: HTMLElement): void {
+  /** Containers that already have a glow border drawn — prevents duplicates
+   *  when multiple discovered elements share the same container. */
+  private glowRendered = new Set<HTMLElement>();
+
+  /** Glow border on repeating container + inside-end pill label.
+   *  The first element per container gets the glow border + glow-positioned
+   *  label. Subsequent elements in the same container get pill positioning
+   *  using their own element rect. */
+  private positionContainerGlow(div: HTMLDivElement, container: HTMLElement, elRect: DOMRect): void {
     let glowRect = container.getBoundingClientRect();
     const nestedList = container.querySelector(LIST_BOUNDARY_SELECTOR);
     if (nestedList) {
       glowRect = this.clampRectToHeader(glowRect, nestedList as HTMLElement);
     }
-    const glow = document.createElement("div");
-    glow.className = "tabi-hint-container-glow";
-    const glowPos = this.viewportToDocument(glowRect.left, glowRect.top);
-    glow.style.left = glowPos.x + "px";
-    glow.style.top = glowPos.y + "px";
-    glow.style.width = glowRect.width + "px";
-    glow.style.height = glowRect.height + "px";
-    if (this.overlay) this.overlay.appendChild(glow);
 
-    const verticalInset = (glowRect.height - HINT_HEIGHT) / 3;
-    const insetRight = Math.min(verticalInset, 24);
-    const pos = this.viewportToDocument(
-      glowRect.right - insetRight,
-      glowRect.top + glowRect.height / 2
-    );
-    div.style.left = pos.x + "px";
-    div.style.top = pos.y + "px";
-    div.style.transform = "translate(-100%, -50%)";
+    if (!this.glowRendered.has(container)) {
+      this.glowRendered.add(container);
+      const glow = document.createElement("div");
+      glow.className = "tabi-hint-container-glow";
+      const glowPos = this.viewportToDocument(glowRect.left, glowRect.top);
+      glow.style.left = glowPos.x + "px";
+      glow.style.top = glowPos.y + "px";
+      glow.style.width = glowRect.width + "px";
+      glow.style.height = glowRect.height + "px";
+      if (this.overlay) this.overlay.appendChild(glow);
+
+      const verticalInset = (glowRect.height - HINT_HEIGHT) / 3;
+      const insetRight = Math.min(verticalInset, 24);
+      const pos = this.viewportToDocument(
+        glowRect.right - insetRight,
+        glowRect.top + glowRect.height / 2
+      );
+      div.style.left = pos.x + "px";
+      div.style.top = pos.y + "px";
+      div.style.transform = "translate(-100%, -50%)";
+    } else {
+      this.positionPill(div, elRect);
+    }
   }
 
   /** Pill below element with pointer tail. */

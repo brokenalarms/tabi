@@ -37,6 +37,7 @@ export const HEADING_SELECTOR = HEADING_ELEMENTS.join(", ");
 export const MINIMUM_CONTAINER_WIDTH = 100;
 export const MINIMUM_CONTAINER_HEIGHT = 32;
 
+
 // Hint label outer height, matching hints.css:
 // 12px font × 1.2 line-height + 2 × 1px padding + 2 × 1px border
 const HINT_FONT_SIZE = 12;
