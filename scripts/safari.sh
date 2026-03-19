@@ -51,7 +51,14 @@ osascript -e '
       delay 1.5
     end if
     activate
-    delay 1
+    -- Wait for Safari to be fully ready (frontmost with a window)
+    tell application "System Events"
+      repeat 20 times
+        if frontmost of process "Safari" then exit repeat
+        delay 0.25
+      end repeat
+    end tell
+    delay 0.5
     -- Remember the blank window Safari opens on launch
     set blankWin to missing value
     try
@@ -59,10 +66,19 @@ osascript -e '
         set blankWin to id of front window
       end if
     end try
-    -- Reopen all tabs from previous session (Cmd+Shift+T)
-    tell application "System Events"
-      keystroke "t" using {command down, shift down}
-    end tell
+    -- Reopen all windows from previous session via History menu
+    try
+      tell application "System Events"
+        tell process "Safari"
+          click menu item "Reopen All Windows from Last Session" of menu "History" of menu bar 1
+        end tell
+      end tell
+    on error
+      -- Fallback to keystroke if menu item not available
+      tell application "System Events"
+        keystroke "t" using {command down, shift down}
+      end tell
+    end try
     delay 0.5
     -- Close the blank startup window
     try
