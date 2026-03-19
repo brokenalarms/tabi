@@ -7,7 +7,7 @@ import { DEFAULTS } from "../types";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
 import { HINT_HEIGHT } from "./constants";
 import { isLargeEnoughForGlow, isFormControl, getRepeatingContainer, countNestedLinks, isZeroSizeAnchor, shouldRedirectToHeading, hasBox } from "./elementPredicates";
-import { LIST_BOUNDARY_SELECTOR, REPEATING_CONTAINER_SELECTOR, MAX_NESTED_LINKS_FOR_GLOW } from "./constants";
+import { LIST_BOUNDARY_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER_HEIGHT } from "./constants";
 import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect, captureRetryStrategies, executeRetryStrategies } from "./elementTraversals";
 
 import { Mode } from "../commands";
@@ -137,11 +137,13 @@ export class HintMode {
       const container = target === el ? getRepeatingContainer(el) : null;
 
       if (container && CONTAINER_GLOW_STRATEGY !== "none") {
-        const noNestedLinks = countNestedLinks(container, el, discoveredSet) <= MAX_NESTED_LINKS_FOR_GLOW;
         const nestedList = container.querySelector(LIST_BOUNDARY_SELECTOR);
         const containerRect = nestedList
           ? this.clampRectToHeader(container.getBoundingClientRect(), nestedList as HTMLElement)
           : container.getBoundingClientRect();
+        const heightMultiplier = Math.floor(containerRect.height / MINIMUM_CONTAINER_HEIGHT);
+        const maxNested = heightMultiplier >= 2 ? heightMultiplier : 0;
+        const noNestedLinks = countNestedLinks(container, el, discoveredSet) <= maxNested;
         const glowEligible = nestedList !== null || isLargeEnoughForGlow(container, containerRect);
         const parent = container.parentElement || container;
 
