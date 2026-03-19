@@ -6,8 +6,8 @@ import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
 import { HINT_HEIGHT } from "./constants";
-import { isLargeEnoughForGlow, isFormControl, getRepeatingContainer, hasNestedLinks, isZeroSizeAnchor, shouldRedirectToHeading } from "./elementPredicates";
-import { LIST_BOUNDARY_SELECTOR } from "./constants";
+import { isLargeEnoughForGlow, isFormControl, getRepeatingContainer, hasNestedLinks, isZeroSizeAnchor, shouldRedirectToHeading, hasBox } from "./elementPredicates";
+import { LIST_BOUNDARY_SELECTOR, REPEATING_CONTAINER_SELECTOR } from "./constants";
 import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect, retryClick } from "./elementTraversals";
 
 import { Mode } from "../commands";
@@ -132,6 +132,27 @@ export class HintMode {
         group.push({ el, rect, container, noNestedLinks, glowEligible });
       } else {
         this.hintPlacementMap.set(el, { style: "pill", rect });
+      }
+    }
+
+    // Add sibling containers that have no discovered elements to the
+    // group so they participate in the same all-or-none glow decision.
+    // Repeating containers (li, tr) in the same parent share the same
+    // interaction pattern — if some get glow, all should.
+    for (const [parent, group] of containerGroups) {
+      const containersInGroup = new Set(group.map(g => g.container));
+      for (const child of parent.children) {
+        const c = child as HTMLElement;
+        if (containersInGroup.has(c)) continue;
+        if (!c.matches(REPEATING_CONTAINER_SELECTOR)) continue;
+        if (!hasBox(c)) continue;
+        const nestedList = c.querySelector(LIST_BOUNDARY_SELECTOR);
+        const containerRect = nestedList
+          ? this.clampRectToHeader(c.getBoundingClientRect(), nestedList as HTMLElement)
+          : c.getBoundingClientRect();
+        const glowEligible = nestedList !== null || isLargeEnoughForGlow(c, containerRect);
+        elements.push(c);
+        group.push({ el: c, rect: containerRect, container: c, noNestedLinks: true, glowEligible });
       }
     }
 

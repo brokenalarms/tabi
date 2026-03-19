@@ -2859,3 +2859,89 @@ describe("heading ancestor rect clamping", () => {
 // TODO: Test for expanded folder glow eligibility — containers with child lists
 // always qualify for glow regardless of aspect ratio. Needs investigation into
 // why this test causes happy-dom to hang.
+
+// ISSUE: Sibling <tr> rows in a table should get consistent container glow
+// treatment (all or none), just like <li> items in a <ul>. If one row gets
+// glow, all rows in the same <tbody> must also get glow.
+// SITE: Macquarie banking — account list table with clickable rows
+// FIX: Verify all-or-none grouping works for <tr> the same as <li>.
+describe("table row container glow all-or-none", () => {
+    afterEach(() => {
+        const { hintMode, keyHandler } = getState();
+        if (hintMode) hintMode.destroy();
+        if (keyHandler) keyHandler.destroy();
+    });
+
+    it("sibling <tr> rows with 1 button each get consistent glow", () => {
+        // Build table: 2 rows, each with 1 button inside a <td>
+        const table = makeElement("TABLE", { top: 0, left: 0, width: 1000, height: 100, display: "table" });
+        const tbody = makeElement("TBODY", { top: 0, left: 0, width: 1000, height: 100, display: "table-row-group" });
+
+        const tr1 = makeElement("TR", { top: 0, left: 0, width: 1000, height: 50, display: "table-row" });
+        const td1 = makeElement("TD", { top: 0, left: 0, width: 200, height: 50, display: "table-cell" });
+        const btn1 = makeElement("BUTTON", { top: 10, left: 10, width: 80, height: 30, textContent: "Pin 1" });
+        td1.appendChild(btn1);
+        tr1.appendChild(td1);
+
+        const tr2 = makeElement("TR", { top: 50, left: 0, width: 1000, height: 50, display: "table-row" });
+        const td2 = makeElement("TD", { top: 50, left: 0, width: 200, height: 50, display: "table-cell" });
+        const btn2 = makeElement("BUTTON", { top: 60, left: 10, width: 80, height: 30, textContent: "Pin 2" });
+        td2.appendChild(btn2);
+        tr2.appendChild(td2);
+
+        tbody.appendChild(tr1);
+        tbody.appendChild(tr2);
+        table.appendChild(tbody);
+
+        loadModules([table]);
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const glows = overlay?.querySelectorAll(".tabi-hint-container-glow");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
+
+        // Both rows should get hints
+        assert.equal(hints?.length, 2, "both buttons should get hints");
+        // All-or-none: both rows should get container glow
+        assert.equal(glows?.length, 2, "both rows should get container glow (all-or-none)");
+    });
+
+    it("glow propagates to sibling <tr> without discovered elements", () => {
+        // Row 1 has a button, row 2 has no interactive elements.
+        // Glow should propagate to row 2 because it's a sibling container.
+        const table = makeElement("TABLE", { top: 0, left: 0, width: 1000, height: 100, display: "table" });
+        const tbody = makeElement("TBODY", { top: 0, left: 0, width: 1000, height: 100, display: "table-row-group" });
+
+        const tr1 = makeElement("TR", { top: 0, left: 0, width: 1000, height: 50, display: "table-row" });
+        const td1 = makeElement("TD", { top: 0, left: 0, width: 200, height: 50, display: "table-cell" });
+        const btn1 = makeElement("BUTTON", { top: 10, left: 10, width: 80, height: 30, textContent: "Pin 1" });
+        td1.appendChild(btn1);
+        tr1.appendChild(td1);
+
+        // Row 2: no interactive elements at all
+        const tr2 = makeElement("TR", { top: 50, left: 0, width: 1000, height: 50, display: "table-row" });
+        const td2 = makeElement("TD", { top: 50, left: 0, width: 200, height: 50, display: "table-cell" });
+        td2.appendChild(((globalThis as any).document as Document).createTextNode("Transaction Account") as unknown as Node);
+        tr2.appendChild(td2);
+
+        tbody.appendChild(tr1);
+        tbody.appendChild(tr2);
+        table.appendChild(tbody);
+
+        loadModules([table]);
+        const { hintMode } = getState();
+        hintMode.activate(false);
+        assert.ok(hintMode.isActive());
+
+        const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
+        const glows = overlay?.querySelectorAll(".tabi-hint-container-glow");
+        const hints = overlay?.querySelectorAll(".tabi-hint");
+
+        // Row 1 button + propagated row 2 container = 2 hints
+        assert.equal(hints?.length, 2, "propagated row should get a hint too");
+        // Both rows get glow
+        assert.equal(glows?.length, 2, "glow propagates to sibling container");
+    });
+});
