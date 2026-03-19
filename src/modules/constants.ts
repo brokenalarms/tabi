@@ -37,6 +37,12 @@ export const HEADING_SELECTOR = HEADING_ELEMENTS.join(", ");
 export const MINIMUM_CONTAINER_WIDTH = 100;
 export const MINIMUM_CONTAINER_HEIGHT = 32;
 
+/** Maximum number of other discovered elements allowed inside a container
+ *  before glow is disqualified. The primary element's hint is promoted to
+ *  the container border, so it doesn't count — this threshold applies to
+ *  the remaining elements (e.g. a menu button alongside a title link). */
+export const MAX_NESTED_LINKS_FOR_GLOW = 2;
+
 // Hint label outer height, matching hints.css:
 // 12px font × 1.2 line-height + 2 × 1px padding + 2 × 1px border
 const HINT_FONT_SIZE = 12;
