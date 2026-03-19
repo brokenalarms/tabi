@@ -354,6 +354,7 @@ export class KeyHandler {
       event.stopPropagation();
       this.resetKeyBuffer();
       const cmd = modeBindings.get(candidate)!;
+      // Track held key for keyup dispatch (only single-key bindings)
       if (!candidate.includes(" ") && this.keyUpCommands.has(cmd)) {
         this.heldCommand = cmd;
         this.heldCode = event.code;
