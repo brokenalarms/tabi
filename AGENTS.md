@@ -112,3 +112,4 @@ The element discovery pipeline only uses semantic signals (`CLICKABLE_SELECTOR`:
 
 - **No `_` prefixes on private members.** The `private` keyword is sufficient — underscore prefixes are a JavaScript-era convention that adds noise. Use plain names: `private keyBuffer`, not `private _keyBuffer`.
 - **No `!!` boolean coercion.** Use proper type narrowing instead of `!!value`. For example, use `value !== null` or `value !== undefined` rather than `!!value`.
+- **No `setTimeout` in tests.** Tests should be synchronous — dispatch events manually and assert state before/after. `setTimeout` makes tests slow, flaky in CI, and hides timing bugs. For example, instead of waiting for `animationend` with a timeout, dispatch it manually and check the result synchronously. Avoid `setTimeout` in production code too — prefer event-driven patterns.
