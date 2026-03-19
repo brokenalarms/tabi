@@ -50,6 +50,34 @@ export class ScrollController {
   private _keyHandler: KeyHandlerLike;
   private static _chaseAnimations = new Map<Element, ChaseAnimation>();
   private static _velocity: VelocityScroll | null = null;
+  /** Elements whose scroll-behavior we've overridden to "auto". */
+  private static _overriddenElements = new Set<HTMLElement>();
+
+  /** Disable CSS scroll-behavior:smooth on the target so direct scrollTop/Left
+   *  assignments aren't intercepted by the browser's smooth-scroll animation. */
+  private static _disableSmoothScroll(target: Element): void {
+    const el = target as HTMLElement;
+    if (!el.style) return;
+    if (ScrollController._overriddenElements.has(el)) return;
+    const style = getComputedStyle(target);
+    if (style.scrollBehavior === "smooth") {
+      el.style.scrollBehavior = "auto";
+      ScrollController._overriddenElements.add(el);
+    }
+  }
+
+  /** Restore scroll-behavior on a target when all animations on it are done. */
+  private static _restoreSmoothScroll(target: Element): void {
+    const el = target as HTMLElement;
+    if (!el.style) return;
+    if (!ScrollController._overriddenElements.has(el)) return;
+    // Only restore if no velocity or chase is still active on this target
+    const v = ScrollController._velocity;
+    if (v && v.target === target) return;
+    if (ScrollController._chaseAnimations.has(target)) return;
+    el.style.scrollBehavior = "";
+    ScrollController._overriddenElements.delete(el);
+  }
 
   constructor(keyHandler: KeyHandlerLike) {
     this._keyHandler = keyHandler;
@@ -122,6 +150,7 @@ export class ScrollController {
 
       if ("isConnected" in target && !target.isConnected) {
         ScrollController._chaseAnimations.delete(target);
+        ScrollController._restoreSmoothScroll(target);
         return;
       }
 
@@ -135,6 +164,7 @@ export class ScrollController {
         target.scrollLeft = anim.targetX;
         target.scrollTop = anim.targetY;
         ScrollController._chaseAnimations.delete(target);
+        ScrollController._restoreSmoothScroll(target);
         return;
       }
 
@@ -147,12 +177,14 @@ export class ScrollController {
         target.scrollLeft = anim.targetX;
         target.scrollTop = anim.targetY;
         ScrollController._chaseAnimations.delete(target);
+        ScrollController._restoreSmoothScroll(target);
         return;
       }
 
       anim.rafId = requestAnimationFrame(step);
     }
 
+    ScrollController._disableSmoothScroll(target);
     ScrollController._chaseAnimations.set(target, anim);
     anim.rafId = requestAnimationFrame(step);
   }
@@ -195,6 +227,7 @@ export class ScrollController {
 
       if ("isConnected" in vel.target && !vel.target.isConnected) {
         ScrollController._velocity = null;
+        ScrollController._restoreSmoothScroll(vel.target);
         return;
       }
 
@@ -212,12 +245,14 @@ export class ScrollController {
       // Hit boundary
       if (after === before) {
         ScrollController._velocity = null;
+        ScrollController._restoreSmoothScroll(vel.target);
         return;
       }
 
       vel.rafId = requestAnimationFrame(step);
     }
 
+    ScrollController._disableSmoothScroll(target);
     ScrollController._velocity = vel;
     vel.rafId = requestAnimationFrame(step);
   }
@@ -240,6 +275,7 @@ export class ScrollController {
     if (!v) return;
     cancelAnimationFrame(v.rafId);
     ScrollController._velocity = null;
+    ScrollController._restoreSmoothScroll(v.target);
   }
 
   // --- Scroll operations ---
@@ -272,6 +308,7 @@ export class ScrollController {
     if (existing) {
       cancelAnimationFrame(existing.rafId);
       ScrollController._chaseAnimations.delete(target);
+      ScrollController._restoreSmoothScroll(target);
     }
   }
 
