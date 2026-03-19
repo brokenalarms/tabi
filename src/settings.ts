@@ -19,6 +19,7 @@ import type { MarkMap } from "./modules/QuickMarks";
 import { COMMANDS } from "./commands";
 import { DEFAULTS } from "./types";
 import type { KeyLayout, Theme, KeyBindingMode } from "./types";
+import { PremiumPrompt, PREMIUM_FEATURES } from "./modules/PremiumPrompt";
 
 declare const browser: {
   storage: {
@@ -94,6 +95,7 @@ let animate = DEFAULTS.animate;
 let autoNotifications = DEFAULTS.autoNotifications;
 let counters: StatCounters = { hintsClicked: 0, linksYanked: 0, tabsSearched: 0, scrollActions: 0 };
 let marks: MarkMap = {};
+const premiumPrompt = new PremiumPrompt();
 
 // ── Page builders ─────────────────────────────────────────────
 
@@ -114,7 +116,15 @@ function buildSegmented(
   }
   container.addEventListener("click", (e) => {
     const btn = (e.target as HTMLElement).closest("button") as HTMLButtonElement | null;
-    if (!btn || !btn.dataset.value || btn.disabled) return;
+    if (!btn || !btn.dataset.value) return;
+    if (btn.disabled) {
+      // Show premium prompt for the gated feature
+      const featureKey = btn.dataset.value;
+      if (PREMIUM_FEATURES[featureKey]) {
+        premiumPrompt.show(featureKey, () => navigate("premium"));
+      }
+      return;
+    }
     for (const b of container.querySelectorAll<HTMLButtonElement>("button")) {
       b.classList.toggle("active", b === btn);
     }
@@ -257,6 +267,10 @@ function buildSettingsPage(): HTMLElement {
       (input as HTMLInputElement).disabled = true;
       (input as HTMLInputElement).checked = false;
     }
+    notifToggle.style.cursor = "pointer";
+    notifToggle.addEventListener("click", () => {
+      premiumPrompt.show("notifications", () => navigate("premium"));
+    });
   }
   page.appendChild(notifToggle);
 
@@ -281,11 +295,14 @@ function buildStatisticsPage(): HTMLElement {
   page.appendChild(titleRow);
 
   if (!isPremium) {
-    const empty = el("div", { class: "empty-state" });
+    const empty = el("div", { class: "empty-state empty-state-gated" });
     empty.appendChild(text("div", "empty-state-icon", "\ud83d\udcca"));
     empty.appendChild(
       text("div", "empty-state-text", "Statistics tracking is a premium feature. Upgrade to see your usage insights.")
     );
+    const emptyBtn = el("button", { class: "upgrade-btn empty-state-cta", text: "Upgrade to Premium" });
+    emptyBtn.addEventListener("click", () => navigate("premium"));
+    empty.appendChild(emptyBtn);
     page.appendChild(empty);
     return page;
   }
@@ -374,7 +391,7 @@ function buildQuickMarksPage(): HTMLElement {
   page.appendChild(titleRow);
 
   if (!isPremium) {
-    const empty = el("div", { class: "empty-state" });
+    const empty = el("div", { class: "empty-state empty-state-gated" });
     empty.appendChild(text("div", "empty-state-icon", "\ud83d\udccc"));
     empty.appendChild(
       text(
@@ -383,6 +400,9 @@ function buildQuickMarksPage(): HTMLElement {
         "Quick Marks is a premium feature. Set marks with m+letter, jump with '+letter."
       )
     );
+    const emptyBtn = el("button", { class: "upgrade-btn empty-state-cta", text: "Upgrade to Premium" });
+    emptyBtn.addEventListener("click", () => navigate("premium"));
+    empty.appendChild(emptyBtn);
     page.appendChild(empty);
     return page;
   }
@@ -516,7 +536,10 @@ function buildKeyLayoutsPage(): HTMLElement {
     card.appendChild(buildMiniKeyboard(preset));
 
     card.addEventListener("click", () => {
-      if (isLayoutPremium(layoutKey) && !isPremium) return;
+      if (isLayoutPremium(layoutKey) && !isPremium) {
+        premiumPrompt.show(layoutKey, () => navigate("premium"));
+        return;
+      }
       currentLayout = layoutKey;
       browser.storage.local.set({ keyLayout: layoutKey });
       refreshPage();
@@ -578,23 +601,12 @@ function buildPremiumPage(): HTMLElement {
   );
   page.appendChild(hero);
 
-  // Feature list
+  // Feature list — sourced from the shared feature catalog
   const features = [
-    {
-      icon: "\u2328",
-      name: "One-handed Layouts",
-      desc: "Left Hand and Right Hand keyboard layouts for single-handed browsing.",
-    },
-    {
-      icon: "\ud83d\udcca",
-      name: "Usage Statistics",
-      desc: "Track hints clicked, links yanked, time saved, and milestone achievements.",
-    },
-    {
-      icon: "\ud83d\udccc",
-      name: "Quick Marks",
-      desc: "Vim-style marks (a-z) to save and jump to pages instantly.",
-    },
+    { icon: PREMIUM_FEATURES.leftHand.icon, name: "One-handed Layouts", desc: PREMIUM_FEATURES.leftHand.description },
+    { icon: PREMIUM_FEATURES.fuzzySearch.icon, name: PREMIUM_FEATURES.fuzzySearch.name, desc: PREMIUM_FEATURES.fuzzySearch.description },
+    { icon: PREMIUM_FEATURES.statistics.icon, name: PREMIUM_FEATURES.statistics.name, desc: PREMIUM_FEATURES.statistics.description },
+    { icon: PREMIUM_FEATURES.quickmarks.icon, name: PREMIUM_FEATURES.quickmarks.name, desc: PREMIUM_FEATURES.quickmarks.description },
   ];
 
   const list = el("ul", { class: "feature-list" });

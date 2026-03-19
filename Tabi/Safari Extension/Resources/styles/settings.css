@@ -386,6 +386,19 @@ body {
   line-height: 1.5;
 }
 
+.empty-state-gated {
+  padding: 48px 32px;
+}
+
+.empty-state-cta {
+  margin-top: 20px;
+  max-width: 220px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
 /* ── Quick Marks page ────────────────────────────────────── */
 
 .marks-grid {

@@ -2,8 +2,7 @@
 // the segmented button state to reflect persisted values. Shows premium
 // status pill and provides a link to open the full settings page.
 
-import { layoutFamilyFromOS, layoutFamilyLabel } from "./keyboardLayouts";
-import type { LayoutFamily } from "./keyboardLayouts";
+import { PremiumPrompt, PREMIUM_FEATURES } from "./modules/PremiumPrompt";
 
 declare const browser: {
   storage: {
@@ -39,7 +38,7 @@ function updatePremiumPill(pill: HTMLElement, isPremium: boolean): void {
 
 // Load persisted settings and wire click handlers.
 async function init(): Promise<void> {
-  const keys = [...SETTINGS.map(s => s.key), "isPremium", "keyboardLayout"];
+  const keys = [...SETTINGS.map(s => s.key), "isPremium"];
   const stored = await browser.storage.local.get(keys);
 
   // Premium pill
@@ -50,10 +49,12 @@ async function init(): Promise<void> {
 
   const isPremium = stored.isPremium === true;
 
-  // Gate premium buttons
+  // Gate premium buttons — style as disabled but keep them enabled so clicks
+  // fire, letting us show the premium prompt.
+  const premiumPrompt = new PremiumPrompt();
   for (const btn of document.querySelectorAll<HTMLButtonElement>("button[data-premium]")) {
     if (!isPremium) {
-      btn.disabled = true;
+      btn.classList.add("premium-gated");
       btn.title = "Premium feature";
     }
   }
@@ -69,18 +70,19 @@ async function init(): Promise<void> {
     container.addEventListener("click", (e) => {
       const btn = (e.target as HTMLElement).closest("button");
       if (!btn || !btn.dataset.value || btn.disabled) return;
+      if (btn.classList.contains("premium-gated")) {
+        const featureKey = btn.dataset.value;
+        if (PREMIUM_FEATURES[featureKey]) {
+          premiumPrompt.show(featureKey, () => {
+            browser.tabs.create({ url: browser.runtime.getURL("settings.html") });
+            window.close();
+          });
+        }
+        return;
+      }
       activateButton(container, btn.dataset.value);
       browser.storage.local.set({ [key]: btn.dataset.value });
     });
-  }
-
-  // Detected keyboard layout — update the key binding mode hint text
-  const osLayout = typeof stored.keyboardLayout === "string" ? stored.keyboardLayout : "";
-  const family: LayoutFamily = layoutFamilyFromOS(osLayout);
-  const bindingHint = document.querySelector("#keyBindingMode + .hint-text");
-  if (bindingHint && family !== "qwerty") {
-    const label = layoutFamilyLabel(family);
-    bindingHint.textContent = `${label} keyboard detected. Character mode recommended.`;
   }
 
   // Settings link — opens full settings page in a new tab
