@@ -7,7 +7,7 @@ import './style.css'
 // --- Scroll-triggered fade-in animations ---
 function initScrollAnimations(): void {
   const targets = document.querySelectorAll<HTMLElement>(
-    '.pain-card, .step-card, .feature-card, .audience-card, .anatomy-step, .rsi-info-box, .pain-anatomy, .comparison-table-wrap'
+    '.pain-card, .step-card, .feature-card, .audience-card, .anatomy-step, .rsi-info-box, .pain-anatomy, .comparison-table-wrap, .why-origin, .safari-card, .limitation-card'
   )
   targets.forEach((el) => el.classList.add('fade-in'))
 

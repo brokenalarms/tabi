@@ -943,6 +943,107 @@ kbd {
   color: var(--text);
 }
 
+/* --- WHY TABI / WHY SAFARI --- */
+.why-tabi {
+  padding: var(--section-pad);
+  text-align: center;
+  background: var(--bg-alt);
+}
+
+.why-origin {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 48px;
+  text-align: left;
+  margin-bottom: 60px;
+}
+
+.why-origin h3 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-bottom: 16px;
+}
+
+.why-origin p {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: var(--text);
+  margin-bottom: 16px;
+}
+
+.why-origin p:last-child {
+  margin-bottom: 0;
+}
+
+.why-safari-section {
+  text-align: left;
+}
+
+.why-safari-section h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.why-safari-intro {
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: var(--text);
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto 48px;
+}
+
+.safari-benefits-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.safari-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px 24px;
+  transition: border-color 0.3s var(--ease), transform 0.3s var(--ease);
+}
+.safari-card:hover {
+  border-color: #3b82f6;
+  transform: translateY(-4px);
+}
+
+.safari-icon {
+  font-size: 2rem;
+  margin-bottom: 12px;
+}
+
+.safari-card h4 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-bottom: 10px;
+}
+
+.safari-card p {
+  font-size: 0.9rem;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.safari-closer {
+  font-size: 1rem;
+  color: var(--text);
+  text-align: center;
+  line-height: 1.7;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
 /* --- AUDIENCE --- */
 .audience {
   padding: var(--section-pad);
@@ -1041,6 +1142,59 @@ kbd {
 }
 .comparison-table tbody tr:hover {
   background: var(--bg-card);
+}
+
+/* --- LIMITATIONS --- */
+.limitations {
+  padding: var(--section-pad);
+  text-align: center;
+  background: var(--bg-alt);
+}
+
+.limitations-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.limitation-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 36px 24px;
+  text-align: left;
+  transition: border-color 0.3s var(--ease);
+}
+.limitation-card:hover {
+  border-color: var(--text-dim);
+}
+
+.limitation-icon {
+  font-size: 2rem;
+  margin-bottom: 12px;
+}
+
+.limitation-card h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-bottom: 10px;
+}
+
+.limitation-card p {
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--text);
+}
+
+.limitations-closer {
+  font-size: 0.95rem;
+  color: var(--text-dim);
+  max-width: 680px;
+  margin: 0 auto;
+  line-height: 1.7;
+  font-style: italic;
 }
 
 /* --- DOWNLOAD --- */
@@ -1173,6 +1327,18 @@ kbd {
   }
 
   .audience-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .safari-benefits-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .why-origin {
+    padding: 28px 20px;
+  }
+
+  .limitations-grid {
     grid-template-columns: 1fr;
   }
 
