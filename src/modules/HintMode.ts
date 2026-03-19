@@ -142,7 +142,7 @@ export class HintMode {
           ? this.clampRectToHeader(container.getBoundingClientRect(), nestedList as HTMLElement)
           : container.getBoundingClientRect();
         const heightMultiplier = Math.floor(containerRect.height / MINIMUM_CONTAINER_HEIGHT);
-        const maxNested = heightMultiplier >= 2 ? heightMultiplier : 0;
+        const maxNested = Math.min(heightMultiplier >= 2 ? heightMultiplier : 0, 3);
         const noNestedLinks = countNestedLinks(container, el, discoveredSet) <= maxNested;
         const glowEligible = nestedList !== null || isLargeEnoughForGlow(container, containerRect);
         const parent = container.parentElement || container;
