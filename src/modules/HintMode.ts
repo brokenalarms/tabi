@@ -111,7 +111,7 @@ export class HintMode {
     this.keyHandler.setMode(Mode.HINTS);
 
     let elements = discoverElements((el: HTMLElement) => this.getHintRect(el));
-    if (mode === "yank") {
+    if (mode === "yank" || mode === "multi") {
       elements = elements.filter(el =>
         el.tagName.toLowerCase() === "a" && (el as HTMLAnchorElement).href
       );
@@ -517,8 +517,8 @@ export class HintMode {
 
     if (event.code === "Escape") return false;
 
-    // Multi mode: Space executes all accumulated selections
-    if (this.modeType === "multi" && event.code === "Space") {
+    // Multi mode: Space or Enter executes all accumulated selections
+    if (this.modeType === "multi" && (event.code === "Space" || event.code === "Enter")) {
       event.preventDefault();
       event.stopPropagation();
       this.executeMultiSelections();
@@ -726,7 +726,7 @@ export class HintMode {
     const label = HintMode.MODE_LABELS[this.modeType];
     if (this.modeType === "multi") {
       const count = this.multiSelections.length;
-      this.statusBar.textContent = `${label} — ${count} selected, Space to open`;
+      this.statusBar.textContent = `${label} — ${count} selected, Space or Enter to open`;
     } else {
       this.statusBar.textContent = label;
     }

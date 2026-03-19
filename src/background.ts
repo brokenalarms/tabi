@@ -104,13 +104,15 @@ export async function handleCommand(command: Command, sender: MessageSender, mes
 
     case "closeTab": {
       if (!sender.tab) break;
-      // Switch to the previously active tab before closing
+      // Capture return target before remove — removing the tab triggers
+      // onActivated (Safari auto-activates the next tab), which would
+      // overwrite activeHistory before we can read it.
       const returnTo = activeHistory.previous !== null && activeHistory.previous !== sender.tab.id
         ? activeHistory.previous : null;
-      await browser.tabs.remove(sender.tab.id);
       if (returnTo !== null) {
         try { await browser.tabs.update(returnTo, { active: true }); } catch (_) {}
       }
+      await browser.tabs.remove(sender.tab.id);
       break;
     }
 
