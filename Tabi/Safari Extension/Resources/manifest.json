@@ -30,6 +30,12 @@
         "256": "images/icon-256.png",
         "512": "images/icon-512.png"
     },
+    "web_accessible_resources": [
+        {
+            "resources": ["settings.html"],
+            "matches": ["<all_urls>"]
+        }
+    ],
     "action": {
         "default_popup": "popup.html",
         "default_icon": {

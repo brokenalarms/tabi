@@ -7,7 +7,7 @@ await import("./loadEnv.mjs");
 const outDir = "Tabi/Safari Extension/Resources";
 
 await build({
-  entryPoints: ["src/content.ts", "src/background.ts", "src/popup.ts"],
+  entryPoints: ["src/content.ts", "src/background.ts", "src/popup.ts", "src/settings.ts"],
   outdir: outDir,
   bundle: true,
   format: "iife",
