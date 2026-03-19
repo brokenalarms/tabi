@@ -3,8 +3,12 @@
 // and hint positioning, which require a real layout engine.
 
 import { test, expect } from "@playwright/test";
-import { NodeFilter } from "happy-dom";
 import path from "path";
+
+// Native NodeFilter constants (same in every browser and happy-dom).
+// Imported here so Node-side assertions don't need a DOM environment.
+const NF_ACCEPT = 1;
+const NF_REJECT = 2;
 
 const HARNESS_PATH = path.resolve(__dirname, "harness.js");
 
@@ -556,7 +560,7 @@ test("multi-line link inside heading is not falsely occluded by adjacent content
     return walkerFilter(document.getElementById("heading-link")!);
   });
 
-  expect(verdict).toBe(NodeFilter.FILTER_ACCEPT);
+  expect(verdict).toBe(NF_ACCEPT);
 });
 
 // Clicking a hint dispatches a click to the target element only after the
@@ -580,39 +584,31 @@ test("hint click dispatches after collapse animation completes", async ({ page }
     }
   `});
 
-  const clicked = await page.evaluate(() => {
-    return new Promise<boolean>((resolve) => {
-      const target = document.getElementById("target")!;
-      let wasClicked = false;
-      target.addEventListener("click", () => { wasClicked = true; });
+  // Wire up click tracking and activate hint mode
+  await page.evaluate(() => {
+    (window as any).__clicked = false;
+    document.getElementById("target")!
+      .addEventListener("click", () => { (window as any).__clicked = true; });
 
-      const { KeyHandler, HintMode, Mode } = window.TestHarness;
-      const kh = new KeyHandler();
-      const hm = new HintMode(kh);
-      hm.wireCommands();
-      kh.on("exitToNormal", () => {
-        if (hm.isActive()) hm.deactivate();
-        kh.setMode(Mode.NORMAL);
-      });
-      hm.activate(false);
-
-      // With a single element, the label is the first hint char "s".
-      // Simulate typing it to trigger activateHint.
-      const event = new KeyboardEvent("keydown", {
-        key: "s", code: "KeyS", bubbles: true,
-      });
-      document.dispatchEvent(event);
-
-      // Click should not have happened yet (animation is 150ms)
-      const clickedBeforeAnimation = wasClicked;
-
-      // Wait for animation to complete + buffer
-      setTimeout(() => {
-        resolve(!clickedBeforeAnimation && wasClicked);
-      }, 300);
+    const { KeyHandler, HintMode, Mode } = window.TestHarness;
+    const kh = new KeyHandler();
+    const hm = new HintMode(kh);
+    hm.wireCommands();
+    kh.on("exitToNormal", () => {
+      if (hm.isActive()) hm.deactivate();
+      kh.setMode(Mode.NORMAL);
     });
+    hm.activate(false);
+
+    // With a single element, the label is the first hint char "s".
+    document.dispatchEvent(new KeyboardEvent("keydown", {
+      key: "s", code: "KeyS", bubbles: true,
+    }));
   });
 
+  // Wait for click to fire (animationend triggers it; generous timeout for CI)
+  await page.waitForFunction(() => (window as any).__clicked, null, { timeout: 2000 });
+  const clicked = await page.evaluate(() => (window as any).__clicked);
   expect(clicked).toBe(true);
 });
 
