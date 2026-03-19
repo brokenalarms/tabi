@@ -1,29 +1,11 @@
-.tabi-help-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 2147483647;
-    background: transparent;
-    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-}
-
 .tabi-help-modal {
     position: fixed;
     bottom: 16px;
     right: 16px;
     width: fit-content;
     max-width: 90vw;
-    background: var(--tabi-help-bg);
-    border-radius: 10px;
-    box-shadow: var(--tabi-help-shadow);
-    overflow: hidden;
     display: flex;
     flex-direction: column;
-    color: var(--tabi-help-color);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
 }
 
 .tabi-help-title {
@@ -31,8 +13,7 @@
     font-weight: 600;
     padding: 10px 14px;
     margin: 0;
-    border-bottom: 1px solid var(--tabi-help-border);
-    color: var(--tabi-help-color);
+    border-bottom: 1px solid var(--tabi-panel-border);
 }
 
 .tabi-help-grid {
@@ -57,23 +38,30 @@
 .tabi-help-key {
     font-family: "SF Mono", Menlo, monospace;
     font-size: 11px;
-    padding: 4px 14px;
-    text-align: right;
+    line-height: 1.4;
     white-space: nowrap;
     color: var(--tabi-help-key-color);
+    background: var(--tabi-help-key-bg);
+    border: 1px solid var(--tabi-help-key-border);
+    border-radius: 5px;
+    padding: 3px 8px;
+    margin: 3px 10px 3px 14px;
+    min-width: 24px;
+    text-align: center;
 }
 
 .tabi-help-desc {
-    font-size: 12px;
-    color: var(--tabi-help-desc-color);
+    font-size: 13px;
     padding: 4px 14px 4px 8px;
+    display: flex;
+    align-items: center;
 }
 
 .tabi-help-hint {
     text-align: center;
     font-size: 10px;
-    color: var(--tabi-help-muted-color);
+    color: var(--tabi-panel-muted);
     padding: 6px 14px;
-    border-top: 1px solid var(--tabi-help-border);
+    border-top: 1px solid var(--tabi-panel-border);
     margin: 0;
 }

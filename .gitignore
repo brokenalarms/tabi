@@ -17,6 +17,7 @@ Tabi/Safari Extension/Resources/**/*.js
 # Playwright
 tests/integration/harness.js
 test-results/
+scripts/screenshots/
 
 # Environment
 .env

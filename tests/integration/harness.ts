@@ -3,6 +3,8 @@
 
 import { KeyHandler } from "../../src/modules/KeyHandler";
 import { HintMode } from "../../src/modules/HintMode";
+import { HelpOverlay } from "../../src/modules/HelpOverlay";
+import { TabSearch } from "../../src/modules/TabSearch";
 import { Mode } from "../../src/commands";
 import { walkerFilter } from "../../src/modules/ElementGatherer";
 import {
@@ -15,6 +17,8 @@ declare global {
     TestHarness: {
       KeyHandler: typeof KeyHandler;
       HintMode: typeof HintMode;
+      HelpOverlay: typeof HelpOverlay;
+      TabSearch: typeof TabSearch;
       Mode: typeof Mode;
       walkerFilter: typeof walkerFilter;
       predicates: {
@@ -31,7 +35,7 @@ declare global {
 }
 
 window.TestHarness = {
-  KeyHandler, HintMode, Mode, walkerFilter,
+  KeyHandler, HintMode, HelpOverlay, TabSearch, Mode, walkerFilter,
   predicates: {
     isExcludedByIntent, childrenCannotBeVisible, isOnScreen, isVisible,
     isClippedByOverflow, isOccluded, hasBox,

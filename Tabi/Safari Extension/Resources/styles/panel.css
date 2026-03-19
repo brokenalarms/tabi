@@ -1,0 +1,26 @@
+/*
+ * Shared base styles for tabi panels (mode bar, tab search, help).
+ * Each panel adds its own layout rules; this file covers the shared
+ * visual treatment: frosted glass, border-radius, font stack, color.
+ */
+
+.tabi-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2147483647;
+    background: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+}
+
+.tabi-panel {
+    background: var(--tabi-panel-bg);
+    box-shadow: var(--tabi-panel-shadow);
+    color: var(--tabi-panel-color);
+    border-radius: 10px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    overflow: hidden;
+}

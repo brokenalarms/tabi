@@ -107,17 +107,10 @@
     width: fit-content;
     z-index: 2147483647;
     padding: 10px 24px;
-    border-radius: 10px;
-    background: var(--tabi-mode-bar-bg);
-    box-shadow: var(--tabi-mode-bar-shadow);
-    color: var(--tabi-mode-bar-color);
-    font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
-    font-weight: 600;
+    font: 600 15px/1.4 -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
     text-align: center;
     white-space: nowrap;
     pointer-events: none;
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
 }
 
 .tabi-hint-container-glow {
