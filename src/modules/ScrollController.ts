@@ -133,10 +133,11 @@ export class ScrollController {
       targetX: Math.max(0, Math.min(maxX, target.scrollLeft + deltaX)),
       targetY: Math.max(0, Math.min(maxY, target.scrollTop + deltaY)),
       rafId: 0,
-      lastTime: performance.now(),
+      lastTime: 0,
     };
 
     function step(now: number) {
+      if (anim.lastTime === 0) anim.lastTime = now;
       const dt = now - anim.lastTime;
       anim.lastTime = now;
 
@@ -164,8 +165,8 @@ export class ScrollController {
       target.scrollLeft += remainingX * factor;
       target.scrollTop += remainingY * factor;
 
-      // Sub-pixel rounding prevented movement — snap to close any remaining gap
-      if (target.scrollLeft === beforeX && target.scrollTop === beforeY) {
+      // Sub-pixel rounding prevented movement — only snap after real dt
+      if (dt > 0 && target.scrollLeft === beforeX && target.scrollTop === beforeY) {
         target.scrollLeft = anim.targetX;
         target.scrollTop = anim.targetY;
         ScrollController._chaseAnimations.delete(target);
@@ -204,10 +205,11 @@ export class ScrollController {
       axis,
       direction,
       rafId: 0,
-      lastTime: performance.now(),
+      lastTime: 0,
     };
 
     function step(now: number) {
+      if (vel.lastTime === 0) vel.lastTime = now;
       const dt = now - vel.lastTime;
       vel.lastTime = now;
 
@@ -228,8 +230,8 @@ export class ScrollController {
 
       const after = vel.axis === "y" ? vel.target.scrollTop : vel.target.scrollLeft;
 
-      // Hit boundary
-      if (after === before) {
+      // Hit boundary — only check after real movement was attempted
+      if (dt > 0 && after === before) {
         ScrollController._velocity = null;
         ScrollController._restoreSmoothScroll(vel.target);
         return;
