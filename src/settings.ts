@@ -4,8 +4,6 @@
 
 import { PRESETS, isLayoutPremium } from "./keybindings";
 import type { PresetMeta, KeyBinding } from "./keybindings";
-import { layoutFamilyFromOS, layoutFamilyLabel } from "./keyboardLayouts";
-import type { LayoutFamily } from "./keyboardLayouts";
 import {
   loadCounters,
   totalActions,
@@ -93,9 +91,9 @@ let currentLayout: KeyLayout = DEFAULTS.keyLayout;
 let currentBindingMode: KeyBindingMode = DEFAULTS.keyBindingMode;
 let currentTheme: Theme = DEFAULTS.theme;
 let animate = DEFAULTS.animate;
+let autoNotifications = DEFAULTS.autoNotifications;
 let counters: StatCounters = { hintsClicked: 0, linksYanked: 0, tabsSearched: 0, scrollActions: 0 };
 let marks: MarkMap = {};
-let detectedFamily: LayoutFamily = "qwerty";
 
 // ── Page builders ─────────────────────────────────────────────
 
@@ -188,9 +186,7 @@ function buildSettingsPage(): HTMLElement {
 
   // Key Binding Mode
   const bindingHint =
-    detectedFamily !== "qwerty"
-      ? `${layoutFamilyLabel(detectedFamily)} keyboard detected. Character mode recommended.`
-      : "Character matches what you type. Position matches physical key location.";
+    "Character matches what you type. Position matches physical key location.";
 
   page.appendChild(
     buildSection(
@@ -242,6 +238,27 @@ function buildSettingsPage(): HTMLElement {
       browser.storage.local.set({ animate: v });
     })
   );
+
+  page.appendChild(el("hr", { class: "separator" }));
+
+  // Auto Notifications (premium)
+  const notifToggle = buildToggle(
+    "Weekly Stats Notification",
+    "Show a summary of your keyboard usage once a week",
+    autoNotifications,
+    (v) => {
+      autoNotifications = v;
+      browser.storage.local.set({ autoNotifications: v });
+    }
+  );
+  if (!isPremium) {
+    const input = notifToggle.querySelector("input");
+    if (input) {
+      (input as HTMLInputElement).disabled = true;
+      (input as HTMLInputElement).checked = false;
+    }
+  }
+  page.appendChild(notifToggle);
 
   return page;
 }
@@ -673,7 +690,7 @@ async function init(): Promise<void> {
     "theme",
     "animate",
     "isPremium",
-    "keyboardLayout",
+    "autoNotifications",
     "statistics",
     "quickMarks",
   ]);
@@ -683,11 +700,9 @@ async function init(): Promise<void> {
   currentBindingMode = (stored.keyBindingMode as KeyBindingMode) || DEFAULTS.keyBindingMode;
   currentTheme = (stored.theme as Theme) || DEFAULTS.theme;
   animate = stored.animate !== undefined ? (stored.animate as boolean) : DEFAULTS.animate;
+  autoNotifications = stored.autoNotifications !== undefined ? (stored.autoNotifications as boolean) : DEFAULTS.autoNotifications;
   counters = loadCounters(stored);
   marks = loadMarks(stored);
-
-  const osLayout = typeof stored.keyboardLayout === "string" ? stored.keyboardLayout : "";
-  detectedFamily = layoutFamilyFromOS(osLayout);
 
   render();
 
@@ -722,6 +737,10 @@ async function init(): Promise<void> {
     }
     if (changes.animate?.newValue !== undefined) {
       animate = changes.animate.newValue as boolean;
+      needsRefresh = true;
+    }
+    if (changes.autoNotifications?.newValue !== undefined) {
+      autoNotifications = changes.autoNotifications.newValue as boolean;
       needsRefresh = true;
     }
 

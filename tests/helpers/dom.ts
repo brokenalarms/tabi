@@ -40,6 +40,7 @@ export function createDOM(html?: string): DOMEnvironment {
   (globalThis as any).KeyboardEvent = (window as any).KeyboardEvent;
   (globalThis as any).MouseEvent = (window as any).MouseEvent;
   (globalThis as any).clearTimeout = globalThis.clearTimeout;
+  (globalThis as any).requestAnimationFrame = (cb: () => void) => { cb(); return 0; };
 
   const cleanup = (): void => {
     window.close();
