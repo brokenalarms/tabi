@@ -133,10 +133,17 @@ export class ScrollController {
       targetX: Math.max(0, Math.min(maxX, target.scrollLeft + deltaX)),
       targetY: Math.max(0, Math.min(maxY, target.scrollTop + deltaY)),
       rafId: 0,
-      lastTime: performance.now(),
+      lastTime: 0,
     };
 
     function step(now: number) {
+      // First frame: record timestamp, schedule next frame (no movement yet)
+      if (anim.lastTime === 0) {
+        anim.lastTime = now;
+        anim.rafId = requestAnimationFrame(step);
+        return;
+      }
+
       const dt = now - anim.lastTime;
       anim.lastTime = now;
 
@@ -204,10 +211,17 @@ export class ScrollController {
       axis,
       direction,
       rafId: 0,
-      lastTime: performance.now(),
+      lastTime: 0,
     };
 
     function step(now: number) {
+      // First frame: record timestamp, schedule next frame (no movement yet)
+      if (vel.lastTime === 0) {
+        vel.lastTime = now;
+        vel.rafId = requestAnimationFrame(step);
+        return;
+      }
+
       const dt = now - vel.lastTime;
       vel.lastTime = now;
 
