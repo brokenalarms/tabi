@@ -54,6 +54,9 @@ function resetBrowserShim() {
             onUpdated: {
                 addListener(fn: (tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string }) => void) { tabUpdatedListeners.push(fn); },
             },
+            onActivated: {
+                addListener() {},
+            },
         },
         action: {
             async enable(tabId: number) {
@@ -99,6 +102,7 @@ import {
     activeTabSet,
     tabUrlCache,
     tabOrder,
+    activeHistory,
     init,
 } from "../src/background";
 
@@ -109,6 +113,8 @@ describe("background.ts tab management", () => {
         activeTabSet.clear();
         tabUrlCache.clear();
         tabOrder.length = 0;
+        activeHistory.previous = null;
+        activeHistory.current = null;
         init();
     });
 

@@ -22,6 +22,7 @@ declare const browser: {
     query(opts: { currentWindow: boolean }): Promise<Array<{ id: number; title: string; url: string; active: boolean }>>;
     onRemoved: { addListener(fn: (tabId: number) => void): void };
     onUpdated: { addListener(fn: (tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string }) => void): void };
+    onActivated: { addListener(fn: (activeInfo: { tabId: number }) => void): void };
   };
   action: {
     enable(tabId: number): Promise<void>;
@@ -59,6 +60,9 @@ export const tabUrlCache = new Map<number, string>();
 // Ordered list of tab IDs so we can find left neighbors when a tab is closed
 export const tabOrder: number[] = [];
 
+// Track the previously active tab so we can return to it after closing
+export const activeHistory = { previous: null as number | null, current: null as number | null };
+
 export async function updateIconState(tabId: number): Promise<void> {
   try {
     if (activeTabSet.has(tabId)) {
@@ -90,13 +94,23 @@ export async function handleCommand(command: Command, sender: MessageSender, mes
   switch (command) {
     case "createTab": {
       const url = message && typeof message.url === "string" ? message.url : undefined;
-      await browser.tabs.create(url ? { url } : {});
+      // Open new tab to the right of the current tab
+      const tabs = await browser.tabs.query({ currentWindow: true });
+      const senderIdx = sender.tab ? tabs.findIndex(t => t.id === sender.tab!.id) : -1;
+      const insertIndex = senderIdx >= 0 ? senderIdx + 1 : undefined;
+      await browser.tabs.create(url ? { url, index: insertIndex } : { index: insertIndex });
       break;
     }
 
     case "closeTab": {
       if (!sender.tab) break;
+      // Switch to the previously active tab before closing
+      const returnTo = activeHistory.previous !== null && activeHistory.previous !== sender.tab.id
+        ? activeHistory.previous : null;
       await browser.tabs.remove(sender.tab.id);
+      if (returnTo !== null) {
+        try { await browser.tabs.update(returnTo, { active: true }); } catch (_) {}
+      }
       break;
     }
 
@@ -201,6 +215,12 @@ export async function handleCommand(command: Command, sender: MessageSender, mes
 // Register listeners and populate caches — called at load time in production,
 // and explicitly from tests after the browser shim is installed.
 export function init(): void {
+  // Track active tab changes for "return to previous" on close
+  browser.tabs.onActivated.addListener((activeInfo: { tabId: number }) => {
+    activeHistory.previous = activeHistory.current;
+    activeHistory.current = activeInfo.tabId;
+  });
+
   // Track tab URLs for closed-tab restore
   browser.tabs.onUpdated.addListener((tabId: number, changeInfo: { url?: string }) => {
     if (changeInfo.url) {
