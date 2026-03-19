@@ -133,10 +133,11 @@ export class ScrollController {
       targetX: Math.max(0, Math.min(maxX, target.scrollLeft + deltaX)),
       targetY: Math.max(0, Math.min(maxY, target.scrollTop + deltaY)),
       rafId: 0,
-      lastTime: performance.now(),
+      lastTime: 0,
     };
 
     function step(now: number) {
+      if (anim.lastTime === 0) anim.lastTime = now;
       const dt = now - anim.lastTime;
       anim.lastTime = now;
 
@@ -204,10 +205,11 @@ export class ScrollController {
       axis,
       direction,
       rafId: 0,
-      lastTime: performance.now(),
+      lastTime: 0,
     };
 
     function step(now: number) {
+      if (vel.lastTime === 0) vel.lastTime = now;
       const dt = now - vel.lastTime;
       vel.lastTime = now;
 
