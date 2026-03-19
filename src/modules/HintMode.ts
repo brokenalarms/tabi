@@ -733,7 +733,7 @@ export class HintMode {
 
   private createStatusBar(): void {
     this.statusBar = document.createElement("div");
-    this.statusBar.className = "tabi-mode-bar";
+    this.statusBar.className = "tabi-panel tabi-mode-bar";
     this.updateStatusBar();
     document.documentElement.appendChild(this.statusBar);
   }

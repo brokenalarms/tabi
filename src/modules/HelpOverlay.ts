@@ -44,10 +44,10 @@ export class HelpOverlay {
 
   private _createOverlay(): void {
     this._overlay = document.createElement("div") as HTMLDivElement;
-    this._overlay.className = "tabi-help-overlay";
+    this._overlay.className = "tabi-overlay";
 
     const modal = document.createElement("div");
-    modal.className = "tabi-help-modal";
+    modal.className = "tabi-panel tabi-help-modal";
 
     const title = document.createElement("h2");
     title.className = "tabi-help-title";

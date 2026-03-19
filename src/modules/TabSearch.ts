@@ -148,10 +148,10 @@ export class TabSearch {
 
   private _createOverlay(): void {
     this._overlayEl = document.createElement("div");
-    this._overlayEl.className = "tabi-tab-search-overlay";
+    this._overlayEl.className = "tabi-overlay";
 
     const modal = document.createElement("div");
-    modal.className = "tabi-tab-search-modal";
+    modal.className = "tabi-panel tabi-tab-search-modal";
 
     this._inputEl = document.createElement("input");
     this._inputEl.type = "text";
