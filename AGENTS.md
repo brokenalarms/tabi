@@ -77,6 +77,10 @@ If the user agrees, you may proceed:
 
 - **Pull in the latest from origin main, commit and create PR** then we have a history of each fix in Github as well. This is part of completing the fix after I agree, you don't need to ask to create a PR. If there are errors we can update it (updating the description to account for all commits each time).
 - CHECK before updating a PR that it's not already merged. If you're just pushing to a branch post-PR merge, you'll need to create a new PR.
+- After every push to a PR branch, check whether GitHub reports conflicts or the branch is behind main. If so, rebase and force-push:
+  1. `git fetch origin main && git rebase origin/main`
+  2. `git push --force-with-lease`
+  This is equivalent to GitHub's "Update branch" button but uses rebase. Do this proactively after every push — don't wait for conflicts to be reported.
 
 Each pasted scenario = one test. The test is the proof that the bug is fixed and won't regress.
 
