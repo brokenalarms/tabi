@@ -208,9 +208,9 @@ const nextFrame = (): Promise<void> =>
 export async function executeRetryStrategies(captured: CapturedStrategy[]): Promise<void> {
   for (const result of captured) {
     await nextFrame();
-    if (result.didChange()) continue;
+    if (result.didChange()) return;
     result.retry();
     await nextFrame();
-    if (result.didChange()) continue;
+    if (result.didChange()) return;
   }
 }
