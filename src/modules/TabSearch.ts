@@ -38,6 +38,8 @@ export class TabSearch {
   private _filtered: TabInfo[];
   private _selectedIndex: number;
   private readonly _onInput: () => void;
+  /** Optional callback fired when a tab switch is executed. */
+  onAction: (() => void) | null;
 
   constructor(keyHandler: KeyHandlerLike) {
     this._keyHandler = keyHandler;
@@ -49,6 +51,7 @@ export class TabSearch {
     this._filtered = [];
     this._selectedIndex = 0;
     this._onInput = this._handleInput.bind(this);
+    this.onAction = null;
     this._wireCommands();
   }
 
@@ -265,6 +268,7 @@ export class TabSearch {
     const tab = this._filtered[this._selectedIndex];
     if (tab && tab.id) {
       browser.runtime.sendMessage({ command: "switchTab", tabId: tab.id });
+      this.onAction?.();
     }
     this.deactivate();
   }
