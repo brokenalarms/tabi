@@ -9,6 +9,7 @@ import { ScrollController } from "./modules/ScrollController";
 import { HintMode } from "./modules/HintMode";
 import { TabSearch } from "./modules/TabSearch";
 import { HelpOverlay } from "./modules/HelpOverlay";
+import { setPremiumStatus } from "./premium";
 
 // Browser API (Safari Web Extension)
 declare const browser: {
@@ -86,6 +87,7 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   // Apply initial settings
   keyHandler.setKeyBindingMode(resolved.keyBindingMode);
   applyTheme(resolved.theme);
+  setPremiumStatus(resolved.isPremium);
 
   // Scroll and history navigation
   const scrollController = new ScrollController(keyHandler);
@@ -109,6 +111,9 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
     }
     if (changes.theme?.newValue) {
       applyTheme(changes.theme.newValue as Theme);
+    }
+    if (changes.isPremium !== undefined) {
+      setPremiumStatus(changes.isPremium.newValue as boolean);
     }
   });
 
@@ -234,7 +239,7 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
 }
 
 // Read all settings and initialize
-browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme"]).then((result) => {
+browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme", "isPremium"]).then((result) => {
   const excluded = (result.excludedDomains as string[]) || [];
   if (isDomainExcluded(excluded)) {
     browser.runtime.sendMessage({ command: "extensionInactive" });

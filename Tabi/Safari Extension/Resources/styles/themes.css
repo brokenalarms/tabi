@@ -43,6 +43,13 @@
     --tabi-hint-bar-glow: rgba(187, 187, 187, 0.15);
 }
 
+/* ── Premium toast accent (dark default) ─────────────────────────────── */
+
+.tabi-premium-toast {
+    --tabi-premium-border: rgba(195, 138, 34, 0.6);
+    --tabi-premium-accent: #e2a73a;
+}
+
 /* ── Shared panel theme (dark default) ────────────────────────────────── */
 
 .tabi-panel {
@@ -110,5 +117,10 @@
         --tabi-help-key-bg: rgba(0, 0, 0, 0.04);
         --tabi-help-key-border: rgba(0, 0, 0, 0.1);
         --tabi-help-row-hover: rgba(0, 0, 0, 0.04);
+    }
+
+    .tabi-premium-toast {
+        --tabi-premium-border: rgba(195, 138, 34, 0.45);
+        --tabi-premium-accent: #b07d1e;
     }
 }

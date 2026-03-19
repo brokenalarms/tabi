@@ -18,7 +18,7 @@
         {
             "matches": ["<all_urls>"],
             "js": ["content.js"],
-            "css": ["styles/themes.css", "styles/panel.css", "styles/hints.css", "styles/tab-search.css", "styles/help.css"],
+            "css": ["styles/themes.css", "styles/panel.css", "styles/hints.css", "styles/tab-search.css", "styles/help.css", "styles/premium.css"],
             "run_at": "document_idle",
             "all_frames": false
         }
