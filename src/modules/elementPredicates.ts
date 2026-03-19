@@ -301,14 +301,15 @@ export function countNestedLinks(container: HTMLElement, el: HTMLElement, discov
 
 
 /** Is this element large and rectangular enough for container-style hint placement?
- *  Checks minimum width, aspect ratio or viewport fraction, and box generation. */
+ *  Rectangular: wide landscape items (nav rows, table rows).
+ *  Tall: portrait cards (video grids) — narrower width threshold but must
+ *  be at least twice the minimum container height. */
 export function isLargeEnoughForGlow(el: HTMLElement, rect: DOMRect): boolean {
   if (!hasBox(el)) return false;
-  if (rect.width <= MINIMUM_CONTAINER_WIDTH) return false;
   if (rect.height < MINIMUM_CONTAINER_HEIGHT) return false;
-  const isRectangular = rect.width / (rect.height || 1) >= 1.5;
-  const isLarge = rect.width > window.innerWidth * 0.25;
-  return isRectangular || isLarge;
+  const isRectangular = rect.width > MINIMUM_CONTAINER_WIDTH && rect.width / (rect.height || 1) >= 1.5;
+  const isTall = rect.width > MINIMUM_CONTAINER_WIDTH / 2 && rect.height > MINIMUM_CONTAINER_HEIGHT * 2;
+  return isRectangular || isTall;
 }
 
 /** Does this element contain a heading (h1–h6) as a descendant? */
