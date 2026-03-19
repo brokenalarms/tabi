@@ -69,6 +69,7 @@ targets:
         outputFiles:
           - $(PROJECT_DIR)/Tabi/Safari Extension/Resources/background.js
           - $(PROJECT_DIR)/Tabi/Safari Extension/Resources/content.js
+          - $(PROJECT_DIR)/Tabi/Safari Extension/Resources/popup.js
     postBuildScripts:
       - name: Copy Extension Resources
         script: |
