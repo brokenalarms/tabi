@@ -1,9 +1,13 @@
 // ScrollController — scroll target detection and scroll commands for Tabi
 // Finds the correct scrollable element and performs directional scrolling.
 //
-// Step keys (j/k/h/l) use a RAF loop for 60fps smooth scrolling: keydown
-// starts continuous scrolling at a fixed speed, keyup stops immediately.
-// Single-shot commands (d/u/gg/G) use the browser's scrollBy/scrollTo
+// Step keys (j/k/h/l) use a single RAF loop with velocity smoothing:
+// currentSpeed approaches targetSpeed via exponential smoothing each frame.
+// Keydown sets targetSpeed to max → ease-in. Keyup sets targetSpeed to 0 →
+// ease-out. Both directions use the same time constant for a consistent feel
+// that matches Safari's native arrow key scrolling.
+//
+// Single-shot commands (d/u/gg/G) use the browser's native scrollBy/scrollTo
 // with behavior:"smooth".
 
 type Axis = "x" | "y";
@@ -15,21 +19,27 @@ interface KeyHandlerLike {
 }
 
 export const ScrollConfig = {
-  /** Scroll velocity (px/sec) for held j/k/h/l */
+  /** Max scroll velocity (px/sec) for held j/k/h/l */
   scrollSpeed: 800,
+  /** Velocity smoothing time constant (ms) — controls ease-in/out duration */
+  smoothTimeMs: 80,
+  /** Stop threshold (px/sec) — stop the loop when speed drops below this */
+  stopThreshold: 5,
 };
 
-interface VelocityScroll {
+interface SmoothScroll {
   target: Element;
   axis: Axis;
   direction: number;
+  targetSpeed: number;
+  currentSpeed: number;
   rafId: number;
   lastTime: number;
 }
 
 export class ScrollController {
   private keyHandler: KeyHandlerLike;
-  private static velocity: VelocityScroll | null = null;
+  private static scroll: SmoothScroll | null = null;
 
   constructor(keyHandler: KeyHandlerLike) {
     this.keyHandler = keyHandler;
@@ -63,60 +73,86 @@ export class ScrollController {
     return el.scrollHeight > el.clientHeight;
   }
 
-  // --- Velocity scroll (held j/k/h/l) ---
+  // --- Smooth velocity scroll (held j/k/h/l) ---
 
-  private static startVelocity(axis: Axis, direction: number): void {
-    const v = ScrollController.velocity;
-    if (v && v.axis === axis && v.direction === direction) return;
+  private static startScroll(axis: Axis, direction: number): void {
+    const s = ScrollController.scroll;
 
-    ScrollController.stopVelocity();
+    // Already scrolling in same direction — just ensure target speed is max
+    if (s && s.axis === axis && s.direction === direction) {
+      s.targetSpeed = ScrollConfig.scrollSpeed;
+      return;
+    }
+
+    // Direction change or new axis — stop and restart
+    ScrollController.stopImmediate();
     const target = ScrollController.findScrollTarget(axis);
 
-    const vel: VelocityScroll = {
+    const scroll: SmoothScroll = {
       target,
       axis,
       direction,
+      targetSpeed: ScrollConfig.scrollSpeed,
+      currentSpeed: 0,
       rafId: 0,
       lastTime: 0,
     };
 
     function step(now: number) {
-      if (vel.lastTime === 0) {
-        vel.lastTime = now;
-        vel.rafId = requestAnimationFrame(step);
+      if (scroll.lastTime === 0) {
+        scroll.lastTime = now;
+        scroll.rafId = requestAnimationFrame(step);
         return;
       }
 
-      const dt = now - vel.lastTime;
-      vel.lastTime = now;
+      const dt = now - scroll.lastTime;
+      scroll.lastTime = now;
 
-      const px = ScrollConfig.scrollSpeed * (dt / 1000) * vel.direction;
-      const before = vel.axis === "y" ? vel.target.scrollTop : vel.target.scrollLeft;
+      // Exponential smoothing: currentSpeed → targetSpeed
+      const factor = 1 - Math.exp(-dt / ScrollConfig.smoothTimeMs);
+      scroll.currentSpeed += (scroll.targetSpeed - scroll.currentSpeed) * factor;
 
-      if (vel.axis === "y") {
-        vel.target.scrollTop += px;
+      // If decelerating and speed is negligible, stop
+      if (scroll.targetSpeed === 0 && scroll.currentSpeed < ScrollConfig.stopThreshold) {
+        ScrollController.scroll = null;
+        return;
+      }
+
+      const px = scroll.currentSpeed * (dt / 1000) * scroll.direction;
+      const before = scroll.axis === "y" ? scroll.target.scrollTop : scroll.target.scrollLeft;
+
+      if (scroll.axis === "y") {
+        scroll.target.scrollTop += px;
       } else {
-        vel.target.scrollLeft += px;
+        scroll.target.scrollLeft += px;
       }
 
-      const after = vel.axis === "y" ? vel.target.scrollTop : vel.target.scrollLeft;
-      if (after === before) {
-        ScrollController.velocity = null;
+      const after = scroll.axis === "y" ? scroll.target.scrollTop : scroll.target.scrollLeft;
+      if (after === before && scroll.targetSpeed > 0) {
+        // Hit boundary
+        ScrollController.scroll = null;
         return;
       }
 
-      vel.rafId = requestAnimationFrame(step);
+      scroll.rafId = requestAnimationFrame(step);
     }
 
-    ScrollController.velocity = vel;
-    vel.rafId = requestAnimationFrame(step);
+    ScrollController.scroll = scroll;
+    scroll.rafId = requestAnimationFrame(step);
   }
 
-  private static stopVelocity(): void {
-    const v = ScrollController.velocity;
-    if (!v) return;
-    cancelAnimationFrame(v.rafId);
-    ScrollController.velocity = null;
+  private static stopScroll(): void {
+    const s = ScrollController.scroll;
+    if (!s) return;
+    // Set target to 0 — the loop will decelerate and self-terminate
+    s.targetSpeed = 0;
+  }
+
+  private static stopImmediate(): void {
+    const s = ScrollController.scroll;
+    if (!s) return;
+    cancelAnimationFrame(s.rafId);
+    ScrollController.scroll = null;
   }
 
   // --- Command wiring ---
@@ -131,28 +167,28 @@ export class ScrollController {
       ["scrollLeft", "x", -1],
     ];
     for (const [cmd, axis, dir] of scrollCmds) {
-      kh.on(cmd, () => ScrollController.startVelocity(axis, dir));
-      kh.onKeyUp(cmd, () => ScrollController.stopVelocity());
+      kh.on(cmd, () => ScrollController.startScroll(axis, dir));
+      kh.onKeyUp(cmd, () => ScrollController.stopScroll());
     }
 
     kh.on("scrollHalfPageDown", () => {
-      ScrollController.stopVelocity();
+      ScrollController.stopImmediate();
       const target = ScrollController.findScrollTarget("y");
       target.scrollBy({ top: Math.round(target.clientHeight / 2), behavior: "smooth" });
     });
     kh.on("scrollHalfPageUp", () => {
-      ScrollController.stopVelocity();
+      ScrollController.stopImmediate();
       const target = ScrollController.findScrollTarget("y");
       target.scrollBy({ top: -Math.round(target.clientHeight / 2), behavior: "smooth" });
     });
 
     kh.on("scrollToTop", () => {
-      ScrollController.stopVelocity();
+      ScrollController.stopImmediate();
       const target = ScrollController.findScrollTarget("y");
       target.scrollTo({ top: 0, behavior: "smooth" });
     });
     kh.on("scrollToBottom", () => {
-      ScrollController.stopVelocity();
+      ScrollController.stopImmediate();
       const target = ScrollController.findScrollTarget("y");
       target.scrollTo({
         top: target.scrollHeight - target.clientHeight,
@@ -166,7 +202,7 @@ export class ScrollController {
   }
 
   destroy(): void {
-    ScrollController.stopVelocity();
+    ScrollController.stopImmediate();
     const commands = [
       "scrollDown", "scrollUp", "scrollRight", "scrollLeft",
       "scrollHalfPageDown", "scrollHalfPageUp",
