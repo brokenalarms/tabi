@@ -19,9 +19,9 @@ export const ScrollConfig = {
   /** Scroll velocity (px/sec) for held j/k/h/l */
   scrollSpeed: 800,
   /** Pixels per single j/k tap (keydown→keyup with no hold) */
-  scrollStep: 60,
+  scrollStep: 40,
   /** Smoothing time constant (ms) for deceleration and gg/G */
-  smoothTimeMs: 120,
+  smoothTimeMs: 80,
   /** Snap threshold (px) — stop animating when this close to target */
   snapThreshold: 0.5,
 };
@@ -133,18 +133,10 @@ export class ScrollController {
       targetX: Math.max(0, Math.min(maxX, target.scrollLeft + deltaX)),
       targetY: Math.max(0, Math.min(maxY, target.scrollTop + deltaY)),
       rafId: 0,
-      lastTime: 0, // 0 = first frame not yet recorded
+      lastTime: performance.now(),
     };
 
     function step(now: number) {
-      // First frame: just record the timestamp, skip computation.
-      // Guarantees the next frame has a real dt (~16ms).
-      if (anim.lastTime === 0) {
-        anim.lastTime = now;
-        anim.rafId = requestAnimationFrame(step);
-        return;
-      }
-
       const dt = now - anim.lastTime;
       anim.lastTime = now;
 
@@ -212,16 +204,10 @@ export class ScrollController {
       axis,
       direction,
       rafId: 0,
-      lastTime: 0,
+      lastTime: performance.now(),
     };
 
     function step(now: number) {
-      if (vel.lastTime === 0) {
-        vel.lastTime = now;
-        vel.rafId = requestAnimationFrame(step);
-        return;
-      }
-
       const dt = now - vel.lastTime;
       vel.lastTime = now;
 
