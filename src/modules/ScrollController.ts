@@ -137,7 +137,13 @@ export class ScrollController {
     };
 
     function step(now: number) {
-      if (anim.lastTime === 0) anim.lastTime = now;
+      // First frame: record timestamp, no movement yet
+      if (anim.lastTime === 0) {
+        anim.lastTime = now;
+        anim.rafId = requestAnimationFrame(step);
+        return;
+      }
+
       const dt = now - anim.lastTime;
       anim.lastTime = now;
 
@@ -165,8 +171,8 @@ export class ScrollController {
       target.scrollLeft += remainingX * factor;
       target.scrollTop += remainingY * factor;
 
-      // Sub-pixel rounding prevented movement — only snap after real dt
-      if (dt > 0 && target.scrollLeft === beforeX && target.scrollTop === beforeY) {
+      // Sub-pixel rounding prevented movement — snap to close any remaining gap
+      if (target.scrollLeft === beforeX && target.scrollTop === beforeY) {
         target.scrollLeft = anim.targetX;
         target.scrollTop = anim.targetY;
         ScrollController._chaseAnimations.delete(target);
@@ -209,7 +215,13 @@ export class ScrollController {
     };
 
     function step(now: number) {
-      if (vel.lastTime === 0) vel.lastTime = now;
+      // First frame: record timestamp, no movement yet
+      if (vel.lastTime === 0) {
+        vel.lastTime = now;
+        vel.rafId = requestAnimationFrame(step);
+        return;
+      }
+
       const dt = now - vel.lastTime;
       vel.lastTime = now;
 
@@ -226,15 +238,6 @@ export class ScrollController {
         vel.target.scrollTop += px;
       } else {
         vel.target.scrollLeft += px;
-      }
-
-      const after = vel.axis === "y" ? vel.target.scrollTop : vel.target.scrollLeft;
-
-      // Hit boundary — only check after real movement was attempted
-      if (dt > 0 && after === before) {
-        ScrollController._velocity = null;
-        ScrollController._restoreSmoothScroll(vel.target);
-        return;
       }
 
       vel.rafId = requestAnimationFrame(step);
