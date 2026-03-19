@@ -219,7 +219,7 @@ export class KeyHandler {
     addBinding(n, "KeyM", "multiOpen");
 
     // Tabs
-    addBinding(n, "KeyT", "createTab");
+    addBinding(n, "KeyT", "openTabSearch");
     addBinding(n, "KeyX", "closeTab");
     addBinding(n, "Shift-KeyX", "restoreTab");
     addBinding(n, "Shift-KeyJ", "tabLeft");
@@ -232,9 +232,6 @@ export class KeyHandler {
     this.bind(n, "KeyG Shift-Digit6", "goToTabFirst");   // g^
     this.bind(n, "KeyG Digit0", "goToTabFirst");          // g0
     this.bind(n, "KeyG Shift-Digit4", "goToTabLast");     // g$
-
-    // Tab search
-    addBinding(n, "Shift-KeyT", "openTabSearch");
 
     // Navigation
     addBinding(n, "KeyG KeyI", "focusInput");
