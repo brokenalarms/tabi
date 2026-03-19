@@ -11,6 +11,7 @@ import { LIST_BOUNDARY_SELECTOR, REPEATING_CONTAINER_SELECTOR } from "./constant
 import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect, captureRetryStrategies, executeRetryStrategies } from "./elementTraversals";
 
 import { Mode } from "../commands";
+import { removeOverlay } from "./overlayUtils";
 
 declare const browser: {
   runtime: {
@@ -239,7 +240,7 @@ export class HintMode {
       this.overlay.classList.remove("visible");
       const overlay = this.overlay;
       overlay.addEventListener("transitionend", () => {
-        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        removeOverlay(overlay);
       }, { once: true });
       this.overlay = null;
     }
