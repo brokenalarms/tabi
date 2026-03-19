@@ -532,9 +532,7 @@ function buildKeyLayoutsPage(): HTMLElement {
   page.appendChild(
     buildSection(
       "Key Binding Mode",
-      detectedFamily !== "qwerty"
-        ? `${layoutFamilyLabel(detectedFamily)} keyboard detected. Character mode recommended.`
-        : "Character matches what you type. Position matches physical key location.",
+      "Character matches what you type. Position matches physical key location.",
       buildSegmented(
         [
           { value: "character", label: "Character" },
