@@ -26,10 +26,16 @@ interface KeyHandlerLike {
   off(command: string): void;
 }
 
+type HintModeType = "click" | "yank" | "multi";
+
 interface Hint {
   element: HTMLElement;
   label: string;
   div: HTMLDivElement;
+}
+
+interface MultiSelection {
+  hint: Hint;
 }
 
 type HintStyle = "pill" | "containerGlow";
@@ -56,6 +62,7 @@ export class HintMode {
   private keyHandler: KeyHandlerLike;
   private active: boolean;
   private willOpenNewTab: boolean;
+  private modeType: HintModeType;
   private hints: Hint[];
   private typed: string;
   private overlay: HTMLDivElement | null;
@@ -66,11 +73,16 @@ export class HintMode {
   private driftTimer: ReturnType<typeof setInterval> | null;
   /** Resolved hint placement for each discovered element. Populated in activate(). */
   private hintPlacementMap: Map<HTMLElement, HintPlacement>;
+  /** Multi-select: accumulated selections waiting for Space to execute. */
+  private multiSelections: MultiSelection[];
+  /** Multi-select: status bar element shown at bottom of viewport. */
+  private statusBar: HTMLDivElement | null;
 
   constructor(keyHandler: KeyHandlerLike) {
     this.keyHandler = keyHandler;
     this.active = false;
     this.willOpenNewTab = false;
+    this.modeType = "click";
     this.hints = [];
     this.typed = "";
     this.overlay = null;
@@ -80,21 +92,30 @@ export class HintMode {
     this.onResize = this.deactivate.bind(this);
     this.driftTimer = null;
     this.hintPlacementMap = new Map();
+    this.multiSelections = [];
+    this.statusBar = null;
   }
 
   // --- Public API ---
 
-  activate(shiftHeld: boolean): void {
+  activate(shiftHeld: boolean, mode: HintModeType = "click"): void {
     if (this.active) {
       this.deactivate();
       return;
     }
     this.willOpenNewTab = shiftHeld;
+    this.modeType = mode;
     this.active = true;
     this.typed = "";
+    this.multiSelections = [];
     this.keyHandler.setMode(Mode.HINTS);
 
-    const elements = discoverElements((el: HTMLElement) => this.getHintRect(el));
+    let elements = discoverElements((el: HTMLElement) => this.getHintRect(el));
+    if (mode === "yank") {
+      elements = elements.filter(el =>
+        el.tagName.toLowerCase() === "a" && (el as HTMLAnchorElement).href
+      );
+    }
     if (elements.length === 0) {
       this.deactivate();
       return;
@@ -181,6 +202,10 @@ export class HintMode {
       return { element: el, label, div };
     });
 
+    if (mode === "multi") {
+      this.createStatusBar();
+    }
+
     this.keyHandler.setModeKeyDelegate(this.handleKey.bind(this));
     document.addEventListener("mousedown", this.onMouseDown, true);
     window.addEventListener("scroll", this.onScroll, true);
@@ -193,7 +218,9 @@ export class HintMode {
     this.active = false;
     this.typed = "";
     this.willOpenNewTab = false;
+    this.modeType = "click";
     this.activating = false;
+    this.multiSelections = [];
     this.keyHandler.clearModeKeyDelegate();
     document.removeEventListener("mousedown", this.onMouseDown, true);
     window.removeEventListener("scroll", this.onScroll, true);
@@ -219,6 +246,11 @@ export class HintMode {
       this.overlay = null;
     }
 
+    if (this.statusBar) {
+      this.statusBar.remove();
+      this.statusBar = null;
+    }
+
     this.hints = [];
     this.hintPlacementMap.clear();
     this.keyHandler.setMode(Mode.NORMAL);
@@ -231,11 +263,15 @@ export class HintMode {
   wireCommands(): void {
     this.keyHandler.on("activateHints", () => this.activate(false));
     this.keyHandler.on("activateHintsNewTab", () => this.activate(true));
+    this.keyHandler.on("yankLink", () => this.activate(false, "yank"));
+    this.keyHandler.on("multiOpen", () => this.activate(false, "multi"));
   }
 
   unwireCommands(): void {
     this.keyHandler.off("activateHints");
     this.keyHandler.off("activateHintsNewTab");
+    this.keyHandler.off("yankLink");
+    this.keyHandler.off("multiOpen");
   }
 
   destroy(): void {
@@ -459,7 +495,9 @@ export class HintMode {
       return true;
     }
 
-    if (event.code === "KeyF" && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
+    const dismissCodes: Record<HintModeType, string> = { click: "KeyF", yank: "KeyY", multi: "KeyM" };
+    const dismissCode = dismissCodes[this.modeType];
+    if (event.code === dismissCode && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
       event.preventDefault();
       event.stopPropagation();
       this.deactivate();
@@ -467,6 +505,14 @@ export class HintMode {
     }
 
     if (event.code === "Escape") return false;
+
+    // Multi mode: Space executes all accumulated selections
+    if (this.modeType === "multi" && event.code === "Space") {
+      event.preventDefault();
+      event.stopPropagation();
+      this.executeMultiSelections();
+      return true;
+    }
 
     event.preventDefault();
     event.stopPropagation();
@@ -498,16 +544,26 @@ export class HintMode {
       if (event.shiftKey) {
         this.willOpenNewTab = true;
       }
-      this.activateHint(match);
+      if (this.modeType === "multi") {
+        this.selectForMulti(match);
+      } else {
+        this.activateHint(match);
+      }
     }
     return true;
   }
 
   private updateHintVisibility(): void {
+    const selectedSet = this.modeType === "multi"
+      ? new Set(this.multiSelections.map(s => s.hint))
+      : null;
+
     for (const hint of this.hints) {
+      // In multi mode, selected hints always stay visible
+      const isSelected = selectedSet !== null && selectedSet.has(hint);
       const matches = hint.label.startsWith(this.typed);
-      hint.div.style.display = matches ? "" : "none";
-      if (matches) {
+      hint.div.style.display = (matches || isSelected) ? "" : "none";
+      if (matches && !isSelected) {
         const matched = hint.label.slice(0, this.typed.length);
         const remaining = hint.label.slice(this.typed.length);
         hint.div.innerHTML = "";
@@ -525,6 +581,7 @@ export class HintMode {
   private activateHint(hint: Hint): void {
     const element = hint.element;
     const newTab = this.willOpenNewTab;
+    const yank = this.modeType === "yank";
     this.activating = true;
 
     for (const h of this.hints) {
@@ -566,23 +623,28 @@ export class HintMode {
         return;
       }
 
-      const isLink = element.tagName.toLowerCase() === "a" && (element as HTMLAnchorElement).href;
-      const opensNewWindow = isLink && (newTab || (element as HTMLAnchorElement).target === "_blank");
-
-      if (opensNewWindow) {
-        browser.runtime.sendMessage({
-          command: "createTab",
-          url: (element as HTMLAnchorElement).href,
-        });
+      if (yank) {
+        const url = (element as HTMLAnchorElement).href;
+        navigator.clipboard.writeText(url);
       } else {
-        element.focus();
-        element.style.outline = "none";
-        element.addEventListener("blur", () => { element.style.outline = ""; }, { once: true });
-        const opts = { bubbles: true, cancelable: true, view: window };
-        element.dispatchEvent(new MouseEvent("mousedown", opts));
-        element.dispatchEvent(new MouseEvent("mouseup", opts));
-        element.click();
-        retryClick(element);
+        const isLink = element.tagName.toLowerCase() === "a" && (element as HTMLAnchorElement).href;
+        const opensNewWindow = isLink && (newTab || (element as HTMLAnchorElement).target === "_blank");
+
+        if (opensNewWindow) {
+          browser.runtime.sendMessage({
+            command: "createTab",
+            url: (element as HTMLAnchorElement).href,
+          });
+        } else {
+          element.focus();
+          element.style.outline = "none";
+          element.addEventListener("blur", () => { element.style.outline = ""; }, { once: true });
+          const opts = { bubbles: true, cancelable: true, view: window };
+          element.dispatchEvent(new MouseEvent("mousedown", opts));
+          element.dispatchEvent(new MouseEvent("mouseup", opts));
+          element.click();
+          retryClick(element);
+        }
       }
 
       // Fade out the ring
@@ -591,5 +653,59 @@ export class HintMode {
     };
 
     hint.div.addEventListener("animationend", afterCollapse, { once: true });
+  }
+
+  // --- Multi-select ---
+
+  private selectForMulti(hint: Hint): void {
+    // Already selected — deselect
+    const existingIdx = this.multiSelections.findIndex(s => s.hint === hint);
+    if (existingIdx >= 0) {
+      this.multiSelections.splice(existingIdx, 1);
+      hint.div.classList.remove("tabi-hint-selected");
+    } else {
+      this.multiSelections.push({ hint });
+      hint.div.classList.add("tabi-hint-selected");
+    }
+
+    // Reset typed buffer and show all unselected hints again
+    this.typed = "";
+    this.updateHintVisibility();
+    this.updateStatusBar();
+  }
+
+  private executeMultiSelections(): void {
+    const selections = [...this.multiSelections];
+    this.deactivate();
+
+    for (const { hint } of selections) {
+      const element = hint.element;
+      const isLink = element.tagName.toLowerCase() === "a" && (element as HTMLAnchorElement).href;
+
+      if (isLink) {
+        browser.runtime.sendMessage({
+          command: "createTab",
+          url: (element as HTMLAnchorElement).href,
+        });
+      } else {
+        const opts = { bubbles: true, cancelable: true, view: window };
+        element.dispatchEvent(new MouseEvent("mousedown", opts));
+        element.dispatchEvent(new MouseEvent("mouseup", opts));
+        element.click();
+      }
+    }
+  }
+
+  private createStatusBar(): void {
+    this.statusBar = document.createElement("div");
+    this.statusBar.className = "tabi-multi-status";
+    this.updateStatusBar();
+    document.documentElement.appendChild(this.statusBar);
+  }
+
+  private updateStatusBar(): void {
+    if (!this.statusBar) return;
+    const count = this.multiSelections.length;
+    this.statusBar.textContent = `${count} selected — press Space to open`;
   }
 }

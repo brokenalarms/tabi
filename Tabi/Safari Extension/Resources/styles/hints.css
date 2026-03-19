@@ -94,6 +94,27 @@
 }
 
 
+.tabi-hint-selected {
+    background: var(--tabi-hint-selected-bg, rgba(69, 137, 255, 0.85));
+    color: var(--tabi-hint-selected-color, #fff);
+    border-color: var(--tabi-hint-selected-border, rgba(69, 137, 255, 1));
+}
+
+.tabi-multi-status {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 2147483647;
+    padding: 6px 16px;
+    background: var(--tabi-hint-bg);
+    border-top: 1px solid var(--tabi-hint-border);
+    color: var(--tabi-hint-color);
+    font: 12px/1.4 "Helvetica Neue", Helvetica, Arial, sans-serif;
+    text-align: center;
+    pointer-events: none;
+}
+
 .tabi-hint-container-glow {
     position: absolute;
     z-index: 2147483646;

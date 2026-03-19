@@ -215,6 +215,8 @@ export class KeyHandler {
     // Hints
     addBinding(n, "KeyF", "activateHints");
     addBinding(n, "Shift-KeyF", "activateHintsNewTab");
+    addBinding(n, "KeyY", "yankLink");
+    addBinding(n, "KeyM", "multiOpen");
 
     // Tabs
     addBinding(n, "KeyT", "createTab");
