@@ -59,38 +59,11 @@ osascript -e '
       end repeat
     end tell
     delay 0.5
-    -- Remember the blank window Safari opens on launch
-    set blankWin to missing value
-    try
-      if (count of windows) > 0 then
-        set blankWin to id of front window
-      end if
-    end try
-    -- Reopen all windows from previous session via History menu
-    try
-      tell application "System Events"
-        tell process "Safari"
-          click menu item "Reopen All Windows from Last Session" of menu "History" of menu bar 1
-        end tell
-      end tell
-    on error
-      -- Fallback to keystroke if menu item not available
-      tell application "System Events"
-        keystroke "t" using {command down, shift down}
-      end tell
-    end try
+    -- Reopen last session tabs via Cmd+Shift+T (avoids extra start page)
+    tell application "System Events"
+      keystroke "t" using {command down, shift down}
+    end tell
     delay 0.5
-    -- Close the blank startup window
-    try
-      if blankWin is not missing value then
-        repeat with w in windows
-          if id of w = blankWin then
-            close w
-            exit repeat
-          end if
-        end repeat
-      end if
-    end try
     -- Restore window bounds and active tabs
     try
       set winList to windows
