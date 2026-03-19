@@ -249,11 +249,26 @@ function isInNavWithSingleInteractiveChildren(el: HTMLElement): boolean {
   return true;
 }
 
+/** Does this container have 2+ same-tag siblings in its parent?
+ *  A single <li> in a <ul> isn't a repeating pattern — it needs peers. */
+export function hasRepeatingPeers(container: HTMLElement): boolean {
+  const parent = container.parentElement;
+  if (!parent) return false;
+  const tag = container.tagName;
+  let count = 0;
+  for (const child of parent.children) {
+    if (child.tagName === tag) count++;
+    if (count >= 2) return true;
+  }
+  return false;
+}
+
 /** Return the nearest repeating container for this element, or null.
- *  Checks semantic list containers first, then flat sibling patterns. */
+ *  Checks semantic list containers first, then flat sibling patterns.
+ *  List containers must have repeating peers — a sole <li> isn't a pattern. */
 export function getRepeatingContainer(el: HTMLElement): HTMLElement | null {
   const listContainer = isInListContainer(el);
-  if (listContainer !== null) return listContainer;
+  if (listContainer !== null && hasRepeatingPeers(listContainer)) return listContainer;
   if (isInSiblingLinkGroup(el)) return el;
   if (isInNavWithSingleInteractiveChildren(el)) return el;
   return null;
