@@ -5,6 +5,7 @@
 
 import type { ModeValue, TabInfo } from "../types";
 import { Mode } from "../commands";
+import { removeOverlay } from "./overlayUtils";
 
 // Browser API (Safari Web Extension)
 declare const browser: {
@@ -71,9 +72,7 @@ export class TabSearch {
     if (!this._active) return;
     this._active = false;
     this._keyHandler.clearModeKeyDelegate();
-    if (this._overlayEl && this._overlayEl.parentNode) {
-      this._overlayEl.parentNode.removeChild(this._overlayEl);
-    }
+    if (this._overlayEl) removeOverlay(this._overlayEl);
     this._overlayEl = null;
     this._inputEl = null;
     this._resultsEl = null;

@@ -4,8 +4,8 @@
 
 - `npm run build` — esbuild compile
 - `npm test` — node built-in test runner (`node --test tests/*.test.ts`)
-- `npm run test:integration` — Playwright WebKit layout tests
-- `npm run safari` — full pipeline: build → xcodegen → xcodebuild → restart Safari with tabs restored
+- `npm run test:integration` — Playwright WebKit layout test
+- `npm run safari` — full pipeline: build → xcodegen → xcodebuild → restart Safari with tabs restored (DON'T RUN THIS FROM WORKTREES, it just spawns multiple apps so I can't verify changes. You can from main if you're there.).
 
 ### Testing ladder
 

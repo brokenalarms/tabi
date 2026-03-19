@@ -11,6 +11,7 @@ import { LIST_BOUNDARY_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER
 import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect, captureRetryStrategies, executeRetryStrategies } from "./elementTraversals";
 
 import { Mode } from "../commands";
+import { removeOverlay } from "./overlayUtils";
 
 declare const browser: {
   runtime: {
@@ -242,7 +243,7 @@ export class HintMode {
       this.overlay.classList.remove("visible");
       const overlay = this.overlay;
       overlay.addEventListener("transitionend", () => {
-        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        removeOverlay(overlay);
       }, { once: true });
       this.overlay = null;
     }
@@ -739,12 +740,6 @@ export class HintMode {
 
   private updateStatusBar(): void {
     if (!this.statusBar) return;
-    const label = HintMode.MODE_LABELS[this.modeType];
-    if (this.modeType === "multi") {
-      const count = this.multiSelections.length;
-      this.statusBar.textContent = `${label} — ${count} selected, Space or Enter to open`;
-    } else {
-      this.statusBar.textContent = label;
-    }
+    this.statusBar.textContent = HintMode.MODE_LABELS[this.modeType];
   }
 }
