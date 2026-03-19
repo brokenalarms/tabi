@@ -1,0 +1,128 @@
+.tabi-hint-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 2147483647;
+    pointer-events: none;
+    overflow: visible;
+}
+
+.tabi-hint {
+    position: absolute;
+    z-index: 2147483647;
+    padding: 1px 3px;
+    background: var(--tabi-hint-bg);
+    border: 1px solid var(--tabi-hint-border);
+    border-radius: 3px;
+    box-shadow: var(--tabi-hint-shadow);
+    color: var(--tabi-hint-color);
+    font: bold 12px/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif;
+    text-transform: uppercase;
+    pointer-events: none;
+    white-space: nowrap;
+}
+
+.tabi-hint-overlay.tabi-hint-animate {
+    opacity: 0;
+    transition: opacity 100ms ease-out;
+}
+
+.tabi-hint-overlay.tabi-hint-animate.visible {
+    opacity: 1;
+}
+
+.tabi-hint .tabi-hint-matched {
+    opacity: var(--tabi-hint-matched-opacity);
+}
+
+.tabi-hint-active {
+    --poof-x: 0px;
+    --poof-y: 0px;
+    animation: tabi-hint-collapse 150ms ease-in forwards;
+}
+
+@keyframes tabi-hint-collapse {
+    0% {
+        opacity: 1;
+        transform: scale(1) translate(0, 0);
+        filter: blur(0);
+    }
+    100% {
+        opacity: 0;
+        transform: scale(0.3) translate(var(--poof-x), var(--poof-y));
+        filter: blur(2px);
+    }
+}
+
+
+.tabi-hint-ring {
+    position: absolute;
+    z-index: 2147483647;
+    border-radius: 6px;
+    border: 2px solid rgba(69, 137, 255, 0.85);
+    box-shadow: 0 0 8px rgba(69, 137, 255, 0.4);
+    pointer-events: none;
+    animation: tabi-hint-ring-in 150ms ease-out forwards;
+}
+
+.tabi-hint-ring-out {
+    animation: tabi-hint-ring-fade 300ms ease-out forwards;
+}
+
+@keyframes tabi-hint-ring-in {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+}
+
+@keyframes tabi-hint-ring-fade {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+.tabi-hint-tail {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-bottom: 4px solid var(--tabi-hint-border);
+}
+
+
+.tabi-hint-selected {
+    background: var(--tabi-hint-selected-bg, rgba(69, 137, 255, 0.85));
+    color: var(--tabi-hint-selected-color, #fff);
+    border-color: var(--tabi-hint-selected-border, rgba(69, 137, 255, 1));
+}
+
+.tabi-multi-status {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 2147483647;
+    padding: 6px 16px;
+    background: var(--tabi-hint-bg);
+    border-top: 1px solid var(--tabi-hint-border);
+    color: var(--tabi-hint-color);
+    font: 12px/1.4 "Helvetica Neue", Helvetica, Arial, sans-serif;
+    text-align: center;
+    pointer-events: none;
+}
+
+.tabi-hint-container-glow {
+    position: absolute;
+    z-index: 2147483646;
+    pointer-events: none;
+    border-radius: 6px;
+    box-shadow:
+        inset 0 0 8px 1px var(--tabi-hint-bar-glow),
+        inset 0 -6px 12px -4px var(--tabi-hint-bar-line);
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0%, black 30%);
+    mask-image: linear-gradient(to bottom, transparent 0%, black 30%);
+}

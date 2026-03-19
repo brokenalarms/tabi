@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <meta name="color-scheme" content="light dark">
+  <link rel="stylesheet" href="styles/popup.css">
+</head>
+<body>
+  <div class="popup">
+    <h1>Tabi</h1>
+
+    <div class="setting">
+      <label class="setting-label">Key Binding Mode</label>
+      <div class="segmented" id="keyBindingMode">
+        <button data-value="character">By Character</button>
+        <button data-value="location" class="active">By Position</button>
+      </div>
+      <p class="hint">Character matches what you type. <br/> Position matches by physical key location, regardless of layout location, for non-QWERTY users.</p>
+    </div>
+
+    <hr>
+
+    <div class="setting">
+      <label class="setting-label">Tag Style</label>
+      <div class="segmented" id="theme">
+        <button data-value="auto" class="active">Auto</button>
+        <button data-value="dark">Dark</button>
+        <button data-value="light">Light</button>
+        <button data-value="classic">Classic</button>
+      </div>
+      <p class="hint">Auto selects light or dark in order to best contrast with page background. <br/> Classic is yellow!</p>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,15 +1,13 @@
 // Single source of truth for global constants.
-// Loaded first in manifest.json — all other content scripts access via globalThis.
 
-const Mode = {
+export const Mode = {
   NORMAL: "NORMAL",
   INSERT: "INSERT",
   HINTS: "HINTS",
-  FIND: "FIND",
   TAB_SEARCH: "TAB_SEARCH",
 } as const;
 
-const COMMANDS: Record<string, string> = {
+export const COMMANDS: Record<string, string> = {
   scrollDown: "Scroll down",
   scrollUp: "Scroll up",
   scrollLeft: "Scroll left",
@@ -23,7 +21,8 @@ const COMMANDS: Record<string, string> = {
   pageRefresh: "Refresh page",
   activateHints: "Open link (current tab)",
   activateHintsNewTab: "Open link (new tab)",
-  enterFindMode: "Find on page (Cmd+F)",
+  yankLink: "Copy link URL (yank)",
+  multiOpen: "Multi-open links (new tabs)",
   createTab: "New tab",
   closeTab: "Close tab",
   restoreTab: "Restore tab",
@@ -31,17 +30,10 @@ const COMMANDS: Record<string, string> = {
   tabRight: "Move tab right",
   tabNext: "Next tab",
   tabPrev: "Previous tab",
-  firstTab: "First tab",
-  lastTab: "Last tab",
+  goToTab: "Go to tab by number",
   openTabSearch: "Search tabs",
   focusInput: "Focus first text input",
   goUpUrl: "Go up one URL level",
   showHelp: "Show this help",
   exitToNormal: "Exit to normal mode",
 };
-
-// Export for Node.js tests and content script global access
-if (typeof globalThis !== "undefined") {
-  (globalThis as Record<string, unknown>).Mode = Mode;
-  (globalThis as Record<string, unknown>).COMMANDS = COMMANDS;
-}

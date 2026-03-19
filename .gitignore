@@ -11,7 +11,15 @@ build/
 *.xcworkspace
 
 # Build output (compiled from src/*.ts)
-Vimium/Safari Extension/Resources/**/*.js
+Tabi/Safari Extension/Resources/**/*.js
+!Tabi/Safari Extension/Resources/settings-popup.js
+
+# Playwright
+tests/integration/harness.js
+test-results/
+
+# Environment
+.env
 
 # Node
 node_modules/

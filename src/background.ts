@@ -1,11 +1,11 @@
-// Vimium background service worker
+// Tabi background service worker
 // Handles tab management and messaging with content scripts
 
 // Command names handled by the background service worker
 type Command =
   | "createTab" | "closeTab" | "switchTab" | "queryTabs"
   | "restoreTab" | "tabLeft" | "tabRight" | "tabNext" | "tabPrev"
-  | "firstTab" | "lastTab" | "extensionActive" | "extensionInactive";
+  | "goToTab" | "goToTabFirst" | "goToTabLast" | "extensionActive" | "extensionInactive";
 
 interface TabInfo {
   id: number;
@@ -16,7 +16,7 @@ interface TabInfo {
 
 declare const browser: {
   tabs: {
-    create(opts: { url?: string }): Promise<{ id: number }>;
+    create(opts: { url?: string; index?: number }): Promise<{ id: number }>;
     remove(tabId: number): Promise<void>;
     update(tabId: number, props: { active: boolean }): Promise<unknown>;
     query(opts: { currentWindow: boolean }): Promise<Array<{ id: number; title: string; url: string; active: boolean }>>;
@@ -42,43 +42,51 @@ interface MessageSender {
 
 type CommandResponse = { status: string; reason?: string } | TabInfo[];
 
-const MAX_CLOSED_TABS = 50;
-const closedTabStack: string[] = [];
+export interface ClosedTab {
+  url: string;
+  leftNeighborId: number | null;
+}
+
+export const MAX_CLOSED_TABS = 50;
+export const closedTabStack: ClosedTab[] = [];
 
 // Track which tabs have the extension active (not excluded by domain)
-const activeTabSet = new Set<number>();
+export const activeTabSet = new Set<number>();
 
 // Cache tab URLs so onRemoved can record closed tabs (the tab is already gone by then)
-const tabUrlCache = new Map<number, string>();
+export const tabUrlCache = new Map<number, string>();
 
-async function updateIconState(tabId: number): Promise<void> {
+// Ordered list of tab IDs so we can find left neighbors when a tab is closed
+export const tabOrder: number[] = [];
+
+export async function updateIconState(tabId: number): Promise<void> {
   try {
     if (activeTabSet.has(tabId)) {
       await browser.action.enable(tabId);
       await browser.action.setBadgeText({ text: "", tabId });
-      await browser.action.setTitle({ title: "vimium-mac", tabId });
+      await browser.action.setTitle({ title: "tabi", tabId });
     } else {
       await browser.action.disable(tabId);
-      await browser.action.setTitle({ title: "vimium-mac (disabled on this site)", tabId });
+      await browser.action.setTitle({ title: "tabi (disabled on this site)", tabId });
     }
   } catch (_) {
     // browser.action may not be available in all contexts
   }
 }
 
-function pushClosedTab(url: string | null | undefined): void {
+export function pushClosedTab(url: string | null | undefined, leftNeighborId: number | null): void {
   if (!url || url === "about:blank" || url === "about:newtab") return;
-  closedTabStack.push(url);
+  closedTabStack.push({ url, leftNeighborId });
   if (closedTabStack.length > MAX_CLOSED_TABS) {
     closedTabStack.shift();
   }
 }
 
-function popClosedTab(): string | null {
+export function popClosedTab(): ClosedTab | null {
   return closedTabStack.pop() || null;
 }
 
-async function handleCommand(command: Command, sender: MessageSender, message?: Record<string, unknown>): Promise<CommandResponse> {
+export async function handleCommand(command: Command, sender: MessageSender, message?: Record<string, unknown>): Promise<CommandResponse> {
   switch (command) {
     case "createTab": {
       const url = message && typeof message.url === "string" ? message.url : undefined;
@@ -93,9 +101,15 @@ async function handleCommand(command: Command, sender: MessageSender, message?: 
     }
 
     case "restoreTab": {
-      const url = popClosedTab();
-      if (url) {
-        await browser.tabs.create({ url });
+      const closed = popClosedTab();
+      if (closed) {
+        const tabs = await browser.tabs.query({ currentWindow: true });
+        let index = 0;
+        if (closed.leftNeighborId !== null) {
+          const neighborIdx = tabs.findIndex(t => t.id === closed.leftNeighborId);
+          index = neighborIdx >= 0 ? neighborIdx + 1 : tabs.length;
+        }
+        await browser.tabs.create({ url: closed.url, index });
       }
       break;
     }
@@ -122,7 +136,17 @@ async function handleCommand(command: Command, sender: MessageSender, message?: 
       break;
     }
 
-    case "firstTab": {
+    case "goToTab": {
+      const tabs = await browser.tabs.query({ currentWindow: true });
+      if (tabs.length === 0) break;
+      const index = message && typeof message.index === "number" ? message.index : 1;
+      // g1-g9 = tab N (1-indexed, clamped to tab count)
+      const targetIndex = Math.min(index - 1, tabs.length - 1);
+      await browser.tabs.update(tabs[targetIndex].id, { active: true });
+      break;
+    }
+
+    case "goToTabFirst": {
       const tabs = await browser.tabs.query({ currentWindow: true });
       if (tabs.length > 0) {
         await browser.tabs.update(tabs[0].id, { active: true });
@@ -130,7 +154,7 @@ async function handleCommand(command: Command, sender: MessageSender, message?: 
       break;
     }
 
-    case "lastTab": {
+    case "goToTabLast": {
       const tabs = await browser.tabs.query({ currentWindow: true });
       if (tabs.length > 0) {
         await browser.tabs.update(tabs[tabs.length - 1].id, { active: true });
@@ -174,55 +198,60 @@ async function handleCommand(command: Command, sender: MessageSender, message?: 
   return { status: "ok" };
 }
 
-// Track tab URLs for closed-tab restore
-browser.tabs.onUpdated.addListener((tabId: number, changeInfo: { url?: string }) => {
-  if (changeInfo.url) {
-    tabUrlCache.set(tabId, changeInfo.url);
-  }
-});
+// Register listeners and populate caches — called at load time in production,
+// and explicitly from tests after the browser shim is installed.
+export function init(): void {
+  // Track tab URLs for closed-tab restore
+  browser.tabs.onUpdated.addListener((tabId: number, changeInfo: { url?: string }) => {
+    if (changeInfo.url) {
+      tabUrlCache.set(tabId, changeInfo.url);
+    }
+    // Ensure new tabs appear in tabOrder
+    if (!tabOrder.includes(tabId)) {
+      tabOrder.push(tabId);
+    }
+  });
 
-// Clean up activeTabSet and record closed tabs for restore
-browser.tabs.onRemoved.addListener((tabId: number) => {
-  const url = tabUrlCache.get(tabId);
-  if (url) pushClosedTab(url);
-  tabUrlCache.delete(tabId);
-  activeTabSet.delete(tabId);
-});
+  // Record closed tab with its left neighbor, then clean up caches
+  browser.tabs.onRemoved.addListener((tabId: number) => {
+    const url = tabUrlCache.get(tabId);
+    const idx = tabOrder.indexOf(tabId);
+    const leftNeighborId = idx > 0 ? tabOrder[idx - 1] : null;
+    if (url) pushClosedTab(url, leftNeighborId);
+    if (idx >= 0) tabOrder.splice(idx, 1);
+    tabUrlCache.delete(tabId);
+    activeTabSet.delete(tabId);
+  });
 
-// Populate URL cache on startup
-browser.tabs.query({ currentWindow: true }).then(tabs => {
-  for (const tab of tabs) {
-    if (tab.url) tabUrlCache.set(tab.id, tab.url);
-  }
-}).catch(() => {});
+  // Populate caches on startup
+  browser.tabs.query({ currentWindow: true }).then(tabs => {
+    tabOrder.length = 0;
+    tabOrder.push(...tabs.map(t => t.id));
+    for (const tab of tabs) {
+      if (tab.url) tabUrlCache.set(tab.id, tab.url);
+    }
+  }).catch(() => {});
 
-browser.runtime.onMessage.addListener((message: unknown, sender: MessageSender, sendResponse: (response: unknown) => void) => {
-  const msg = message as Record<string, unknown> | null;
-  if (!msg || !msg.command) {
-    sendResponse({ status: "error", reason: "missing command" });
-    return;
-  }
+  browser.runtime.onMessage.addListener((message: unknown, sender: MessageSender, sendResponse: (response: unknown) => void) => {
+    const msg = message as Record<string, unknown> | null;
+    if (!msg || !msg.command) {
+      sendResponse({ status: "error", reason: "missing command" });
+      return;
+    }
 
-  handleCommand(msg.command as Command, sender, msg as Record<string, unknown>)
-    .then(result => sendResponse(result))
-    .catch(err => {
-      console.error("vimium-mac background error:", err);
-      sendResponse({ status: "error", reason: (err as Error).message });
-    });
+    handleCommand(msg.command as Command, sender, msg as Record<string, unknown>)
+      .then(result => sendResponse(result))
+      .catch(err => {
+        console.error("tabi background error:", err);
+        sendResponse({ status: "error", reason: (err as Error).message });
+      });
 
-  // Return true to indicate async sendResponse
-  return true;
-});
+    // Return true to indicate async sendResponse
+    return true;
+  });
+}
 
-// Export internals for testing via globalThis
-if (typeof globalThis !== "undefined") {
-  const g = globalThis as Record<string, unknown>;
-  g.closedTabStack = closedTabStack;
-  g.pushClosedTab = pushClosedTab;
-  g.popClosedTab = popClosedTab;
-  g.handleCommand = handleCommand;
-  g.MAX_CLOSED_TABS = MAX_CLOSED_TABS;
-  g.activeTabSet = activeTabSet;
-  g.tabUrlCache = tabUrlCache;
-  g.updateIconState = updateIconState;
+// Auto-init when running in the browser extension context
+if (typeof browser !== "undefined") {
+  init();
 }

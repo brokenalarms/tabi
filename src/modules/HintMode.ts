@@ -1,16 +1,16 @@
-// HintMode — link-hint overlay for Vimium
-// Discovers clickable elements, renders labeled hints, and dispatches
+// HintMode — link-hint overlay for Tabi
+// Renders labeled hints over discovered elements and dispatches
 // clicks when the user types the matching label characters.
 
 import type { ModeValue } from "../types";
+import { DEFAULTS } from "../types";
+import { discoverElements, renderDebugDots } from "./ElementGatherer";
+import { HINT_HEIGHT } from "./constants";
+import { isLargeEnoughForGlow, isFormControl, getRepeatingContainer, hasNestedLinks, isZeroSizeAnchor, shouldRedirectToHeading, hasBox } from "./elementPredicates";
+import { LIST_BOUNDARY_SELECTOR, REPEATING_CONTAINER_SELECTOR } from "./constants";
+import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect, retryClick } from "./elementTraversals";
 
-declare const Mode: {
-  readonly NORMAL: "NORMAL";
-  readonly INSERT: "INSERT";
-  readonly HINTS: "HINTS";
-  readonly FIND: "FIND";
-  readonly TAB_SEARCH: "TAB_SEARCH";
-};
+import { Mode } from "../commands";
 
 declare const browser: {
   runtime: {
@@ -26,311 +26,332 @@ interface KeyHandlerLike {
   off(command: string): void;
 }
 
+type HintModeType = "click" | "yank" | "multi";
+
 interface Hint {
   element: HTMLElement;
   label: string;
   div: HTMLDivElement;
 }
 
+interface MultiSelection {
+  hint: Hint;
+}
+
+type HintStyle = "pill" | "containerGlow";
+
+type HintPlacement =
+  | { style: "pill"; rect: DOMRect }
+  | { style: "containerGlow"; rect: DOMRect; container: HTMLElement };
+
+/** Strategy for applying ContainerGlow to elements sharing a repeating container parent.
+ *  - "any": at least one container qualifies → all siblings get ContainerGlow
+ *  - "all": every container must qualify for any to get ContainerGlow
+ *  - "none": never use ContainerGlow (always Pill) */
+type ContainerGlowStrategy = "any" | "all" | "none";
+const CONTAINER_GLOW_STRATEGY: ContainerGlowStrategy = "all";
+
 const HINT_CHARS = "sadgjklewcmpoh";
-const HINT_ANIMATE = true;
 
-const CLICKABLE_SELECTOR = [
-  "a", "button", "input", "textarea", "select",
-  "summary", "details",
-  "[role='button']", "[role='link']", "[role='tab']",
-  "[role='menuitem']", "[role='option']", "[role='checkbox']",
-  "[role='radio']", "[role='switch']",
-  "[tabindex]:not([tabindex='-1'])",
-  "[onclick]", "[onmousedown]",
-].join(", ");
+/** How far (px) a hinted element may drift before we dismiss hints. */
+const DRIFT_THRESHOLD = 5;
+/** How often (ms) we check for position drift. */
+const DRIFT_CHECK_INTERVAL = 200;
 
-class HintMode {
-  private _keyHandler: KeyHandlerLike;
-  private _active: boolean;
-  private _newTab: boolean;
-  private _hints: Hint[];
-  private _typed: string;
-  private _overlay: HTMLDivElement | null;
-  private _pointerTails: boolean;
-  private readonly _onMouseDown: () => void;
-  private readonly _onScroll: () => void;
+export class HintMode {
+  private keyHandler: KeyHandlerLike;
+  private active: boolean;
+  private willOpenNewTab: boolean;
+  private modeType: HintModeType;
+  private hints: Hint[];
+  private typed: string;
+  private overlay: HTMLDivElement | null;
+  private activating: boolean;
+  private readonly onMouseDown: () => void;
+  private readonly onScroll: () => void;
+  private readonly onResize: () => void;
+  private driftTimer: ReturnType<typeof setInterval> | null;
+  /** Resolved hint placement for each discovered element. Populated in activate(). */
+  private hintPlacementMap: Map<HTMLElement, HintPlacement>;
+  /** Multi-select: accumulated selections waiting for Space to execute. */
+  private multiSelections: MultiSelection[];
+  /** Multi-select: status bar element shown at bottom of viewport. */
+  private statusBar: HTMLDivElement | null;
 
   constructor(keyHandler: KeyHandlerLike) {
-    this._keyHandler = keyHandler;
-    this._active = false;
-    this._newTab = false;
-    this._hints = [];
-    this._typed = "";
-    this._overlay = null;
-    this._pointerTails = false;
-    this._onMouseDown = this._deactivate.bind(this);
-    this._onScroll = this._deactivate.bind(this);
+    this.keyHandler = keyHandler;
+    this.active = false;
+    this.willOpenNewTab = false;
+    this.modeType = "click";
+    this.hints = [];
+    this.typed = "";
+    this.overlay = null;
+    this.activating = false;
+    this.onMouseDown = this.deactivate.bind(this);
+    this.onScroll = this.deactivate.bind(this);
+    this.onResize = this.deactivate.bind(this);
+    this.driftTimer = null;
+    this.hintPlacementMap = new Map();
+    this.multiSelections = [];
+    this.statusBar = null;
   }
 
   // --- Public API ---
 
-  activate(newTab: boolean): void {
-    if (this._active) {
-      this._deactivate();
+  activate(shiftHeld: boolean, mode: HintModeType = "click"): void {
+    if (this.active) {
+      this.deactivate();
       return;
     }
-    this._newTab = !!newTab;
-    this._active = true;
-    this._typed = "";
-    this._keyHandler.setMode(Mode.HINTS);
+    this.willOpenNewTab = shiftHeld;
+    this.modeType = mode;
+    this.active = true;
+    this.typed = "";
+    this.multiSelections = [];
+    this.keyHandler.setMode(Mode.HINTS);
 
-    const elements = this._discoverElements();
+    let elements = discoverElements((el: HTMLElement) => this.getHintRect(el));
+    if (mode === "yank") {
+      elements = elements.filter(el =>
+        el.tagName.toLowerCase() === "a" && (el as HTMLAnchorElement).href
+      );
+    }
     if (elements.length === 0) {
-      this._deactivate();
+      this.deactivate();
       return;
+    }
+
+    // Resolve hint placement. ContainerGlow is all-or-none per container
+    // group (siblings sharing the same repeating-container parent).
+    // Disqualified immediately if any container has nested discovered
+    // links (glow label would clash with their hints). Beyond that,
+    // size eligibility is decided by CONTAINER_GLOW_STRATEGY ("any"/"all").
+    type ContainerCandidate = { el: HTMLElement; rect: DOMRect; container: HTMLElement; noNestedLinks: boolean; glowEligible: boolean };
+    const containerGroups = new Map<HTMLElement, ContainerCandidate[]>();
+
+    const discoveredSet = new Set(elements);
+
+    for (const el of elements) {
+      const rect = this.getHintRect(el);
+      const target = this.getHintTargetElement(el);
+      const container = target === el ? getRepeatingContainer(el) : null;
+
+      if (container && CONTAINER_GLOW_STRATEGY !== "none") {
+        const noNestedLinks = !hasNestedLinks(container, el, discoveredSet);
+        const nestedList = container.querySelector(LIST_BOUNDARY_SELECTOR);
+        const containerRect = nestedList
+          ? this.clampRectToHeader(container.getBoundingClientRect(), nestedList as HTMLElement)
+          : container.getBoundingClientRect();
+        const glowEligible = nestedList !== null || isLargeEnoughForGlow(container, containerRect);
+        const parent = container.parentElement || container;
+
+        let group = containerGroups.get(parent);
+        if (!group) {
+          group = [];
+          containerGroups.set(parent, group);
+        }
+        group.push({ el, rect, container, noNestedLinks, glowEligible });
+      } else {
+        this.hintPlacementMap.set(el, { style: "pill", rect });
+      }
+    }
+
+    // Add sibling containers that have no discovered elements to the
+    // group so they participate in the same all-or-none glow decision.
+    // Repeating containers (li, tr) in the same parent share the same
+    // interaction pattern — if some get glow, all should.
+    for (const [parent, group] of containerGroups) {
+      const containersInGroup = new Set(group.map(g => g.container));
+      for (const child of parent.children) {
+        const c = child as HTMLElement;
+        if (containersInGroup.has(c)) continue;
+        if (!c.matches(REPEATING_CONTAINER_SELECTOR)) continue;
+        if (!hasBox(c)) continue;
+        const nestedList = c.querySelector(LIST_BOUNDARY_SELECTOR);
+        const containerRect = nestedList
+          ? this.clampRectToHeader(c.getBoundingClientRect(), nestedList as HTMLElement)
+          : c.getBoundingClientRect();
+        const glowEligible = nestedList !== null || isLargeEnoughForGlow(c, containerRect);
+        elements.push(c);
+        group.push({ el: c, rect: containerRect, container: c, noNestedLinks: true, glowEligible });
+      }
+    }
+
+    for (const [, group] of containerGroups) {
+      const allFreeOfNestedHints = group.every(g => g.noNestedLinks);
+      const groupSized = CONTAINER_GLOW_STRATEGY === "any"
+        ? group.some(g => g.glowEligible)
+        : group.every(g => g.glowEligible);
+      const useGlow = allFreeOfNestedHints && groupSized;
+
+      for (const { el, rect, container } of group) {
+        if (useGlow) {
+          this.hintPlacementMap.set(el, { style: "containerGlow", rect, container });
+        } else {
+          this.hintPlacementMap.set(el, { style: "pill", rect });
+        }
+      }
     }
 
     const labels = HintMode.generateLabels(elements.length);
-    this._createOverlay();
-    this._hints = elements.map((el, i) => {
+    this.createOverlay();
+    if (this.overlay) renderDebugDots(this.overlay, elements);
+    this.hints = elements.map((el, i) => {
       const label = labels[i];
-      const div = this._createHintDiv(el, label);
+      const div = this.createHintDiv(el, label);
       return { element: el, label, div };
     });
 
-    this._keyHandler.setModeKeyDelegate(this._handleKey.bind(this));
-    document.addEventListener("mousedown", this._onMouseDown, true);
-    window.addEventListener("scroll", this._onScroll, true);
+    if (mode === "multi") {
+      this.createStatusBar();
+    }
+
+    this.keyHandler.setModeKeyDelegate(this.handleKey.bind(this));
+    document.addEventListener("mousedown", this.onMouseDown, true);
+    window.addEventListener("scroll", this.onScroll, true);
+    window.addEventListener("resize", this.onResize);
+    this.startDriftCheck();
   }
 
   deactivate(): void {
-    this._deactivate();
+    if (!this.active) return;
+    this.active = false;
+    this.typed = "";
+    this.willOpenNewTab = false;
+    this.modeType = "click";
+    this.activating = false;
+    this.multiSelections = [];
+    this.keyHandler.clearModeKeyDelegate();
+    document.removeEventListener("mousedown", this.onMouseDown, true);
+    window.removeEventListener("scroll", this.onScroll, true);
+    window.removeEventListener("resize", this.onResize);
+    if (this.driftTimer !== null) {
+      clearInterval(this.driftTimer);
+      this.driftTimer = null;
+    }
+
+    // Remove any orphaned focus rings (e.g. deactivation interrupted the
+    // hint collapse animation before afterCollapse could clean up).
+    // Skip rings that are already fading out — those will self-remove on animationend.
+    for (const ring of document.documentElement.querySelectorAll(".tabi-hint-ring:not(.tabi-hint-ring-out)")) {
+      ring.remove();
+    }
+
+    if (this.overlay) {
+      this.overlay.classList.remove("visible");
+      const overlay = this.overlay;
+      overlay.addEventListener("transitionend", () => {
+        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      }, { once: true });
+      this.overlay = null;
+    }
+
+    if (this.statusBar) {
+      this.statusBar.remove();
+      this.statusBar = null;
+    }
+
+    this.hints = [];
+    this.hintPlacementMap.clear();
+    this.keyHandler.setMode(Mode.NORMAL);
   }
 
   isActive(): boolean {
-    return this._active;
-  }
-
-  setPointerTails(enabled: boolean): void {
-    this._pointerTails = enabled;
+    return this.active;
   }
 
   wireCommands(): void {
-    this._keyHandler.on("activateHints", () => this.activate(false));
-    this._keyHandler.on("activateHintsNewTab", () => this.activate(true));
+    this.keyHandler.on("activateHints", () => this.activate(false));
+    this.keyHandler.on("activateHintsNewTab", () => this.activate(true));
+    this.keyHandler.on("yankLink", () => this.activate(false, "yank"));
+    this.keyHandler.on("multiOpen", () => this.activate(false, "multi"));
   }
 
   unwireCommands(): void {
-    this._keyHandler.off("activateHints");
-    this._keyHandler.off("activateHintsNewTab");
+    this.keyHandler.off("activateHints");
+    this.keyHandler.off("activateHintsNewTab");
+    this.keyHandler.off("yankLink");
+    this.keyHandler.off("multiOpen");
   }
 
-  // --- Element discovery ---
-
-  private _discoverElements(): HTMLElement[] {
-    const seen = new Set<Element>();
-    const result: HTMLElement[] = [];
-
-    const collect = (root: Document | ShadowRoot): void => {
-      const nodes = root.querySelectorAll(CLICKABLE_SELECTOR);
-      for (const el of nodes) {
-        if (seen.has(el)) continue;
-        seen.add(el);
-        if (this._isInteractive(el as HTMLElement) && this._isVisible(el as HTMLElement)) result.push(el as HTMLElement);
-      }
-
-      // Check for shadow roots
-      const allEls = root.querySelectorAll("*");
-      for (const el of allEls) {
-        if (el.shadowRoot) {
-          collect(el.shadowRoot);
-        }
-      }
-    };
-
-    collect(document);
-
-    // Sort by viewport position: top-left elements get shortest labels
-    result.sort((a, b) => {
-      const ra = this._getHintRect(a);
-      const rb = this._getHintRect(b);
-      return (ra.top - rb.top) || (ra.left - rb.left);
-    });
-
-    // Remove ancestor elements when a descendant is also a candidate —
-    // the inner element is the actual interaction target.
-    const resultSet = new Set(result);
-    const toRemove = new Set<HTMLElement>();
-    for (const el of result) {
-      let ancestor = el.parentElement;
-      while (ancestor) {
-        if (resultSet.has(ancestor as HTMLElement)) {
-          toRemove.add(ancestor as HTMLElement);
-        }
-        ancestor = ancestor.parentElement;
-      }
-    }
-    return result.filter(el => !toRemove.has(el));
+  destroy(): void {
+    this.deactivate();
+    this.unwireCommands();
   }
 
-  // Non-semantic elements (divs, spans, etc.) must show visual interactivity
-  // signals to be considered real click targets. Without this, container wrappers
-  // with tabindex or onclick produce false hints.
-  private _isInteractive(el: HTMLElement): boolean {
-    // Disabled elements and aria-hidden trees are never interactive
-    if ((el as HTMLButtonElement).disabled) return false;
-    if (el.getAttribute("aria-hidden") === "true") return false;
+  // --- Layout drift detection ---
 
-    const tag = el.tagName;
-    if (tag === "A" || tag === "BUTTON" || tag === "INPUT" ||
-        tag === "TEXTAREA" || tag === "SELECT" ||
-        tag === "SUMMARY" || tag === "DETAILS") {
-      return true;
+  /** Periodically check whether hinted elements have shifted from their
+   *  original positions. Dismisses hints when a majority of sampled
+   *  elements have drifted, indicating a real layout shift rather than
+   *  a single animated element (e.g. Amazon carousel). */
+  private startDriftCheck(): void {
+    const MAX_SAMPLE = 5;
+    const entries = [...this.hintPlacementMap.keys()];
+    // Evenly spaced sample so we don't just check the first few
+    const step = Math.max(1, Math.floor(entries.length / MAX_SAMPLE));
+    // Snapshot rects NOW (post-render) rather than using the pre-render rects
+    // from hintPlacementMap. Inserting the overlay and hint divs can cause
+    // minor layout shifts, especially on large/zoomed viewports — using
+    // pre-render rects as the baseline would falsely trigger drift dismissal.
+    const sample: Array<[HTMLElement, DOMRect]> = [];
+    for (let i = 0; i < entries.length && sample.length < MAX_SAMPLE; i += step) {
+      sample.push([entries[i], entries[i].getBoundingClientRect()]);
     }
-    // ARIA widget roles indicate intentional interactivity
-    const role = el.getAttribute("role");
-    if (role === "button" || role === "link" || role === "tab" ||
-        role === "menuitem" || role === "option" ||
-        role === "checkbox" || role === "radio" || role === "switch") {
-      return true;
-    }
-    // Generic elements need cursor:pointer — real custom buttons set this
-    const style = getComputedStyle(el);
-    return style.cursor === "pointer";
+
+    this.driftTimer = setInterval(() => {
+      let drifted = 0;
+      for (const [el, original] of sample) {
+        const current = el.getBoundingClientRect();
+        if (Math.abs(current.top - original.top) > DRIFT_THRESHOLD ||
+            Math.abs(current.left - original.left) > DRIFT_THRESHOLD) {
+          drifted++;
+        }
+      }
+      // Majority of sampled elements must have drifted
+      if (drifted > sample.length / 2) {
+        this.deactivate();
+      }
+    }, DRIFT_CHECK_INTERVAL);
   }
 
-  private _findAssociatedLabel(el: HTMLElement): HTMLElement | null {
-    if (el.id) {
-      const label = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
-      if (label) return label as HTMLElement;
-    }
-    const parent = el.closest("label");
-    if (parent) return parent as HTMLElement;
-    return null;
-  }
+  // --- Hint target element ---
 
-  private _isVisible(el: HTMLElement): boolean {
-    const rect = el.getBoundingClientRect();
-    if (rect.width === 0 && rect.height === 0) {
-      // Anchor elements with display:contents (e.g. Google search links)
-      // have zero-size rects. Find the first child with a real bounding box.
-      if (el.tagName === "A") {
-        for (const child of el.children) {
-          const cr = (child as HTMLElement).getBoundingClientRect();
-          if (cr.width > 0 && cr.height > 0) {
-            return this._isVisible(child as HTMLElement);
-          }
-        }
-      }
-      if (el.tagName === "INPUT") {
-        const type = ((el as HTMLInputElement).type || "").toLowerCase();
-        if (type === "radio" || type === "checkbox") {
-          const label = this._findAssociatedLabel(el);
-          if (label) return this._isVisible(label);
-        }
-      }
-      return false;
-    }
-    if (rect.bottom < 0 || rect.top > window.innerHeight) return false;
-    if (rect.right < 0 || rect.left > window.innerWidth) return false;
-
-    const style = getComputedStyle(el);
-    if (style.visibility === "hidden" || style.display === "none") return false;
-    if (parseFloat(style.opacity) === 0) {
-      if (el.tagName === "INPUT") {
-        const type = ((el as HTMLInputElement).type || "").toLowerCase();
-        if (type === "radio" || type === "checkbox") {
-          const label = this._findAssociatedLabel(el);
-          if (label) return this._isVisible(label);
-        }
-      }
-      return false;
-    }
-
-    // Check if element is clipped by an ancestor with overflow:hidden/clip
-    let ancestor = el.parentElement;
-    while (ancestor && ancestor !== document.body) {
-      const overflow = getComputedStyle(ancestor).overflow;
-      if (overflow === "hidden" || overflow === "clip") {
-        const ar = ancestor.getBoundingClientRect();
-        if (rect.bottom <= ar.top || rect.top >= ar.bottom ||
-            rect.right <= ar.left || rect.left >= ar.right) {
-          return false;
-        }
-      }
-      ancestor = ancestor.parentElement;
-    }
-
-    // Check if element is actually reachable (not covered by another element)
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
-    // Clamp to viewport
-    const px = Math.min(Math.max(centerX, 0), window.innerWidth - 1);
-    const py = Math.min(Math.max(centerY, 0), window.innerHeight - 1);
-    const topEl = document.elementFromPoint(px, py);
-    if (topEl && !el.contains(topEl) && !topEl.contains(el)) {
-      // Also try the top-left corner in case the center is covered
-      const tlEl = document.elementFromPoint(
-        Math.min(Math.max(rect.left + 2, 0), window.innerWidth - 1),
-        Math.min(Math.max(rect.top + 2, 0), window.innerHeight - 1)
-      );
-      if (!tlEl || (!el.contains(tlEl) && !tlEl.contains(el))) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
-  // --- Hint rect fallback for zero-size anchors ---
-
-  private _getHintRect(el: HTMLElement): DOMRect {
+  private getHintTargetElement(el: HTMLElement): HTMLElement {
     const rect = el.getBoundingClientRect();
 
-    if (el.tagName === "INPUT") {
-      const type = ((el as HTMLInputElement).type || "").toLowerCase();
-      if (type === "radio" || type === "checkbox") {
-        if ((rect.width === 0 && rect.height === 0) || parseFloat(getComputedStyle(el).opacity) === 0) {
-          const label = this._findAssociatedLabel(el);
-          if (label) return label.getBoundingClientRect();
-        }
-      }
+    const controlTarget = findControlTarget(el);
+    if (controlTarget) return controlTarget;
+
+    if (isZeroSizeAnchor(el, rect)) {
+      const child = findVisibleChild(el);
+      if (child) return child;
+    }
+    if (shouldRedirectToHeading(el)) {
+      return getHeading(el)!;
+    }
+    return el;
+  }
+
+  private getHintRect(el: HTMLElement): DOMRect {
+    const target = this.getHintTargetElement(el);
+    let rect = target.getBoundingClientRect();
+
+    // Narrow <a> rects to text content bounds (children union or padding-subtracted).
+    // Redirected targets (heading, label) are already text-sized.
+    if (el === target && el.tagName.toLowerCase() === "a") {
+      rect = getLinkContentRect(target, rect);
     }
 
-    // For elements wider than 25% of the viewport, find the most relevant
-    // child to anchor the hint on — a heading, button, icon, or chevron.
-    // Places the hint where the user's eye is naturally drawn rather than
-    // at the top-left of a wide container.
-    if (rect.width > window.innerWidth * 0.25) {
-      const child = el.querySelector(
-        "h1, h2, h3, h4, h5, h6, button, svg, [role='button'], [class*='icon'], [class*='chevron'], [class*='arrow']"
-      );
-      if (child) {
-        const cr = child.getBoundingClientRect();
-        if (cr.width > 0 && cr.height > 0 && cr.width < rect.width * 0.5) {
-          const paddingTop = parseFloat(getComputedStyle(child).paddingTop) || 0;
-          if (paddingTop > 0) {
-            return new DOMRect(cr.left, cr.top + paddingTop, cr.width, cr.height - paddingTop);
-          }
-          return cr;
-        }
-      }
-    }
+    // Clamp to heading ancestor bounds when <a> is inside <h1>–<h6>.
+    // The heading's block rect has the correct height; the <a>'s inline
+    // rect has the correct width. The intersection gives both.
+    const headingRect = getHeadingAncestorRect(target);
+    if (headingRect) rect = clampRect(rect, headingRect);
 
-    if (el.tagName === "A") {
-      // Use getClientRects() for inline elements — gives per-line-box rects,
-      // avoiding inflated bounding rects from visually-hidden child spans
-      const clientRects = el.getClientRects();
-      if (clientRects.length > 0) {
-        for (let i = 0; i < clientRects.length; i++) {
-          const cr = clientRects[i];
-          if (cr.width > 1 && cr.height > 1) return cr;
-        }
-      }
-
-      // Zero-size anchor fallback (display:contents) — find first visible child
-      if (rect.width === 0 && rect.height === 0) {
-        for (const child of el.children) {
-          const cr = (child as HTMLElement).getBoundingClientRect();
-          if (cr.width > 0 && cr.height > 0) return cr;
-        }
-      }
+    // Expand width to repeating container ancestor for aligned hints in lists.
+    if (!isFormControl(target)) {
+      rect = getBlockAncestorRect(target, rect) ?? rect;
     }
 
     return rect;
@@ -343,7 +364,6 @@ class HintMode {
     const chars = HINT_CHARS.split("");
     const base = chars.length;
 
-    // Determine minimum label length to fit all hints
     let len = 1;
     let capacity = base;
     while (capacity < count) {
@@ -368,104 +388,188 @@ class HintMode {
 
   // --- Overlay rendering ---
 
-  private _createOverlay(): void {
-    this._overlay = document.createElement("div") as HTMLDivElement;
-    this._overlay.className = "vimium-hint-overlay";
-    if (HINT_ANIMATE) this._overlay.classList.add("vimium-hint-animate");
-    document.body.appendChild(this._overlay);
-    if (HINT_ANIMATE) {
-      void this._overlay.offsetHeight;
-      this._overlay.classList.add("visible");
+  private viewportToDocument(x: number, y: number): { x: number; y: number } {
+    const docEl = document.documentElement;
+    const rect = docEl.getBoundingClientRect();
+    const style = getComputedStyle(docEl);
+    if (style.position === "static" && !/content|paint|strict/.test(style.contain || "")) {
+      const marginTop = parseFloat(style.marginTop) || 0;
+      const marginLeft = parseFloat(style.marginLeft) || 0;
+      return { x: x - rect.left + marginLeft, y: y - rect.top + marginTop };
+    } else {
+      const clientTop = docEl.clientTop;
+      const clientLeft = docEl.clientLeft;
+      return { x: x - rect.left - clientLeft, y: y - rect.top - clientTop };
     }
   }
 
-  private _createHintDiv(element: HTMLElement, label: string): HTMLDivElement {
-    const rect = this._getHintRect(element);
-    const div = document.createElement("div") as HTMLDivElement;
-    div.className = "vimium-hint";
+  private createOverlay(): void {
+    // Remove any stale overlay left from a previous activation whose
+    // transitionend didn't fire (e.g. rapid toggle, animations disabled).
+    const stale = document.documentElement.querySelector(".tabi-hint-overlay");
+    if (stale) stale.remove();
+
+    this.overlay = document.createElement("div");
+    this.overlay.className = `tabi-hint-overlay${DEFAULTS.animate ? " tabi-hint-animate" : ""}`;
+    document.documentElement.appendChild(this.overlay);
+    void this.overlay.offsetHeight;
+    this.overlay.classList.add("visible");
+  }
+
+  private createHintDiv(element: HTMLElement, label: string): HTMLDivElement {
+    const placement = this.hintPlacementMap.get(element);
+    const div = document.createElement("div");
+    div.className = "tabi-hint";
     div.textContent = label;
-    if (this._pointerTails) {
-      // Floating mode: centered below element, tail points up
-      div.style.left = Math.max(0, rect.left + rect.width / 2) + "px";
-      div.style.top = Math.max(0, rect.bottom + 2) + "px";
-      div.style.transform = "translateX(-50%)";
-      const tail = document.createElement("div");
-      tail.className = "vimium-hint-tail";
-      div.appendChild(tail);
-    } else {
-      // Inline mode: at left edge of element, overlapping text
-      div.style.left = Math.max(0, rect.left) + "px";
-      div.style.top = Math.max(0, rect.top) + "px";
+
+    if (placement) {
+      switch (placement.style) {
+        case "containerGlow":
+          this.positionContainerGlow(div, placement.container);
+          break;
+        case "pill":
+          this.positionPill(div, placement.rect);
+          break;
+      }
     }
 
-    if (this._overlay) this._overlay.appendChild(div);
+    if (this.overlay) this.overlay.appendChild(div);
     return div;
   }
 
-  // --- Key handling during HINTS mode (called via KeyHandler delegate) ---
+  /** Clamp container rect to end before a nested list element. */
+  private clampRectToHeader(rect: DOMRect, nestedList: HTMLElement): DOMRect {
+    const listTop = nestedList.getBoundingClientRect().top;
+    if (listTop > rect.top) {
+      return new DOMRect(rect.left, rect.top, rect.width, listTop - rect.top);
+    }
+    return rect;
+  }
 
-  private _handleKey(event: KeyboardEvent): boolean {
-    if (!this._active) return false;
+  /** Glow border on repeating container + inside-end pill label. */
+  private positionContainerGlow(div: HTMLDivElement, container: HTMLElement): void {
+    let glowRect = container.getBoundingClientRect();
+    const nestedList = container.querySelector(LIST_BOUNDARY_SELECTOR);
+    if (nestedList) {
+      glowRect = this.clampRectToHeader(glowRect, nestedList as HTMLElement);
+    }
+    const glow = document.createElement("div");
+    glow.className = "tabi-hint-container-glow";
+    const glowPos = this.viewportToDocument(glowRect.left, glowRect.top);
+    glow.style.left = glowPos.x + "px";
+    glow.style.top = glowPos.y + "px";
+    glow.style.width = glowRect.width + "px";
+    glow.style.height = glowRect.height + "px";
+    if (this.overlay) this.overlay.appendChild(glow);
 
-    // 'f' with no modifiers toggles hints off
-    if (event.code === "KeyF" && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
+    const verticalInset = (glowRect.height - HINT_HEIGHT) / 3;
+    const insetRight = Math.min(verticalInset, 24);
+    const pos = this.viewportToDocument(
+      glowRect.right - insetRight,
+      glowRect.top + glowRect.height / 2
+    );
+    div.style.left = pos.x + "px";
+    div.style.top = pos.y + "px";
+    div.style.transform = "translate(-100%, -50%)";
+  }
+
+  /** Pill below element with pointer tail. */
+  private positionPill(div: HTMLDivElement, rect: DOMRect): void {
+    const pos = this.viewportToDocument(rect.left + rect.width / 2, rect.bottom + 2);
+    div.style.left = Math.max(0, pos.x) + "px";
+    div.style.top = Math.max(0, pos.y) + "px";
+    div.style.transform = "translateX(-50%)";
+    const tail = document.createElement("div");
+    tail.className = "tabi-hint-tail";
+    div.appendChild(tail);
+  }
+
+  // --- Key handling ---
+
+  private handleKey(event: KeyboardEvent): boolean {
+    if (!this.active) return false;
+
+    if (this.activating) {
       event.preventDefault();
       event.stopPropagation();
-      this._deactivate();
       return true;
     }
 
-    // Let Escape fall through to KeyHandler's exitToNormal dispatch
+    const dismissCodes: Record<HintModeType, string> = { click: "KeyF", yank: "KeyY", multi: "KeyM" };
+    const dismissCode = dismissCodes[this.modeType];
+    if (event.code === dismissCode && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.deactivate();
+      return true;
+    }
+
     if (event.code === "Escape") return false;
+
+    // Multi mode: Space executes all accumulated selections
+    if (this.modeType === "multi" && event.code === "Space") {
+      event.preventDefault();
+      event.stopPropagation();
+      this.executeMultiSelections();
+      return true;
+    }
 
     event.preventDefault();
     event.stopPropagation();
 
-    // Backspace removes last typed character
     if (event.code === "Backspace") {
-      if (this._typed.length > 0) {
-        this._typed = this._typed.slice(0, -1);
-        this._updateHintVisibility();
+      if (this.typed.length > 0) {
+        this.typed = this.typed.slice(0, -1);
+        this.updateHintVisibility();
       }
       return true;
     }
 
-    // Only accept hint characters; any other key dismisses
     const char = event.key ? event.key.toLowerCase() : "";
     if (!HINT_CHARS.includes(char) || char.length !== 1) {
-      this._deactivate();
+      this.deactivate();
       return true;
     }
 
-    this._typed += char;
-    this._updateHintVisibility();
+    this.typed += char;
+    this.updateHintVisibility();
 
-    // Deactivate if no hints match the typed prefix
-    if (!this._hints.some(h => h.label.startsWith(this._typed))) {
-      this._deactivate();
+    if (!this.hints.some(h => h.label.startsWith(this.typed))) {
+      this.deactivate();
       return true;
     }
 
-    // Check for exact match
-    const match = this._hints.find((h) => h.label === this._typed);
+    const match = this.hints.find((h) => h.label === this.typed);
     if (match) {
-      this._activateHint(match);
+      if (event.shiftKey) {
+        this.willOpenNewTab = true;
+      }
+      if (this.modeType === "multi") {
+        this.selectForMulti(match);
+      } else {
+        this.activateHint(match);
+      }
     }
     return true;
   }
 
-  private _updateHintVisibility(): void {
-    for (const hint of this._hints) {
-      const matches = hint.label.startsWith(this._typed);
-      hint.div.style.display = matches ? "" : "none";
-      if (matches) {
-        // Highlight already-typed prefix
-        const matched = hint.label.slice(0, this._typed.length);
-        const remaining = hint.label.slice(this._typed.length);
+  private updateHintVisibility(): void {
+    const selectedSet = this.modeType === "multi"
+      ? new Set(this.multiSelections.map(s => s.hint))
+      : null;
+
+    for (const hint of this.hints) {
+      // In multi mode, selected hints always stay visible
+      const isSelected = selectedSet !== null && selectedSet.has(hint);
+      const matches = hint.label.startsWith(this.typed);
+      hint.div.style.display = (matches || isSelected) ? "" : "none";
+      if (matches && !isSelected) {
+        const matched = hint.label.slice(0, this.typed.length);
+        const remaining = hint.label.slice(this.typed.length);
         hint.div.innerHTML = "";
         if (matched) {
           const span = document.createElement("span");
-          span.className = "vimium-hint-matched";
+          span.className = "tabi-hint-matched";
           span.textContent = matched;
           hint.div.appendChild(span);
         }
@@ -474,68 +578,134 @@ class HintMode {
     }
   }
 
-  private _activateHint(hint: Hint): void {
+  private activateHint(hint: Hint): void {
     const element = hint.element;
+    const newTab = this.willOpenNewTab;
+    const yank = this.modeType === "yank";
+    this.activating = true;
 
-    // Flash the matched hint tag
-    if (hint.div.classList) hint.div.classList.add("vimium-hint-active");
-
-    // Highlight the target element
-    if (element.classList) {
-      element.classList.add("vimium-target-flash");
-      setTimeout(() => {
-        element.classList.remove("vimium-target-flash");
-      }, 300);
+    for (const h of this.hints) {
+      if (h !== hint) h.div.style.display = "none";
     }
 
-    this._deactivate();
+    const placement = this.hintPlacementMap.get(element);
+    if (!placement) return;
+    const targetRect = placement.rect;
+    const tagRect = hint.div.getBoundingClientRect();
+    if (tagRect.width > 0) {
+      const dx = (targetRect.left + targetRect.width / 2) - (tagRect.left + tagRect.width / 2);
+      const dy = (targetRect.top + targetRect.height / 2) - (tagRect.top + tagRect.height / 2);
+      hint.div.style.setProperty("--poof-x", dx + "px");
+      hint.div.style.setProperty("--poof-y", dy + "px");
+    }
 
-    if (this._newTab && element.tagName === "A" && (element as HTMLAnchorElement).href) {
-      browser.runtime.sendMessage({
-        command: "createTab",
-        url: (element as HTMLAnchorElement).href,
-      });
+    hint.div.classList.add("tabi-hint-active");
+
+    // Focus ring around the full clickable element (not the text target)
+    const ring = document.createElement("div");
+    ring.className = "tabi-hint-ring";
+    const ringRect = element.getBoundingClientRect();
+    const pos = this.viewportToDocument(ringRect.left, ringRect.top);
+    ring.style.left = pos.x - 2 + "px";
+    ring.style.top = pos.y - 2 + "px";
+    ring.style.width = ringRect.width + 4 + "px";
+    ring.style.height = ringRect.height + 4 + "px";
+    document.documentElement.appendChild(ring);
+
+    const afterCollapse = (): void => {
+      // If hints were already torn down (e.g. by mutation observer during
+      // the collapse animation), skip the click — the target may have
+      // moved and the ring was already cleaned up by deactivate().
+      const wasActive = this.active;
+      this.deactivate();
+      if (!wasActive) {
+        ring.remove();
+        return;
+      }
+
+      if (yank) {
+        const url = (element as HTMLAnchorElement).href;
+        navigator.clipboard.writeText(url);
+      } else {
+        const isLink = element.tagName.toLowerCase() === "a" && (element as HTMLAnchorElement).href;
+        const opensNewWindow = isLink && (newTab || (element as HTMLAnchorElement).target === "_blank");
+
+        if (opensNewWindow) {
+          browser.runtime.sendMessage({
+            command: "createTab",
+            url: (element as HTMLAnchorElement).href,
+          });
+        } else {
+          element.focus();
+          element.style.outline = "none";
+          element.addEventListener("blur", () => { element.style.outline = ""; }, { once: true });
+          const opts = { bubbles: true, cancelable: true, view: window };
+          element.dispatchEvent(new MouseEvent("mousedown", opts));
+          element.dispatchEvent(new MouseEvent("mouseup", opts));
+          element.click();
+          retryClick(element);
+        }
+      }
+
+      // Fade out the ring
+      ring.classList.add("tabi-hint-ring-out");
+      ring.addEventListener("animationend", () => ring.remove(), { once: true });
+    };
+
+    hint.div.addEventListener("animationend", afterCollapse, { once: true });
+  }
+
+  // --- Multi-select ---
+
+  private selectForMulti(hint: Hint): void {
+    // Already selected — deselect
+    const existingIdx = this.multiSelections.findIndex(s => s.hint === hint);
+    if (existingIdx >= 0) {
+      this.multiSelections.splice(existingIdx, 1);
+      hint.div.classList.remove("tabi-hint-selected");
     } else {
-      element.focus();
-      element.click();
+      this.multiSelections.push({ hint });
+      hint.div.classList.add("tabi-hint-selected");
+    }
+
+    // Reset typed buffer and show all unselected hints again
+    this.typed = "";
+    this.updateHintVisibility();
+    this.updateStatusBar();
+  }
+
+  private executeMultiSelections(): void {
+    const selections = [...this.multiSelections];
+    this.deactivate();
+
+    for (const { hint } of selections) {
+      const element = hint.element;
+      const isLink = element.tagName.toLowerCase() === "a" && (element as HTMLAnchorElement).href;
+
+      if (isLink) {
+        browser.runtime.sendMessage({
+          command: "createTab",
+          url: (element as HTMLAnchorElement).href,
+        });
+      } else {
+        const opts = { bubbles: true, cancelable: true, view: window };
+        element.dispatchEvent(new MouseEvent("mousedown", opts));
+        element.dispatchEvent(new MouseEvent("mouseup", opts));
+        element.click();
+      }
     }
   }
 
-  // --- Cleanup ---
-
-  private _deactivate(): void {
-    if (!this._active) return;
-    this._active = false;
-    this._typed = "";
-    this._keyHandler.clearModeKeyDelegate();
-    document.removeEventListener("mousedown", this._onMouseDown, true);
-    window.removeEventListener("scroll", this._onScroll, true);
-
-    if (HINT_ANIMATE && this._overlay) {
-      this._overlay.classList.remove("visible");
-      const overlay = this._overlay;
-      setTimeout(() => {
-        if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-      }, 80);
-      this._overlay = null;
-    } else if (this._overlay && this._overlay.parentNode) {
-      this._overlay.parentNode.removeChild(this._overlay);
-      this._overlay = null;
-    }
-
-    this._hints = [];
-    this._keyHandler.setMode(Mode.NORMAL);
+  private createStatusBar(): void {
+    this.statusBar = document.createElement("div");
+    this.statusBar.className = "tabi-multi-status";
+    this.updateStatusBar();
+    document.documentElement.appendChild(this.statusBar);
   }
 
-  destroy(): void {
-    this._deactivate();
-    this.unwireCommands();
+  private updateStatusBar(): void {
+    if (!this.statusBar) return;
+    const count = this.multiSelections.length;
+    this.statusBar.textContent = `${count} selected — press Space to open`;
   }
-}
-
-// Export for Node.js tests; no-op in browser content script context
-if (typeof globalThis !== "undefined") {
-  (globalThis as Record<string, unknown>).HintMode = HintMode;
-  (globalThis as Record<string, unknown>).HINT_CHARS = HINT_CHARS;
-  (globalThis as Record<string, unknown>).CLICKABLE_SELECTOR = CLICKABLE_SELECTOR;
 }

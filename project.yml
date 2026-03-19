@@ -1,4 +1,4 @@
-name: Vimium
+name: Tabi
 options:
   bundleIdPrefix: com.brokenalarms
   deploymentTarget:
@@ -12,85 +12,70 @@ settings:
     DEVELOPMENT_TEAM: F73P768296
 
 schemes:
-  Vimium:
+  Tabi:
     build:
       targets:
-        Vimium: all
-        Vimium Extension: all
+        Tabi: all
+        Tabi Extension: all
     run:
-      executable: Vimium
+      executable: Tabi
 
 targets:
-  Vimium:
+  Tabi:
     type: application
     platform: macOS
     sources:
-      - path: Vimium/Host App
-      - path: Vimium/Shared
+      - path: Tabi/Host App
+      - path: Tabi/Shared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.brokenalarms.Vimium
-        CODE_SIGN_ENTITLEMENTS: Vimium/Host App/Vimium.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.brokenalarms.tabi
+        CODE_SIGN_ENTITLEMENTS: Tabi/Host App/Tabi.entitlements
         CODE_SIGN_STYLE: Automatic
-        INFOPLIST_KEY_CFBundleDisplayName: Vimium
+        INFOPLIST_KEY_CFBundleDisplayName: Tabi
         GENERATE_INFOPLIST_FILE: true
         ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES: true
     dependencies:
-      - target: Vimium Extension
+      - target: Tabi Extension
         embed: true
         codeSign: true
         copy:
           destination: plugins
           subpath: ""
 
-  Vimium Extension:
+  Tabi Extension:
     type: app-extension
     platform: macOS
     sources:
-      - path: Vimium/Safari Extension
+      - path: Tabi/Safari Extension
         excludes:
           - "Resources/**"
-      - path: Vimium/Shared
+      - path: Tabi/Shared
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.brokenalarms.Vimium.Extension
-        CODE_SIGN_ENTITLEMENTS: Vimium/Safari Extension/VimiumExtension.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.brokenalarms.tabi.Extension
+        CODE_SIGN_ENTITLEMENTS: Tabi/Safari Extension/TabiExtension.entitlements
         CODE_SIGN_STYLE: Automatic
         GENERATE_INFOPLIST_FILE: true
-        INFOPLIST_FILE: Vimium/Safari Extension/Info.plist
+        INFOPLIST_FILE: Tabi/Safari Extension/Info.plist
         OTHER_LDFLAGS: ["-framework", "SafariServices"]
     preBuildScripts:
       - name: Compile TypeScript
+        basedOnDependencyAnalysis: false
         script: |
           cd "$PROJECT_DIR"
           export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
           npm run build
-        inputFiles:
-          - $(PROJECT_DIR)/src/background.ts
-          - $(PROJECT_DIR)/src/content.ts
-          - $(PROJECT_DIR)/src/types.ts
-          - $(PROJECT_DIR)/src/modules/FindMode.ts
-          - $(PROJECT_DIR)/src/modules/HintMode.ts
-          - $(PROJECT_DIR)/src/modules/KeyHandler.ts
-          - $(PROJECT_DIR)/src/modules/ScrollController.ts
-          - $(PROJECT_DIR)/src/modules/TabSearch.ts
-          - $(PROJECT_DIR)/src/modules/HelpOverlay.ts
         outputFiles:
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/background.js
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/content.js
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/types.js
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/FindMode.js
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/HintMode.js
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/KeyHandler.js
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/ScrollController.js
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/TabSearch.js
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/modules/HelpOverlay.js
+          - $(PROJECT_DIR)/Tabi/Safari Extension/Resources/background.js
+          - $(PROJECT_DIR)/Tabi/Safari Extension/Resources/content.js
+          - $(PROJECT_DIR)/Tabi/Safari Extension/Resources/popup.js
     postBuildScripts:
       - name: Copy Extension Resources
         script: |
-          rsync -a --delete "${PROJECT_DIR}/Vimium/Safari Extension/Resources/" "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/"
+          rsync -a --delete "${PROJECT_DIR}/Tabi/Safari Extension/Resources/" "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/"
         inputFiles:
-          - $(PROJECT_DIR)/Vimium/Safari Extension/Resources/
+          - $(PROJECT_DIR)/Tabi/Safari Extension/Resources/
         outputFiles:
           - $(BUILT_PRODUCTS_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/manifest.json
       - name: Validate Extension Bundle
@@ -99,7 +84,7 @@ targets:
           # NSExtension dictionary is required for Safari to recognize the extension
           if ! /usr/libexec/PlistBuddy -c "Print :NSExtension:NSExtensionPointIdentifier" "$PLIST" &>/dev/null; then
             echo "error: NSExtension dictionary missing from extension Info.plist. Safari will silently ignore this extension."
-            echo "error: Ensure Vimium/Safari Extension/Info.plist exists and contains the NSExtension dictionary."
+            echo "error: Ensure Tabi/Safari Extension/Info.plist exists and contains the NSExtension dictionary."
             exit 1
           fi
           # Verify manifest.json was copied

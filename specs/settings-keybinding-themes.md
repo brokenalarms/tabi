@@ -28,7 +28,7 @@ case "getSettings":
 
 ### Background Settings Sync
 
-Rename `syncExcludedDomains()` → `syncSettings()`. Use `"getSettings"` native message. Store all values in `browser.storage.local`. Validate with `VimiumSettings` type, fallback to defaults for bad values. Handle `"settingsChanged"` dispatchMessage for live re-sync.
+Rename `syncExcludedDomains()` → `syncSettings()`. Use `"getSettings"` native message. Store all values in `browser.storage.local`. Validate with `TabiSettings` type, fallback to defaults for bad values. Handle `"settingsChanged"` dispatchMessage for live re-sync.
 
 ### Key Binding Mode (KeyHandler.ts)
 
@@ -43,29 +43,29 @@ Location mode (default): unchanged behavior, always `event.code`.
 
 ### Theme CSS System
 
-**New file: `styles/themes.css`** — CSS custom properties scoped to Vimium classes (NOT `:root`):
+**New file: `styles/themes.css`** — CSS custom properties scoped to Tabi classes (NOT `:root`):
 
 ```css
-.vimium-hint-overlay, .vimium-find-bar, .vimium-tab-search-overlay {
-    /* yellow defaults via --vimium-* vars */
+.tabi-hint-overlay, .tabi-find-bar, .tabi-tab-search-overlay {
+    /* yellow defaults via --tabi-* vars */
 }
-[data-vimium-theme="dark"] .vimium-hint-overlay, ... { /* dark */ }
-[data-vimium-theme="light"] .vimium-hint-overlay, ... { /* light */ }
+[data-tabi-theme="dark"] .tabi-hint-overlay, ... { /* dark */ }
+[data-tabi-theme="light"] .tabi-hint-overlay, ... { /* light */ }
 @media (prefers-color-scheme: dark) {
-    [data-vimium-theme="auto"] ... { /* = dark */ }
+    [data-tabi-theme="auto"] ... { /* = dark */ }
 }
 @media (prefers-color-scheme: light) {
-    [data-vimium-theme="auto"] ... { /* = light */ }
+    [data-tabi-theme="auto"] ... { /* = light */ }
 }
 ```
 
-Update `hints.css`, `find.css`, `tab-search.css` to use `var(--vimium-*)` variables. Add `themes.css` first in manifest.json css array.
+Update `hints.css`, `find.css`, `tab-search.css` to use `var(--tabi-*)` variables. Add `themes.css` first in manifest.json css array.
 
 Do NOT remove inline `_injectStyles()` — separate cleanup concern.
 
 ### Content Script Integration
 
-Read all settings from `browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme"])`. Apply theme via `data-vimium-theme` attribute on `document.documentElement`. Wire `keyHandler.setKeyBindingMode(mode)`. Add `browser.storage.onChanged` listener for live updates.
+Read all settings from `browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme"])`. Apply theme via `data-tabi-theme` attribute on `document.documentElement`. Wire `keyHandler.setKeyBindingMode(mode)`. Add `browser.storage.onChanged` listener for live updates.
 
 ### Host App UI (ContentView.swift)
 

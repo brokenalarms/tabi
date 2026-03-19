@@ -1,18 +1,8 @@
-// HelpOverlay — keybinding reference modal for Vimium
+// HelpOverlay — keybinding reference modal for Tabi
 // Shows all NORMAL-mode bindings in a centered overlay.
 // Dismissed on any keypress or mouse click.
 
-import type { ModeValue } from "../types";
-
-declare const COMMANDS: Record<string, string>;
-
-declare const Mode: {
-  readonly NORMAL: "NORMAL";
-  readonly INSERT: "INSERT";
-  readonly HINTS: "HINTS";
-  readonly FIND: "FIND";
-  readonly TAB_SEARCH: "TAB_SEARCH";
-};
+import { COMMANDS } from "../commands";
 
 interface KeyHandlerLike {
   on(command: string, callback: () => void): void;
@@ -20,7 +10,7 @@ interface KeyHandlerLike {
   getBindings(): Map<string, Map<string, string>>;
 }
 
-class HelpOverlay {
+export class HelpOverlay {
   private _keyHandler: KeyHandlerLike;
   private _active: boolean;
   private _overlay: HTMLDivElement | null;
@@ -53,51 +43,68 @@ class HelpOverlay {
 
   private _createOverlay(): void {
     this._overlay = document.createElement("div") as HTMLDivElement;
-    this._overlay.className = "vimium-help-overlay";
+    this._overlay.className = "tabi-help-overlay";
 
     const modal = document.createElement("div");
-    modal.className = "vimium-help-modal";
+    modal.className = "tabi-help-modal";
 
     const title = document.createElement("h2");
-    title.className = "vimium-help-title";
-    title.textContent = "vimium-mac keyboard shortcuts";
+    title.className = "tabi-help-title";
+    title.textContent = "tabi keyboard shortcuts";
     modal.appendChild(title);
 
     const grid = document.createElement("div");
-    grid.className = "vimium-help-grid";
+    grid.className = "tabi-help-grid";
 
     const bindings = this._keyHandler.getBindings();
     const normalBindings = bindings.get("NORMAL");
+    let goToTabDigitShown = false;
     if (normalBindings) {
       for (const [seq, cmd] of normalBindings) {
+        // Collapse g1-g9 into a single help row
+        if (/^goToTab\d$/.test(cmd)) {
+          if (goToTabDigitShown) continue;
+          goToTabDigitShown = true;
+          HelpOverlay._addRow(grid, "g1\u2013g9", "Go to tab by number");
+          continue;
+        }
+        if (cmd === "goToTabFirst") {
+          HelpOverlay._addRow(grid, "g0 / g^", "First tab");
+          continue;
+        }
+        if (cmd === "goToTabLast") {
+          HelpOverlay._addRow(grid, "g$", "Last tab");
+          continue;
+        }
+
         const label = COMMANDS[cmd] || cmd;
-
-        const row = document.createElement("div");
-        row.className = "vimium-help-row";
-
-        const keyEl = document.createElement("kbd");
-        keyEl.className = "vimium-help-key";
-        keyEl.textContent = HelpOverlay._formatSequence(seq);
-
-        const descEl = document.createElement("span");
-        descEl.className = "vimium-help-desc";
-        descEl.textContent = label;
-
-        row.appendChild(keyEl);
-        row.appendChild(descEl);
-        grid.appendChild(row);
+        HelpOverlay._addRow(grid, HelpOverlay._formatSequence(seq), label);
       }
     }
 
     modal.appendChild(grid);
 
     const hint = document.createElement("p");
-    hint.className = "vimium-help-hint";
+    hint.className = "tabi-help-hint";
     hint.textContent = "Press any key to dismiss";
     modal.appendChild(hint);
 
     this._overlay.appendChild(modal);
     document.body.appendChild(this._overlay);
+  }
+
+  private static _addRow(grid: HTMLElement, keyText: string, descText: string): void {
+    const row = document.createElement("div");
+    row.className = "tabi-help-row";
+    const keyEl = document.createElement("kbd");
+    keyEl.className = "tabi-help-key";
+    keyEl.textContent = keyText;
+    const descEl = document.createElement("span");
+    descEl.className = "tabi-help-desc";
+    descEl.textContent = descText;
+    row.appendChild(keyEl);
+    row.appendChild(descEl);
+    grid.appendChild(row);
   }
 
   static _formatSequence(seq: string): string {
@@ -134,9 +141,4 @@ class HelpOverlay {
     this._deactivate();
     this._keyHandler.off("showHelp");
   }
-}
-
-// Export for Node.js tests; no-op in browser content script context
-if (typeof globalThis !== "undefined") {
-  (globalThis as Record<string, unknown>).HelpOverlay = HelpOverlay;
 }

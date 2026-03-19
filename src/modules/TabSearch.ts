@@ -4,20 +4,13 @@
 // Up/Down or Ctrl-j/k, Enter to switch, Escape to dismiss.
 
 import type { ModeValue, TabInfo } from "../types";
+import { Mode } from "../commands";
 
 // Browser API (Safari Web Extension)
 declare const browser: {
   runtime: {
     sendMessage(message: { command: string; tabId?: number }): Promise<unknown>;
   };
-};
-
-declare const Mode: {
-  readonly NORMAL: "NORMAL";
-  readonly INSERT: "INSERT";
-  readonly HINTS: "HINTS";
-  readonly FIND: "FIND";
-  readonly TAB_SEARCH: "TAB_SEARCH";
 };
 
 interface KeyHandlerLike {
@@ -34,7 +27,7 @@ interface ScoredEntry {
   index: number;
 }
 
-class TabSearch {
+export class TabSearch {
   private _keyHandler: KeyHandlerLike;
   private _active: boolean;
   private _overlayEl: HTMLDivElement | null;
@@ -156,10 +149,10 @@ class TabSearch {
 
   private _createOverlay(): void {
     this._overlayEl = document.createElement("div");
-    this._overlayEl.className = "vimium-tab-search-overlay";
+    this._overlayEl.className = "tabi-tab-search-overlay";
 
     const modal = document.createElement("div");
-    modal.className = "vimium-tab-search-modal";
+    modal.className = "tabi-tab-search-modal";
 
     this._inputEl = document.createElement("input");
     this._inputEl.type = "text";
@@ -168,7 +161,7 @@ class TabSearch {
     this._inputEl.setAttribute("spellcheck", "false");
 
     this._resultsEl = document.createElement("div");
-    this._resultsEl.className = "vimium-tab-search-results";
+    this._resultsEl.className = "tabi-tab-search-results";
 
     modal.appendChild(this._inputEl);
     modal.appendChild(this._resultsEl);
@@ -188,7 +181,7 @@ class TabSearch {
 
     if (this._filtered.length === 0) {
       const empty = document.createElement("div");
-      empty.className = "vimium-tab-search-empty";
+      empty.className = "tabi-tab-search-empty";
       empty.textContent = this._inputEl && this._inputEl.value
           ? "No matching tabs" : "No other tabs";
       this._resultsEl.appendChild(empty);
@@ -198,17 +191,17 @@ class TabSearch {
     for (let i = 0; i < this._filtered.length; i++) {
       const tab = this._filtered[i];
       const item = document.createElement("div");
-      item.className = "vimium-tab-search-item";
+      item.className = "tabi-tab-search-item";
       if (i === this._selectedIndex) {
         item.className += " selected";
       }
 
       const title = document.createElement("div");
-      title.className = "vimium-tab-search-item-title";
+      title.className = "tabi-tab-search-item-title";
       title.textContent = tab.title || "(Untitled)";
 
       const url = document.createElement("div");
-      url.className = "vimium-tab-search-item-url";
+      url.className = "tabi-tab-search-item-url";
       url.textContent = tab.url || "";
 
       item.appendChild(title);
@@ -287,9 +280,4 @@ class TabSearch {
     this.deactivate();
     this._keyHandler.off("openTabSearch");
   }
-}
-
-// Export for Node.js tests; no-op in browser content script context
-if (typeof globalThis !== "undefined") {
-  (globalThis as Record<string, unknown>).TabSearch = TabSearch;
 }
