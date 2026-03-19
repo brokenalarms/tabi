@@ -35,7 +35,6 @@ osascript -e '
       try
         repeat with w in windows
           set end of savedBounds to bounds of w
-          -- Find index of the current tab in this window
           set currentTab to current tab of w
           set tabIdx to 0
           repeat with j from 1 to count of tabs of w
@@ -50,8 +49,9 @@ osascript -e '
       quit
       delay 1.5
     end if
+    set expectedCount to count of savedBounds
     activate
-    -- Wait for Safari to be fully ready (frontmost with a window)
+    -- Wait for Safari to be fully ready
     tell application "System Events"
       repeat 20 times
         if frontmost of process "Safari" then exit repeat
@@ -59,11 +59,39 @@ osascript -e '
       end repeat
     end tell
     delay 0.5
-    -- Reopen last session tabs via Cmd+Shift+T (avoids extra start page)
+    -- Reopen all windows from previous session via History menu
     tell application "System Events"
-      keystroke "t" using {command down, shift down}
+      tell process "Safari"
+        click menu item "Reopen All Windows from Last Session" of menu "History" of menu bar 1
+      end tell
     end tell
-    delay 0.5
+    delay 1
+    -- If Safari has more windows than we saved, close blank extras
+    try
+      if (count of windows) > expectedCount then
+        set idsToClose to {}
+        repeat with w in windows
+          if (count of tabs of w) = 1 then
+            set tabURL to URL of current tab of w
+            if tabURL is missing value or tabURL is "" or tabURL starts with "favorites://" then
+              set end of idsToClose to id of w
+            end if
+          end if
+        end repeat
+        repeat with wid in idsToClose
+          if (count of windows) > expectedCount then
+            repeat with w in windows
+              if id of w = wid then
+                close w
+                exit repeat
+              end if
+            end repeat
+          end if
+        end repeat
+      end if
+    end try
+    -- Bring Safari to the front
+    activate
     -- Restore window bounds and active tabs
     try
       set winList to windows
