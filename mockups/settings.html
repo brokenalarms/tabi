@@ -1,0 +1,1540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tabi Settings</title>
+  <style>
+    /* ── Reset ─────────────────────────────────────────────────── */
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* ── CSS Custom Properties for count-up animation ─────────── */
+    @property --stat-hints { syntax: "<integer>"; initial-value: 0; inherits: false; }
+    @property --stat-tabs { syntax: "<integer>"; initial-value: 0; inherits: false; }
+    @property --stat-yanks { syntax: "<integer>"; initial-value: 0; inherits: false; }
+    @property --stat-distance { syntax: "<integer>"; initial-value: 0; inherits: false; }
+
+    /*
+     * ── Tabi Shared Theme ─────────────────────────────────────────
+     * These CSS custom properties are the single source of truth for
+     * ALL Tabi UI surfaces: settings page, popup, help overlay, tab
+     * search modal, premium toast, and stats notification.
+     *
+     * In the real implementation, these live in a shared `tabi-theme.css`
+     * imported by every surface. Overlays add backdrop-filter on top.
+     */
+    :root {
+      /* Surface */
+      --tabi-bg: #1a1a1e;
+      --tabi-surface: rgba(255, 255, 255, 0.04);
+      --tabi-surface-border: rgba(255, 255, 255, 0.08);
+      --tabi-surface-hover: rgba(255, 255, 255, 0.06);
+      --tabi-surface-raised: rgba(255, 255, 255, 0.03);
+      --tabi-divider: rgba(255, 255, 255, 0.06);
+      --tabi-input-bg: rgba(255, 255, 255, 0.05);
+
+      /* Text */
+      --tabi-text: #f0f0f0;
+      --tabi-text-secondary: rgba(255, 255, 255, 0.5);
+      --tabi-text-tertiary: rgba(255, 255, 255, 0.3);
+
+      /* Accent */
+      --tabi-accent: #f59e0b;
+      --tabi-accent-dim: rgba(245, 158, 11, 0.15);
+      --tabi-accent-border: rgba(245, 158, 11, 0.3);
+      --tabi-emerald: #10b981;
+      --tabi-emerald-dim: rgba(16, 185, 129, 0.12);
+      --tabi-blue: #0a84ff;
+      --tabi-blue-dim: rgba(10, 132, 255, 0.12);
+      --tabi-cyan: #38bdf8;
+      --tabi-purple: #a855f7;
+      --tabi-pink: #ec4899;
+      --tabi-danger: #ff453a;
+
+      /* Controls */
+      --tabi-segmented-bg: rgba(255, 255, 255, 0.06);
+      --tabi-segmented-active: #0a84ff;
+
+      /* Overlay (shared with help, tab search, mode bar) */
+      --tabi-overlay-bg: rgba(30, 30, 30, 0.92);
+      --tabi-overlay-shadow: 0 8px 40px rgba(0, 0, 0, 0.55), 0 0 0 0.5px rgba(255, 255, 255, 0.1);
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --tabi-bg: #f5f5f7;
+        --tabi-surface: rgba(255, 255, 255, 0.8);
+        --tabi-surface-border: rgba(0, 0, 0, 0.08);
+        --tabi-surface-hover: rgba(255, 255, 255, 0.95);
+        --tabi-surface-raised: rgba(0, 0, 0, 0.03);
+        --tabi-divider: rgba(0, 0, 0, 0.08);
+        --tabi-input-bg: rgba(0, 0, 0, 0.04);
+        --tabi-text: #1a1a1a;
+        --tabi-text-secondary: rgba(0, 0, 0, 0.5);
+        --tabi-text-tertiary: rgba(0, 0, 0, 0.3);
+        --tabi-accent: #d97706;
+        --tabi-accent-dim: rgba(217, 119, 6, 0.1);
+        --tabi-accent-border: rgba(217, 119, 6, 0.25);
+        --tabi-emerald: #059669;
+        --tabi-emerald-dim: rgba(5, 150, 105, 0.08);
+        --tabi-blue: #007aff;
+        --tabi-blue-dim: rgba(0, 122, 255, 0.08);
+        --tabi-segmented-bg: rgba(0, 0, 0, 0.06);
+        --tabi-segmented-active: #007aff;
+        --tabi-danger: #ff3b30;
+        --tabi-overlay-bg: rgba(255, 255, 255, 0.88);
+        --tabi-overlay-shadow: 0 8px 40px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0, 0, 0, 0.1);
+      }
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+      font-size: 13px;
+      color: var(--tabi-text);
+      background: var(--tabi-bg);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Layout ────────────────────────────────────────────────── */
+    .app { display: flex; min-height: 100vh; }
+
+    /* ── Sidebar ───────────────────────────────────────────────── */
+    .sidebar {
+      width: 200px;
+      flex-shrink: 0;
+      background: var(--tabi-surface-raised);
+      border-right: 1px solid var(--tabi-divider);
+      padding: 20px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .sidebar-brand {
+      font-size: 15px;
+      font-weight: 700;
+      padding: 8px 12px 16px;
+      letter-spacing: -0.01em;
+    }
+
+    .sidebar-nav { display: flex; flex-direction: column; gap: 2px; }
+
+    .sidebar-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 12px;
+      border-radius: 8px;
+      color: var(--tabi-text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+    }
+
+    .sidebar-item:hover { background: var(--tabi-surface); color: var(--tabi-text); }
+    .sidebar-item.active { background: var(--tabi-blue-dim); color: var(--tabi-blue); }
+    .sidebar-item .icon { font-size: 15px; width: 20px; text-align: center; }
+    .sidebar-spacer { flex: 1; }
+    .sidebar-item.premium-nav { color: var(--tabi-accent); }
+    .sidebar-item.premium-nav.active { background: var(--tabi-accent-dim); color: var(--tabi-accent); }
+
+    /* ── Main ──────────────────────────────────────────────────── */
+    .main { flex: 1; padding: 32px; max-width: 760px; overflow-y: auto; }
+    .page { display: none; }
+    .page.active { display: block; }
+
+    .page-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 24px;
+    }
+
+    /* ── Cards ─────────────────────────────────────────────────── */
+    .card {
+      background: var(--tabi-surface);
+      border: 1px solid var(--tabi-surface-border);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+
+    .card-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--tabi-text-secondary);
+      margin-bottom: 12px;
+    }
+
+    /* ── Settings rows ─────────────────────────────────────────── */
+    .setting-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+    }
+    .setting-row + .setting-row { border-top: 1px solid var(--tabi-divider); }
+    .setting-info { flex: 1; }
+    .setting-name { font-weight: 500; font-size: 13px; }
+    .setting-desc { font-size: 11px; color: var(--tabi-text-secondary); margin-top: 2px; }
+
+    /* ── Segmented control ─────────────────────────────────────── */
+    .segmented {
+      display: flex;
+      background: var(--tabi-segmented-bg);
+      border-radius: 8px;
+      padding: 2px;
+      gap: 1px;
+    }
+    .segmented button {
+      flex: 1;
+      padding: 6px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: inherit;
+      border: none;
+      background: transparent;
+      color: var(--tabi-text-secondary);
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .segmented button:hover { color: var(--tabi-text); }
+    .segmented button.active {
+      background: var(--tabi-segmented-active);
+      color: #fff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    }
+
+    /* ── Toggle ────────────────────────────────────────────────── */
+    .toggle {
+      width: 36px; height: 22px;
+      background: var(--tabi-segmented-bg);
+      border-radius: 11px;
+      position: relative;
+      cursor: pointer;
+      transition: background 0.2s;
+      border: none;
+      flex-shrink: 0;
+    }
+    .toggle::after {
+      content: "";
+      position: absolute;
+      top: 3px; left: 3px;
+      width: 16px; height: 16px;
+      background: var(--tabi-text-secondary);
+      border-radius: 50%;
+      transition: all 0.2s;
+    }
+    .toggle.on { background: var(--tabi-emerald); }
+    .toggle.on::after { left: 17px; background: #fff; }
+
+    /* ── Stats Dashboard ───────────────────────────────────────── */
+    .stats-hero {
+      text-align: center;
+      padding: 32px 20px;
+      margin-bottom: 20px;
+    }
+    .stats-hero-number {
+      font-size: 48px;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+      background: linear-gradient(135deg, var(--tabi-accent), #fbbf24);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .stats-hero-label {
+      font-size: 15px;
+      color: var(--tabi-text-secondary);
+      margin-top: 4px;
+      font-weight: 500;
+    }
+    .stats-hero-sub {
+      font-size: 12px;
+      color: var(--tabi-text-tertiary);
+      margin-top: 8px;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background: var(--tabi-surface);
+      border: 1px solid var(--tabi-surface-border);
+      border-radius: 12px;
+      padding: 18px;
+      transition: background 0.15s;
+    }
+    .stat-card:hover { background: var(--tabi-surface-hover); }
+    .stat-icon { font-size: 20px; margin-bottom: 8px; }
+    .stat-number {
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 28px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+      color: var(--tabi-text);
+    }
+    .stat-label { font-size: 12px; color: var(--tabi-text-secondary); margin-top: 2px; font-weight: 500; }
+    .stat-detail {
+      font-size: 11px;
+      color: var(--tabi-text-tertiary);
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px solid var(--tabi-divider);
+    }
+
+    /* Count-up animations */
+    .stat-card:nth-child(1) .stat-number { animation: countHints 1s ease-out forwards; counter-reset: hints var(--stat-hints); }
+    .stat-card:nth-child(1) .stat-number::after { content: counter(hints); }
+    @keyframes countHints { from { --stat-hints: 0; } to { --stat-hints: 2847; } }
+
+    .stat-card:nth-child(2) .stat-number { animation: countTabs 1s ease-out forwards; counter-reset: tabs var(--stat-tabs); }
+    .stat-card:nth-child(2) .stat-number::after { content: counter(tabs); }
+    @keyframes countTabs { from { --stat-tabs: 0; } to { --stat-tabs: 1203; } }
+
+    .stat-card:nth-child(3) .stat-number { animation: countYanks 1s ease-out forwards; counter-reset: yanks var(--stat-yanks); }
+    .stat-card:nth-child(3) .stat-number::after { content: counter(yanks); }
+    @keyframes countYanks { from { --stat-yanks: 0; } to { --stat-yanks: 456; } }
+
+    .stat-card:nth-child(4) .stat-number { animation: countDist 1.2s ease-out forwards; counter-reset: dist var(--stat-distance); }
+    .stat-card:nth-child(4) .stat-number::after { content: counter(dist) " ft"; }
+    @keyframes countDist { from { --stat-distance: 0; } to { --stat-distance: 8420; } }
+
+    .stat-card.accent-border { border-color: var(--tabi-accent-border); }
+    .stat-card.emerald-border { border-color: rgba(16, 185, 129, 0.2); }
+
+    /* ── Mode Hint Color Previews ─────────────────────────────── */
+    .mode-colors {
+      display: flex;
+      gap: 12px;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--tabi-divider);
+    }
+
+    .mode-color-preview {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex: 1;
+    }
+
+    .mode-hint-tag {
+      display: inline-block;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font: bold 11px/1.3 "SF Mono", Menlo, monospace;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .mode-hint-tag.click {
+      background: linear-gradient(to bottom, #fff785, #ffc542);
+      border: 1px solid #c38a22;
+      color: #302505;
+    }
+
+    .mode-hint-tag.yank {
+      background: linear-gradient(to bottom, #a5f3fc, #22d3ee);
+      border: 1px solid #0e7490;
+      color: #083344;
+    }
+
+    .mode-hint-tag.multi {
+      background: linear-gradient(to bottom, #d9f99d, #84cc16);
+      border: 1px solid #4d7c0f;
+      color: #1a2e05;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .mode-hint-tag.click {
+        background: linear-gradient(to bottom, #fff785, #ffc542);
+        color: #302505;
+      }
+      .mode-hint-tag.yank {
+        background: linear-gradient(to bottom, #67e8f9, #06b6d4);
+        border-color: #0891b2;
+        color: #042f2e;
+      }
+      .mode-hint-tag.multi {
+        background: linear-gradient(to bottom, #bef264, #65a30d);
+        border-color: #4d7c0f;
+        color: #1a2e05;
+      }
+    }
+
+    .mode-color-label {
+      font-size: 11px;
+      color: var(--tabi-text-secondary);
+    }
+
+    /* ── Milestone Graph ──────────────────────────────────────── */
+    .milestone-graph {
+      position: relative;
+      padding: 0 0 0 48px;
+    }
+
+    .milestone-track {
+      position: relative;
+      height: 380px;
+      border-left: 2px solid var(--tabi-divider);
+      margin-left: 4px;
+    }
+
+    .milestone-fill {
+      position: absolute;
+      bottom: 0;
+      left: -2px;
+      width: 2px;
+      background: linear-gradient(to top, var(--tabi-emerald), rgba(16, 185, 129, 0.3));
+      border-radius: 2px 2px 0 0;
+      transition: height 1.5s ease-out;
+    }
+
+    .milestone-marker {
+      position: absolute;
+      left: -8px;
+      display: flex;
+      align-items: center;
+      transform: translateY(50%);
+    }
+
+    .milestone-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid var(--tabi-surface-border);
+      background: var(--tabi-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      flex-shrink: 0;
+      z-index: 1;
+    }
+
+    .milestone-marker.reached .milestone-dot {
+      border-color: var(--tabi-emerald);
+      background: var(--tabi-emerald);
+      font-size: 8px;
+    }
+
+    .milestone-marker.current .milestone-dot {
+      border-color: var(--tabi-accent);
+      background: var(--tabi-accent);
+      box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+    }
+
+    .milestone-info {
+      margin-left: 14px;
+      white-space: nowrap;
+    }
+
+    .milestone-emoji {
+      font-size: 18px;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+
+    .milestone-value {
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--tabi-text-secondary);
+    }
+
+    .milestone-marker.reached .milestone-value { color: var(--tabi-emerald); }
+    .milestone-marker.current .milestone-value { color: var(--tabi-accent); }
+
+    .milestone-fact {
+      font-size: 11px;
+      color: var(--tabi-text-tertiary);
+      margin-left: 4px;
+    }
+
+    .milestone-marker.reached .milestone-fact { color: var(--tabi-text-secondary); }
+    .milestone-marker.current .milestone-fact { color: var(--tabi-text-secondary); font-weight: 500; }
+
+    .milestone-you-label {
+      position: absolute;
+      left: 22px;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--tabi-accent);
+      transform: translateY(50%);
+      white-space: nowrap;
+    }
+
+    /* ── Quick Marks ───────────────────────────────────────────── */
+    .marks-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 8px;
+    }
+    .mark-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: var(--tabi-surface);
+      border: 1px solid var(--tabi-surface-border);
+      border-radius: 10px;
+      transition: background 0.15s;
+      cursor: default;
+    }
+    .mark-item:hover { background: var(--tabi-surface-hover); }
+    .mark-key {
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 14px;
+      font-weight: 700;
+      width: 28px; height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--tabi-input-bg);
+      border-radius: 6px;
+      color: var(--tabi-accent);
+      flex-shrink: 0;
+    }
+    .mark-info { flex: 1; min-width: 0; }
+    .mark-title {
+      font-size: 12px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .mark-url {
+      font-size: 10px;
+      color: var(--tabi-text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .mark-delete {
+      opacity: 0;
+      border: none;
+      background: none;
+      color: var(--tabi-danger);
+      cursor: pointer;
+      font-size: 14px;
+      padding: 4px;
+      border-radius: 4px;
+      transition: opacity 0.15s;
+    }
+    .mark-item:hover .mark-delete { opacity: 1; }
+
+    /* Mark add form */
+    .mark-add-form {
+      margin-top: 16px;
+      padding: 16px;
+      background: var(--tabi-surface);
+      border: 1px solid var(--tabi-surface-border);
+      border-radius: 10px;
+    }
+
+    .mark-add-form .card-label { margin-bottom: 10px; }
+
+    .mark-add-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .mark-add-key-input {
+      width: 40px;
+      height: 36px;
+      text-align: center;
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 14px;
+      font-weight: 700;
+      background: var(--tabi-input-bg);
+      border: 1px solid var(--tabi-surface-border);
+      border-radius: 8px;
+      color: var(--tabi-accent);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .mark-add-key-input:focus { border-color: var(--tabi-blue); }
+
+    .mark-add-key-input::placeholder {
+      color: var(--tabi-text-tertiary);
+      font-weight: 400;
+    }
+
+    .mark-add-url-input {
+      flex: 1;
+      height: 36px;
+      padding: 0 12px;
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 12px;
+      background: var(--tabi-input-bg);
+      border: 1px solid var(--tabi-surface-border);
+      border-radius: 8px;
+      color: var(--tabi-text);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .mark-add-url-input:focus { border-color: var(--tabi-blue); }
+    .mark-add-url-input::placeholder { color: var(--tabi-text-tertiary); }
+
+    .mark-add-btn {
+      height: 36px;
+      padding: 0 16px;
+      background: var(--tabi-blue);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+    }
+
+    .mark-add-btn:hover { opacity: 0.85; }
+
+    .mark-add-hint {
+      font-size: 10px;
+      color: var(--tabi-text-tertiary);
+      margin-top: 8px;
+    }
+
+    /* ── Key Layout Selector ───────────────────────────────────── */
+    .layout-selector {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .layout-option {
+      padding: 14px 10px 12px;
+      background: var(--tabi-surface);
+      border: 2px solid var(--tabi-surface-border);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .layout-option:hover { background: var(--tabi-surface-hover); }
+    .layout-option.active { border-color: var(--tabi-blue); background: var(--tabi-blue-dim); }
+
+    .layout-option .layout-name {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .layout-option .layout-desc {
+      font-size: 10px;
+      color: var(--tabi-text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .premium-badge-inline {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--tabi-accent);
+      background: var(--tabi-accent-dim);
+      padding: 2px 6px;
+      border-radius: 4px;
+      vertical-align: middle;
+    }
+
+    /* Mini keyboard in selector cards */
+    .mini-keyboard {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      align-items: center;
+      margin-top: 6px;
+    }
+
+    .mini-row {
+      display: flex;
+      gap: 1px;
+    }
+
+    .mini-key {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      background: var(--tabi-input-bg);
+      border: 0.5px solid var(--tabi-surface-border);
+      font-size: 0;
+    }
+
+    .mini-key.scroll { background: rgba(16, 185, 129, 0.25); border-color: rgba(16, 185, 129, 0.35); }
+    .mini-key.page { background: rgba(56, 189, 248, 0.25); border-color: rgba(56, 189, 248, 0.35); }
+    .mini-key.hint { background: rgba(245, 158, 11, 0.25); border-color: rgba(245, 158, 11, 0.35); }
+    .mini-key.tab { background: rgba(10, 132, 255, 0.25); border-color: rgba(10, 132, 255, 0.35); }
+    .mini-key.action { background: rgba(168, 85, 247, 0.25); border-color: rgba(168, 85, 247, 0.35); }
+    .mini-key.mark { background: rgba(236, 72, 153, 0.25); border-color: rgba(236, 72, 153, 0.35); }
+
+    /* Full keyboard in detail card */
+    .layout-keys { margin-top: 16px; }
+    .key-row { display: flex; gap: 4px; margin-bottom: 4px; justify-content: center; }
+    .key-cap {
+      width: 36px; height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--tabi-input-bg);
+      border: 1px solid var(--tabi-surface-border);
+      border-radius: 6px;
+      font-family: "SF Mono", Menlo, monospace;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--tabi-text-secondary);
+    }
+    .key-cap.scroll { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); color: var(--tabi-emerald); }
+    .key-cap.page { background: rgba(56, 189, 248, 0.1); border-color: rgba(56, 189, 248, 0.2); color: var(--tabi-cyan); }
+    .key-cap.hint { background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.2); color: var(--tabi-accent); }
+    .key-cap.tab { background: rgba(10, 132, 255, 0.1); border-color: rgba(10, 132, 255, 0.2); color: var(--tabi-blue); }
+    .key-cap.action { background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.2); color: var(--tabi-purple); }
+    .key-cap.mark { background: rgba(236, 72, 153, 0.1); border-color: rgba(236, 72, 153, 0.2); color: var(--tabi-pink); }
+
+    .key-legend { display: flex; gap: 16px; justify-content: center; margin-top: 12px; }
+    .key-legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: var(--tabi-text-secondary); }
+    .key-legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .key-legend-dot.scroll { background: var(--tabi-emerald); }
+    .key-legend-dot.page { background: var(--tabi-cyan); }
+    .key-legend-dot.hint { background: var(--tabi-accent); }
+    .key-legend-dot.tab { background: var(--tabi-blue); }
+    .key-legend-dot.action { background: var(--tabi-purple); }
+    .key-legend-dot.mark { background: var(--tabi-pink); }
+
+    /* ── Premium Page ──────────────────────────────────────────── */
+    .premium-header {
+      text-align: center;
+      padding: 24px 0 32px;
+    }
+    .premium-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+    .premium-status.free { background: var(--tabi-segmented-bg); color: var(--tabi-text-secondary); }
+    .premium-status.premium {
+      background: linear-gradient(135deg, var(--tabi-accent-dim), rgba(251, 191, 36, 0.15));
+      border: 1px solid var(--tabi-accent-border);
+      color: var(--tabi-accent);
+    }
+    .premium-tagline {
+      font-size: 14px;
+      color: var(--tabi-text-secondary);
+      max-width: 380px;
+      margin: 0 auto;
+    }
+
+    .feature-list { display: flex; flex-direction: column; gap: 2px; }
+    .feature-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 16px;
+      border-radius: 10px;
+      transition: background 0.15s;
+    }
+    .feature-item:hover { background: var(--tabi-surface); }
+    .feature-icon {
+      font-size: 18px;
+      width: 36px; height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--tabi-surface);
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+    .feature-info { flex: 1; }
+    .feature-name { font-size: 13px; font-weight: 600; }
+    .feature-desc { font-size: 11px; color: var(--tabi-text-secondary); margin-top: 1px; }
+    .feature-badge {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 3px 8px;
+      border-radius: 5px;
+    }
+    .feature-badge.free { background: var(--tabi-emerald-dim); color: var(--tabi-emerald); }
+    .feature-badge.premium { background: var(--tabi-accent-dim); color: var(--tabi-accent); }
+
+    .upgrade-cta {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      margin-top: 24px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #f59e0b, #fbbf24);
+      color: #1a1a1e;
+      font-size: 15px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+      letter-spacing: -0.01em;
+    }
+    .upgrade-cta:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(245, 158, 11, 0.3); }
+    .upgrade-cta:active { transform: translateY(0); }
+
+    /* ── Notification Toast Preview ────────────────────────────── */
+    .notification-preview { position: relative; margin-top: 16px; }
+    .notification-toast {
+      background: var(--tabi-surface);
+      border: 1px solid var(--tabi-accent-border);
+      border-radius: 12px;
+      padding: 14px 18px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      max-width: 360px;
+      margin-left: auto;
+    }
+    .notification-toast-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--tabi-accent);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      margin-bottom: 6px;
+    }
+    .notification-toast-stats { font-size: 12px; color: var(--tabi-text); line-height: 1.6; }
+    .notification-toast-fun { font-size: 11px; color: var(--tabi-text-secondary); margin-top: 6px; font-style: italic; }
+    .notification-label { font-size: 11px; color: var(--tabi-text-tertiary); text-align: right; margin-top: 6px; }
+
+    /* ── Utility ───────────────────────────────────────────────── */
+    .mb-8 { margin-bottom: 8px; }
+    .mb-16 { margin-bottom: 16px; }
+    .text-secondary { color: var(--tabi-text-secondary); }
+    .text-sm { font-size: 11px; }
+
+    kbd {
+      font-family: "SF Mono", Menlo, monospace;
+      background: var(--tabi-input-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- ── Sidebar ──────────────────────────────────────────── -->
+    <nav class="sidebar">
+      <div class="sidebar-brand">tabi</div>
+      <div class="sidebar-nav">
+        <button class="sidebar-item active" data-page="settings">
+          <span class="icon">⚙</span> Settings
+        </button>
+        <button class="sidebar-item" data-page="statistics">
+          <span class="icon">📊</span> Statistics
+        </button>
+        <button class="sidebar-item" data-page="marks">
+          <span class="icon">📌</span> Quick Marks
+        </button>
+        <button class="sidebar-item" data-page="layouts">
+          <span class="icon">⌨</span> Key Layouts
+        </button>
+      </div>
+      <div class="sidebar-spacer"></div>
+      <button class="sidebar-item premium-nav" data-page="premium">
+        <span class="icon">✦</span> Premium
+      </button>
+    </nav>
+
+    <!-- ── Main Content ─────────────────────────────────────── -->
+    <main class="main">
+
+      <!-- ════════════════════════════════════════════════════════
+           SETTINGS PAGE
+           ════════════════════════════════════════════════════════ -->
+      <div class="page active" id="page-settings">
+        <h1 class="page-title">Settings</h1>
+
+        <div class="card">
+          <div class="card-label">Appearance</div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-name">Tag Style</div>
+              <div class="setting-desc">How hint labels look on the page</div>
+            </div>
+            <div class="segmented">
+              <button class="active">Auto</button>
+              <button>Dark</button>
+              <button>Light</button>
+              <button>Classic</button>
+            </div>
+          </div>
+          <div class="mode-colors">
+            <div class="mode-color-preview">
+              <span class="mode-hint-tag click">ab</span>
+              <span class="mode-color-label">Click</span>
+            </div>
+            <div class="mode-color-preview">
+              <span class="mode-hint-tag yank">ab</span>
+              <span class="mode-color-label">Yank</span>
+            </div>
+            <div class="mode-color-preview">
+              <span class="mode-hint-tag multi">ab</span>
+              <span class="mode-color-label">Multi</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-label">Notifications</div>
+          <div class="setting-row">
+            <div class="setting-info">
+              <div class="setting-name">Weekly Stats Summary</div>
+              <div class="setting-desc">Show a brief stats toast once per week</div>
+            </div>
+            <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════
+           STATISTICS PAGE
+           ════════════════════════════════════════════════════════ -->
+      <div class="page" id="page-statistics">
+        <h1 class="page-title">Statistics</h1>
+
+        <div class="card stats-hero">
+          <div class="stats-hero-number">4.2 hrs</div>
+          <div class="stats-hero-label">saved by keeping your hands on the keyboard</div>
+          <div class="stats-hero-sub">Based on 1.3 seconds saved per hint click and tab search</div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat-card accent-border">
+            <div class="stat-icon">🎯</div>
+            <div class="stat-number"></div>
+            <div class="stat-label">Hints Clicked</div>
+            <div class="stat-detail">~62 min saved reaching for the mouse</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">🔍</div>
+            <div class="stat-number"></div>
+            <div class="stat-label">Tabs Found</div>
+            <div class="stat-detail">~26 min saved cycling through tabs</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon">📋</div>
+            <div class="stat-number"></div>
+            <div class="stat-label">Links Yanked</div>
+            <div class="stat-detail">No more right-click → Copy Link</div>
+          </div>
+          <div class="stat-card emerald-border">
+            <div class="stat-icon">🖱</div>
+            <div class="stat-number"></div>
+            <div class="stat-label">Mouse Distance Saved</div>
+            <div class="stat-detail">That's about 14 trips to the fridge 🧊</div>
+          </div>
+        </div>
+
+        <!-- ── Distance Milestones ─────────────────────────────── -->
+        <div class="card">
+          <div class="card-label">Distance Milestones</div>
+          <div class="milestone-graph">
+            <div class="milestone-track">
+              <!-- Green fill bar — current progress (8,420 ft out of max ~30,000) -->
+              <div class="milestone-fill" style="height: 56%"></div>
+
+              <!-- Milestones (bottom = 0, top = max) -->
+              <!-- 6 ft — Fridge -->
+              <div class="milestone-marker reached" style="bottom: 0%">
+                <div class="milestone-dot">✓</div>
+                <div class="milestone-info">
+                  <span class="milestone-emoji">🧊</span>
+                  <span class="milestone-value">6 ft</span>
+                  <span class="milestone-fact">— 1 trip to the fridge</span>
+                </div>
+              </div>
+
+              <!-- 100 ft — Blue whale -->
+              <div class="milestone-marker reached" style="bottom: 3%">
+                <div class="milestone-dot">✓</div>
+                <div class="milestone-info">
+                  <span class="milestone-emoji">🐋</span>
+                  <span class="milestone-value">100 ft</span>
+                  <span class="milestone-fact">— Length of a blue whale</span>
+                </div>
+              </div>
+
+              <!-- 300 ft — Football field -->
+              <div class="milestone-marker reached" style="bottom: 8%">
+                <div class="milestone-dot">✓</div>
+                <div class="milestone-info">
+                  <span class="milestone-emoji">🏈</span>
+                  <span class="milestone-value">300 ft</span>
+                  <span class="milestone-fact">— 1 football field</span>
+                </div>
+              </div>
+
+              <!-- 1,063 ft — Eiffel Tower -->
+              <div class="milestone-marker reached" style="bottom: 18%">
+                <div class="milestone-dot">✓</div>
+                <div class="milestone-info">
+                  <span class="milestone-emoji">🗼</span>
+                  <span class="milestone-value">1,063 ft</span>
+                  <span class="milestone-fact">— Height of the Eiffel Tower</span>
+                </div>
+              </div>
+
+              <!-- 2,717 ft — Burj Khalifa -->
+              <div class="milestone-marker reached" style="bottom: 30%">
+                <div class="milestone-dot">✓</div>
+                <div class="milestone-info">
+                  <span class="milestone-emoji">🏙</span>
+                  <span class="milestone-value">2,717 ft</span>
+                  <span class="milestone-fact">— Height of Burj Khalifa</span>
+                </div>
+              </div>
+
+              <!-- ★ YOU ARE HERE — 8,420 ft -->
+              <div class="milestone-marker current" style="bottom: 56%">
+                <div class="milestone-dot">★</div>
+                <div class="milestone-info">
+                  <span class="milestone-emoji">📍</span>
+                  <span class="milestone-value">8,420 ft</span>
+                  <span class="milestone-fact">— You are here!</span>
+                </div>
+              </div>
+
+              <!-- 29,032 ft — Mt Everest -->
+              <div class="milestone-marker" style="bottom: 72%">
+                <div class="milestone-dot"></div>
+                <div class="milestone-info">
+                  <span class="milestone-emoji">🏔</span>
+                  <span class="milestone-value">29,032 ft</span>
+                  <span class="milestone-fact">— Summit of Mt Everest</span>
+                </div>
+              </div>
+
+              <!-- 35,000 ft — Cruising altitude -->
+              <div class="milestone-marker" style="bottom: 82%">
+                <div class="milestone-dot"></div>
+                <div class="milestone-info">
+                  <span class="milestone-emoji">✈️</span>
+                  <span class="milestone-value">35,000 ft</span>
+                  <span class="milestone-fact">— Cruising altitude</span>
+                </div>
+              </div>
+
+              <!-- 137,500 ft — Marathon distance -->
+              <div class="milestone-marker" style="bottom: 92%">
+                <div class="milestone-dot"></div>
+                <div class="milestone-info">
+                  <span class="milestone-emoji">🏃</span>
+                  <span class="milestone-value">137,500 ft</span>
+                  <span class="milestone-fact">— A marathon</span>
+                </div>
+              </div>
+
+              <!-- 330,000 ft — Edge of space -->
+              <div class="milestone-marker" style="bottom: 100%">
+                <div class="milestone-dot"></div>
+                <div class="milestone-info">
+                  <span class="milestone-emoji">🧑‍🚀</span>
+                  <span class="milestone-value">330,000 ft</span>
+                  <span class="milestone-fact">— Edge of space (Kármán line)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Notification Preview ───────────────────────────── -->
+        <div class="card">
+          <div class="card-label">Weekly Notification Preview</div>
+          <div class="setting-row mb-8">
+            <div class="setting-info">
+              <div class="setting-name">Show weekly notification</div>
+              <div class="setting-desc">Brief stats toast appears once per 7 days</div>
+            </div>
+            <button class="toggle on" onclick="this.classList.toggle('on')"></button>
+          </div>
+          <div class="notification-preview">
+            <div class="notification-toast">
+              <div class="notification-toast-title">✦ This Week with Tabi</div>
+              <div class="notification-toast-stats">
+                <strong>142</strong> hints &nbsp;·&nbsp; <strong>38</strong> tabs &nbsp;·&nbsp; <strong>12</strong> yanks
+              </div>
+              <div class="notification-toast-fun">Your hand traveled 0 feet to the mouse. That's 0 trips to the fridge.</div>
+            </div>
+            <div class="notification-label">↑ Appears bottom-right, auto-dismisses after 8s</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════
+           QUICK MARKS PAGE
+           ════════════════════════════════════════════════════════ -->
+      <div class="page" id="page-marks">
+        <h1 class="page-title">Quick Marks</h1>
+        <p class="text-secondary text-sm mb-16">Press <kbd>m</kbd> + letter to set a mark on any page. Press <kbd>'</kbd> + letter to jump. Or add marks manually below.</p>
+
+        <div class="marks-grid">
+          <div class="mark-item">
+            <div class="mark-key">a</div>
+            <div class="mark-info">
+              <div class="mark-title">GitHub Dashboard</div>
+              <div class="mark-url">github.com</div>
+            </div>
+            <button class="mark-delete">✕</button>
+          </div>
+          <div class="mark-item">
+            <div class="mark-key">g</div>
+            <div class="mark-info">
+              <div class="mark-title">Gmail Inbox</div>
+              <div class="mark-url">mail.google.com/mail/u/0/#inbox</div>
+            </div>
+            <button class="mark-delete">✕</button>
+          </div>
+          <div class="mark-item">
+            <div class="mark-key">h</div>
+            <div class="mark-info">
+              <div class="mark-title">Hacker News</div>
+              <div class="mark-url">news.ycombinator.com</div>
+            </div>
+            <button class="mark-delete">✕</button>
+          </div>
+          <div class="mark-item">
+            <div class="mark-key">t</div>
+            <div class="mark-info">
+              <div class="mark-title">Twitter / X</div>
+              <div class="mark-url">x.com/home</div>
+            </div>
+            <button class="mark-delete">✕</button>
+          </div>
+          <div class="mark-item">
+            <div class="mark-key">y</div>
+            <div class="mark-info">
+              <div class="mark-title">YouTube</div>
+              <div class="mark-url">youtube.com</div>
+            </div>
+            <button class="mark-delete">✕</button>
+          </div>
+          <div class="mark-item">
+            <div class="mark-key">c</div>
+            <div class="mark-info">
+              <div class="mark-title" style="color: var(--tabi-text-tertiary);">Empty</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add mark form -->
+        <div class="mark-add-form">
+          <div class="card-label">Add a Mark</div>
+          <div class="mark-add-row">
+            <input class="mark-add-key-input" type="text" maxlength="1" placeholder="k">
+            <input class="mark-add-url-input" type="text" placeholder="https://example.com">
+            <button class="mark-add-btn">Add Mark</button>
+          </div>
+          <div class="mark-add-hint">Single letter key (a–z). URL will be fetched for the page title.</div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════
+           KEY LAYOUTS PAGE
+           ════════════════════════════════════════════════════════ -->
+      <div class="page" id="page-layouts">
+        <h1 class="page-title">Key Layouts</h1>
+        <p class="text-secondary text-sm mb-16">Choose how commands map to your keyboard. Non-vim layouts are optimized for home-row access.</p>
+
+        <div class="layout-selector">
+          <!-- Vim -->
+          <div class="layout-option" data-layout="vim">
+            <div class="layout-name">Vim</div>
+            <div class="layout-desc">Classic hjkl</div>
+            <div class="mini-keyboard">
+              <div class="mini-row">
+                <div class="mini-key"></div><div class="mini-key"></div><div class="mini-key"></div><div class="mini-key"></div>
+                <div class="mini-key tab"></div><div class="mini-key action"></div>
+                <div class="mini-key page"></div><div class="mini-key"></div><div class="mini-key"></div><div class="mini-key"></div>
+              </div>
+              <div class="mini-row">
+                <div class="mini-key"></div><div class="mini-key"></div><div class="mini-key page"></div><div class="mini-key hint"></div>
+                <div class="mini-key page"></div><div class="mini-key scroll"></div><div class="mini-key scroll"></div><div class="mini-key scroll"></div>
+                <div class="mini-key scroll"></div><div class="mini-key"></div>
+              </div>
+              <div class="mini-row">
+                <div class="mini-key"></div><div class="mini-key tab"></div><div class="mini-key"></div><div class="mini-key"></div>
+                <div class="mini-key"></div><div class="mini-key"></div><div class="mini-key mark"></div><div class="mini-key mark"></div>
+                <div class="mini-key"></div><div class="mini-key action"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Optimized (two-handed) -->
+          <div class="layout-option active" data-layout="optimized">
+            <div class="layout-name">Optimized</div>
+            <div class="layout-desc">Home row, both hands</div>
+            <div class="mini-keyboard">
+              <div class="mini-row">
+                <div class="mini-key tab"></div><div class="mini-key scroll"></div><div class="mini-key scroll"></div><div class="mini-key tab"></div>
+                <div class="mini-key"></div><div class="mini-key"></div>
+                <div class="mini-key action"></div><div class="mini-key scroll"></div><div class="mini-key scroll"></div><div class="mini-key action"></div>
+              </div>
+              <div class="mini-row">
+                <div class="mini-key mark"></div><div class="mini-key scroll"></div><div class="mini-key scroll"></div><div class="mini-key hint"></div>
+                <div class="mini-key"></div><div class="mini-key"></div>
+                <div class="mini-key hint"></div><div class="mini-key scroll"></div><div class="mini-key scroll"></div><div class="mini-key mark"></div>
+              </div>
+              <div class="mini-row">
+                <div class="mini-key"></div><div class="mini-key action"></div><div class="mini-key action"></div><div class="mini-key"></div>
+                <div class="mini-key"></div><div class="mini-key"></div>
+                <div class="mini-key"></div><div class="mini-key tab"></div><div class="mini-key tab"></div><div class="mini-key"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Left hand -->
+          <div class="layout-option" data-layout="lefthand">
+            <div class="layout-name">Left Hand</div>
+            <div class="layout-desc">Right on mouse</div>
+            <span class="premium-badge-inline">✦ Pro</span>
+            <div class="mini-keyboard">
+              <div class="mini-row">
+                <div class="mini-key tab"></div><div class="mini-key scroll"></div><div class="mini-key scroll"></div><div class="mini-key tab"></div>
+                <div class="mini-key action"></div><div class="mini-key"></div>
+                <div class="mini-key"></div><div class="mini-key"></div><div class="mini-key"></div><div class="mini-key"></div>
+              </div>
+              <div class="mini-row">
+                <div class="mini-key mark"></div><div class="mini-key scroll"></div><div class="mini-key scroll"></div><div class="mini-key hint"></div>
+                <div class="mini-key hint"></div><div class="mini-key"></div>
+                <div class="mini-key"></div><div class="mini-key"></div><div class="mini-key"></div><div class="mini-key"></div>
+              </div>
+              <div class="mini-row">
+                <div class="mini-key"></div><div class="mini-key action"></div><div class="mini-key action"></div><div class="mini-key mark"></div>
+                <div class="mini-key"></div><div class="mini-key"></div>
+                <div class="mini-key"></div><div class="mini-key"></div><div class="mini-key"></div><div class="mini-key"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right hand -->
+          <div class="layout-option" data-layout="righthand">
+            <div class="layout-name">Right Hand</div>
+            <div class="layout-desc">Left on mouse</div>
+            <span class="premium-badge-inline">✦ Pro</span>
+            <div class="mini-keyboard">
+              <div class="mini-row">
+                <div class="mini-key"></div><div class="mini-key"></div><div class="mini-key"></div><div class="mini-key"></div>
+                <div class="mini-key"></div><div class="mini-key action"></div>
+                <div class="mini-key tab"></div><div class="mini-key scroll"></div><div class="mini-key scroll"></div><div class="mini-key tab"></div>
+              </div>
+              <div class="mini-row">
+                <div class="mini-key"></div><div class="mini-key"></div><div class="mini-key"></div><div class="mini-key"></div>
+                <div class="mini-key"></div><div class="mini-key hint"></div>
+                <div class="mini-key hint"></div><div class="mini-key scroll"></div><div class="mini-key scroll"></div><div class="mini-key mark"></div>
+              </div>
+              <div class="mini-row">
+                <div class="mini-key"></div><div class="mini-key"></div><div class="mini-key"></div><div class="mini-key"></div>
+                <div class="mini-key"></div><div class="mini-key"></div>
+                <div class="mini-key mark"></div><div class="mini-key action"></div><div class="mini-key action"></div><div class="mini-key"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Keyboard mode indicator -->
+        <div class="card" style="padding: 14px 20px;">
+          <div style="display: flex; align-items: center; justify-content: space-between;">
+            <div>
+              <div class="setting-name">Showing keys for: <strong id="layout-mode-label">Position mode</strong></div>
+              <div class="setting-desc" id="layout-mode-desc">Physical key positions (QWERTY layout). Actual labels adapt to your keyboard in Character mode.</div>
+            </div>
+            <div class="segmented" id="layout-mode-toggle" style="flex-shrink: 0; margin-left: 16px;">
+              <button>Character</button>
+              <button class="active">Position</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Full keyboard detail (shows for selected layout) -->
+        <div class="card" id="layout-detail">
+          <div class="card-label" id="layout-detail-label">Optimized Layout — Home Row</div>
+          <div class="layout-keys" id="layout-keys-position">
+            <div class="key-row">
+              <div class="key-cap">q</div>
+              <div class="key-cap">w</div>
+              <div class="key-cap">e</div>
+              <div class="key-cap">r</div>
+              <div class="key-cap tab">t</div>
+              <div class="key-cap action">y</div>
+              <div class="key-cap page">u</div>
+              <div class="key-cap">i</div>
+              <div class="key-cap">o</div>
+              <div class="key-cap">p</div>
+            </div>
+            <div class="key-row">
+              <div class="key-cap">a</div>
+              <div class="key-cap">s</div>
+              <div class="key-cap page">d</div>
+              <div class="key-cap hint">f</div>
+              <div class="key-cap page">g</div>
+              <div class="key-cap scroll">h</div>
+              <div class="key-cap scroll">j</div>
+              <div class="key-cap scroll">k</div>
+              <div class="key-cap scroll">l</div>
+              <div class="key-cap">;</div>
+            </div>
+            <div class="key-row">
+              <div class="key-cap">z</div>
+              <div class="key-cap tab">x</div>
+              <div class="key-cap">c</div>
+              <div class="key-cap">v</div>
+              <div class="key-cap">b</div>
+              <div class="key-cap">n</div>
+              <div class="key-cap mark">m</div>
+              <div class="key-cap mark">'</div>
+              <div class="key-cap">.</div>
+              <div class="key-cap action">?</div>
+            </div>
+          </div>
+          <!-- Dvorak example (shown in Character mode) -->
+          <div class="layout-keys" id="layout-keys-character" style="display: none;">
+            <div class="key-row">
+              <div class="key-cap">;</div>
+              <div class="key-cap">,</div>
+              <div class="key-cap">.</div>
+              <div class="key-cap">p</div>
+              <div class="key-cap tab">y</div>
+              <div class="key-cap action">f</div>
+              <div class="key-cap page">g</div>
+              <div class="key-cap">c</div>
+              <div class="key-cap">r</div>
+              <div class="key-cap">l</div>
+            </div>
+            <div class="key-row">
+              <div class="key-cap">a</div>
+              <div class="key-cap">o</div>
+              <div class="key-cap page">e</div>
+              <div class="key-cap hint">u</div>
+              <div class="key-cap page">i</div>
+              <div class="key-cap scroll">d</div>
+              <div class="key-cap scroll">h</div>
+              <div class="key-cap scroll">t</div>
+              <div class="key-cap scroll">n</div>
+              <div class="key-cap">s</div>
+            </div>
+            <div class="key-row">
+              <div class="key-cap">'</div>
+              <div class="key-cap tab">q</div>
+              <div class="key-cap">j</div>
+              <div class="key-cap">k</div>
+              <div class="key-cap">x</div>
+              <div class="key-cap">b</div>
+              <div class="key-cap mark">m</div>
+              <div class="key-cap mark">w</div>
+              <div class="key-cap">v</div>
+              <div class="key-cap action">z</div>
+            </div>
+          </div>
+          <div class="key-legend">
+            <div class="key-legend-item"><div class="key-legend-dot hint"></div> Hints</div>
+            <div class="key-legend-item"><div class="key-legend-dot scroll"></div> Scroll</div>
+            <div class="key-legend-item"><div class="key-legend-dot page"></div> Page</div>
+            <div class="key-legend-item"><div class="key-legend-dot tab"></div> Tabs</div>
+            <div class="key-legend-item"><div class="key-legend-dot action"></div> Actions</div>
+            <div class="key-legend-item"><div class="key-legend-dot mark"></div> Marks</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════════
+           PREMIUM PAGE
+           ════════════════════════════════════════════════════════ -->
+      <div class="page" id="page-premium">
+        <h1 class="page-title">Premium</h1>
+
+        <div class="premium-header">
+          <div class="premium-status free">Free Plan</div>
+          <p class="premium-tagline">Unlock the full keyboard-driven browsing experience with Tabi Premium.</p>
+        </div>
+
+        <div class="card">
+          <div class="card-label">What's Included</div>
+          <div class="feature-list">
+            <div class="feature-item">
+              <div class="feature-icon">🎯</div>
+              <div class="feature-info">
+                <div class="feature-name">Hint Mode</div>
+                <div class="feature-desc">Click any link or button with keyboard hints</div>
+              </div>
+              <span class="feature-badge free">Free</span>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">📜</div>
+              <div class="feature-info">
+                <div class="feature-name">Scroll Navigation</div>
+                <div class="feature-desc">Smooth scrolling with hjkl / arrow keys</div>
+              </div>
+              <span class="feature-badge free">Free</span>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">🔄</div>
+              <div class="feature-info">
+                <div class="feature-name">Tab Switching</div>
+                <div class="feature-desc">Next/previous tab with keyboard shortcuts</div>
+              </div>
+              <span class="feature-badge free">Free</span>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">❓</div>
+              <div class="feature-info">
+                <div class="feature-name">Help Overlay</div>
+                <div class="feature-desc">Quick reference for all keybindings</div>
+              </div>
+              <span class="feature-badge free">Free</span>
+            </div>
+            <div class="feature-item" style="margin-top: 8px; padding-top: 12px; border-top: 1px solid var(--tabi-divider);">
+              <div class="feature-icon">🔍</div>
+              <div class="feature-info">
+                <div class="feature-name">Fuzzy Tab Search</div>
+                <div class="feature-desc">Find any tab instantly with fuzzy matching</div>
+              </div>
+              <span class="feature-badge premium">✦ Premium</span>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">📋</div>
+              <div class="feature-info">
+                <div class="feature-name">Yank Mode</div>
+                <div class="feature-desc">Copy any link URL to clipboard with one keystroke</div>
+              </div>
+              <span class="feature-badge premium">✦ Premium</span>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">📌</div>
+              <div class="feature-info">
+                <div class="feature-name">Quick Marks</div>
+                <div class="feature-desc">Bookmark pages with single-key shortcuts</div>
+              </div>
+              <span class="feature-badge premium">✦ Premium</span>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">⌨</div>
+              <div class="feature-info">
+                <div class="feature-name">Optimized Layout</div>
+                <div class="feature-desc">Home row, both hands — the recommended default</div>
+              </div>
+              <span class="feature-badge free">Free</span>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">🤚</div>
+              <div class="feature-info">
+                <div class="feature-name">One-handed Layouts</div>
+                <div class="feature-desc">Left-hand or right-hand layouts for mouse users</div>
+              </div>
+              <span class="feature-badge premium">✦ Premium</span>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">📊</div>
+              <div class="feature-info">
+                <div class="feature-name">Statistics Dashboard</div>
+                <div class="feature-desc">Track hints clicked, time saved, and fun milestones</div>
+              </div>
+              <span class="feature-badge premium">✦ Premium</span>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">🚀</div>
+              <div class="feature-info">
+                <div class="feature-name">Multi-Open</div>
+                <div class="feature-desc">Open multiple links at once with Shift+F</div>
+              </div>
+              <span class="feature-badge premium">✦ Premium</span>
+            </div>
+          </div>
+        </div>
+
+        <button class="upgrade-cta">Upgrade to Tabi Premium</button>
+        <p class="text-secondary text-sm" style="text-align: center; margin-top: 8px;">One-time purchase via the App Store</p>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    // Sidebar navigation
+    document.querySelectorAll('.sidebar-item[data-page]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById('page-' + btn.dataset.page).classList.add('active');
+      });
+    });
+
+    // Segmented controls
+    document.querySelectorAll('.segmented').forEach(seg => {
+      seg.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          seg.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        });
+      });
+    });
+
+    // Layout selector
+    document.querySelectorAll('.layout-option').forEach(opt => {
+      opt.addEventListener('click', () => {
+        document.querySelectorAll('.layout-option').forEach(o => o.classList.remove('active'));
+        opt.classList.add('active');
+        const name = opt.querySelector('.layout-name').textContent;
+        const detailLabel = document.getElementById('layout-detail-label');
+        if (detailLabel) detailLabel.textContent = name + ' Layout — Home Row';
+      });
+    });
+
+    // Layout mode toggle (Position ↔ Character)
+    const layoutModeToggle = document.getElementById('layout-mode-toggle');
+    if (layoutModeToggle) {
+      layoutModeToggle.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          layoutModeToggle.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          const isCharacter = btn.textContent === 'Character';
+          document.getElementById('layout-keys-position').style.display = isCharacter ? 'none' : 'block';
+          document.getElementById('layout-keys-character').style.display = isCharacter ? 'block' : 'none';
+          document.getElementById('layout-mode-label').textContent = isCharacter ? 'Character mode (Dvorak)' : 'Position mode';
+          document.getElementById('layout-mode-desc').textContent = isCharacter
+            ? 'Key labels reflect your detected keyboard layout (Dvorak). Commands stay on the same physical keys.'
+            : 'Physical key positions (QWERTY layout). Actual labels adapt to your keyboard in Character mode.';
+        });
+      });
+    }
+  </script>
+</body>
+</html>

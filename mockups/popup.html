@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width">
+  <meta name="color-scheme" content="light dark">
+  <title>Tabi Popup — Refreshed</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+      font-size: 13px;
+      color: #333;
+      background: #fff;
+      min-width: 290px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      body { background: #1e1e22; color: #e0e0e0; }
+      hr { border-color: rgba(255, 255, 255, 0.08); }
+      .segmented { background: rgba(255, 255, 255, 0.06); }
+      .segmented button { background: transparent; border: none; color: rgba(255, 255, 255, 0.5); }
+      .segmented button:hover { color: #e0e0e0; }
+      .segmented button.active { background: #0a84ff; color: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3); }
+      .hint-text { color: rgba(255, 255, 255, 0.4); }
+      .settings-link { color: rgba(255, 255, 255, 0.4); }
+      .settings-link:hover { color: rgba(255, 255, 255, 0.7); }
+      .premium-pill.free { background: rgba(255, 255, 255, 0.06); color: rgba(255, 255, 255, 0.4); }
+      .premium-pill.premium { background: rgba(245, 158, 11, 0.12); border-color: rgba(245, 158, 11, 0.25); color: #f59e0b; }
+      .footer { border-color: rgba(255, 255, 255, 0.06); }
+    }
+
+    .popup { padding: 20px; }
+
+    /* ── Header ────────────────────────────────────────────── */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+
+    .premium-pill {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 3px 10px;
+      border-radius: 10px;
+      border: 1px solid transparent;
+    }
+
+    .premium-pill.free {
+      background: #f0f0f0;
+      color: #999;
+    }
+
+    .premium-pill.premium {
+      background: rgba(245, 158, 11, 0.1);
+      border-color: rgba(245, 158, 11, 0.25);
+      color: #d97706;
+    }
+
+    /* ── Settings ──────────────────────────────────────────── */
+    .setting { margin-bottom: 14px; }
+
+    .setting-label {
+      display: block;
+      font-weight: 500;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .segmented {
+      display: flex;
+      background: #f0f0f0;
+      border-radius: 8px;
+      padding: 2px;
+      gap: 1px;
+    }
+
+    .segmented button {
+      flex: 1;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: inherit;
+      border: none;
+      background: transparent;
+      color: #888;
+      cursor: pointer;
+      border-radius: 6px;
+      transition: all 0.15s;
+    }
+
+    .segmented button:hover { color: #333; }
+
+    .segmented button.active {
+      background: #007aff;
+      color: #fff;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+    }
+
+    .hint-text {
+      margin-top: 6px;
+      font-size: 11px;
+      color: #999;
+      line-height: 1.5;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid #e8e8e8;
+      margin: 14px 0;
+    }
+
+    /* ── Footer ────────────────────────────────────────────── */
+    .footer {
+      display: flex;
+      justify-content: center;
+      padding-top: 14px;
+      margin-top: 4px;
+      border-top: 1px solid #e8e8e8;
+    }
+
+    .settings-link {
+      font-size: 12px;
+      color: #999;
+      text-decoration: none;
+      cursor: pointer;
+      transition: color 0.15s;
+      font-weight: 500;
+    }
+
+    .settings-link:hover { color: #666; }
+  </style>
+</head>
+<body>
+  <div class="popup">
+    <div class="header">
+      <h1>tabi</h1>
+      <span class="premium-pill free">Free</span>
+      <!-- Toggle to see premium state: -->
+      <!-- <span class="premium-pill premium">✦ Premium</span> -->
+    </div>
+
+    <div class="setting">
+      <label class="setting-label">Key Binding Mode</label>
+      <div class="segmented">
+        <button data-value="character">Character</button>
+        <button data-value="location" class="active">Position</button>
+      </div>
+      <p class="hint-text">Character matches what you type.<br>Position matches physical key location for non-QWERTY.</p>
+    </div>
+
+    <hr>
+
+    <div class="setting">
+      <label class="setting-label">Tag Style</label>
+      <div class="segmented">
+        <button data-value="auto" class="active">Auto</button>
+        <button data-value="dark">Dark</button>
+        <button data-value="light">Light</button>
+        <button data-value="classic">Classic</button>
+      </div>
+      <p class="hint-text">Auto contrasts with the page background. Classic is yellow!</p>
+    </div>
+
+    <div class="footer">
+      <a class="settings-link" href="#">Open Full Settings ↗</a>
+    </div>
+  </div>
+
+  <script>
+    // Toggle premium pill on click for demo
+    document.querySelector('.premium-pill').addEventListener('click', function() {
+      this.classList.toggle('free');
+      this.classList.toggle('premium');
+      this.textContent = this.classList.contains('premium') ? '✦ Premium' : 'Free';
+    });
+
+    // Segmented controls
+    document.querySelectorAll('.segmented').forEach(seg => {
+      seg.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          seg.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        });
+      });
+    });
+  </script>
+</body>
+</html>
