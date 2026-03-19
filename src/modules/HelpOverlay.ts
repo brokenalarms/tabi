@@ -3,6 +3,7 @@
 // Dismissed on any keypress or mouse click.
 
 import { COMMANDS } from "../commands";
+import { removeOverlay } from "./overlayUtils";
 
 interface KeyHandlerLike {
   on(command: string, callback: () => void): void;
@@ -131,9 +132,7 @@ export class HelpOverlay {
     this._active = false;
     document.removeEventListener("keydown", this._onKeyDown, true);
     document.removeEventListener("mousedown", this._onMouseDown, true);
-    if (this._overlay && this._overlay.parentNode) {
-      this._overlay.parentNode.removeChild(this._overlay);
-    }
+    if (this._overlay) removeOverlay(this._overlay);
     this._overlay = null;
   }
 
