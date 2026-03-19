@@ -89,7 +89,7 @@ test("verify hints on live URL", async ({ page }) => {
       if (hm.isActive()) hm.deactivate();
       kh.setMode(Mode.NORMAL);
     });
-    hm.activate(false);
+    hm.activate();
 
     const hints = Array.from(document.querySelectorAll(".tabi-hint")) as HTMLElement[];
     const hintData = hints.map((h) => {

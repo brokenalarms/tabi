@@ -22,7 +22,7 @@ describe("element discovery", () => {
         const hidden = makeElement("A", { href: "#", display: "none", top: 10, left: 0 });
         loadModules([hidden]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         // No visible elements → deactivates
         assert.ok(!hintMode.isActive());
     });
@@ -32,7 +32,7 @@ describe("element discovery", () => {
         const zeroSize = makeElement("A", { href: "#", width: 0, height: 0, top: 10, left: 0 });
         loadModules([zeroSize]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive());
     });
 
@@ -43,7 +43,7 @@ describe("element discovery", () => {
         const anchor = makeElement("A", { href: "#", width: 0, height: 0, top: 0, left: 0, children: [child] });
         loadModules([anchor]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
     });
 
@@ -55,12 +55,12 @@ describe("element discovery", () => {
         const { hintMode } = getState();
 
         // Without [for] — bare label is not interactive
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "label without [for] should not get a hint");
 
         // With [for] — label becomes clickable
         (label as any).htmlFor = "menu-toggle";
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive(), "label[for] should be discovered as clickable");
         fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
         assert.ok(!hintMode.isActive());
@@ -80,7 +80,7 @@ describe("element discovery", () => {
 
         loadModules([btn]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "Button inside inert subtree should be filtered");
     });
 
@@ -93,7 +93,7 @@ describe("element discovery", () => {
         });
         loadModules([btn]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "Element with aria-hidden=true should be filtered");
     });
 
@@ -108,7 +108,7 @@ describe("element discovery", () => {
 
         loadModules([btn]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "Element inside aria-hidden ancestor should be filtered");
     });
 
@@ -117,7 +117,7 @@ describe("element discovery", () => {
         const btn = makeElement("BUTTON", { top: 10, left: 10, hidden: true });
         loadModules([btn]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "Hidden element should be filtered");
     });
 
@@ -129,7 +129,7 @@ describe("element discovery", () => {
         loadModules([wrapperAlone]);
         (globalThis as any).document.elementsFromPoint = () => [wrapperAlone];
         const { hintMode: base } = getState();
-        base.activate(false);
+        base.activate();
         assert.ok(base.isActive(), "onclick wrapper alone should get a hint");
         base.destroy();
 
@@ -149,7 +149,7 @@ describe("element discovery", () => {
         };
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
         // Only 1 hint (textarea), not 2 (wrapper filtered out)
         fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
@@ -188,7 +188,7 @@ describe("visibility edge cases", () => {
         };
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive(), "Opacity:0 radio with visible label should get a hint");
     });
 
@@ -215,7 +215,7 @@ describe("visibility edge cases", () => {
         };
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive(), "Should produce a hint");
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
@@ -249,7 +249,7 @@ describe("visibility edge cases", () => {
         };
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive(), "Zero-size radio with visible label should get a hint");
     });
 });
@@ -323,7 +323,7 @@ describe("label-for dedup", () => {
         };
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
         // 3 hints (radios only) → single-char labels s, a, d
         // If labels weren't deduped we'd have 6 → two-char labels
@@ -360,7 +360,7 @@ describe("hash-link/label dedup", () => {
         };
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
         // 1 hint (label only) → single-char label "s"
         fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
@@ -376,7 +376,7 @@ describe("hash-link/label dedup", () => {
 
         loadModules([anchor]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
         fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
         assert.ok(!hintMode.isActive(), "Hash-link without matching label should be kept");
@@ -404,7 +404,7 @@ describe("disclosure trigger dedup", () => {
 
         loadModules([link, btn]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
         // 1 hint → single-char label "s"; typing "s" activates it
         fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
@@ -422,7 +422,7 @@ describe("disclosure trigger dedup", () => {
 
         loadModules([btn]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
         fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
         assert.ok(!hintMode.isActive(), "Expected 1 hint (lone disclosure button should be kept)");
@@ -438,13 +438,13 @@ describe("disclosure trigger dedup", () => {
 
         loadModules([link, btn]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
         // 2 hints → single-char labels "s" and "a"
         // Type "s" to activate link, then reactivate and type "a" to activate button
         fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
         assert.equal(link.click.mock.callCount(), 1, "Link hint should work");
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive(), "Should reactivate with 2 hints (button not filtered)");
         fireKeyDown(makeKeyEvent("KeyA", { key: "a" }));
         assert.equal(btn.click.mock.callCount(), 1, "Button hint should work (not filtered)");
@@ -545,7 +545,7 @@ describe("hint target redirects to sole clickable child", () => {
         };
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
@@ -668,7 +668,7 @@ describe("inline element hint alignment", () => {
         loadModules([a1, a2, a3]);
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
@@ -704,7 +704,7 @@ describe("zero in one dimension filtered", () => {
         loadModules([normal]);
         (globalThis as any).document.elementsFromPoint = () => [normal];
         const { hintMode: base } = getState();
-        base.activate(false);
+        base.activate();
         assert.ok(base.isActive(), "onclick div with size should get a hint");
         base.destroy();
 
@@ -715,7 +715,7 @@ describe("zero in one dimension filtered", () => {
         });
         loadModules([zeroHeight]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "Zero-height element should not get a hint");
     });
 
@@ -728,7 +728,7 @@ describe("zero in one dimension filtered", () => {
         loadModules([normal]);
         (globalThis as any).document.elementsFromPoint = () => [normal];
         const { hintMode: base } = getState();
-        base.activate(false);
+        base.activate();
         assert.ok(base.isActive(), "onclick div with size should get a hint");
         base.destroy();
 
@@ -739,7 +739,7 @@ describe("zero in one dimension filtered", () => {
         });
         loadModules([zeroWidth]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "Zero-width element should not get a hint");
     });
 });
@@ -764,7 +764,7 @@ describe("checkbox/radio hint positioning", () => {
         loadModules([checkbox]);
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
@@ -784,7 +784,7 @@ describe("checkbox/radio hint positioning", () => {
         loadModules([radio]);
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
@@ -811,7 +811,7 @@ describe("checkbox/radio hint positioning", () => {
         (globalThis as any).document.elementsFromPoint = () => [checkbox];
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
@@ -840,7 +840,7 @@ describe("checkbox/radio hint positioning", () => {
         (globalThis as any).document.elementsFromPoint = () => [checkbox];
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
@@ -868,7 +868,7 @@ describe("checkbox/radio hint positioning", () => {
         (globalThis as any).document.elementsFromPoint = () => [checkbox];
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
@@ -891,7 +891,7 @@ describe("checkbox/radio hint positioning", () => {
 
         loadModules([plainLink]);
         const { hintMode: hm1 } = getState();
-        hm1.activate(false);
+        hm1.activate();
         const overlay1 = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
         const baseLeft = parseFloat(overlay1?.querySelector(".tabi-hint")?.style.left);
         hm1.destroy();
@@ -910,7 +910,7 @@ describe("checkbox/radio hint positioning", () => {
 
         loadModules([link]);
         const { hintMode: hm2 } = getState();
-        hm2.activate(false);
+        hm2.activate();
         assert.ok(hm2.isActive());
 
         const overlay2 = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
@@ -936,7 +936,7 @@ describe("checkbox/radio hint positioning", () => {
 
         loadModules([link]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
@@ -978,7 +978,7 @@ describe("inline link in mixed text content", () => {
         loadModules([link]);
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
@@ -1008,7 +1008,7 @@ describe("hint positioning accounts for padding-bottom", () => {
         loadModules([link]);
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
         const hints = overlay?.querySelectorAll(".tabi-hint");
@@ -1026,7 +1026,7 @@ describe("hint positioning accounts for padding-bottom", () => {
         loadModules([link]);
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
         const hints = overlay?.querySelectorAll(".tabi-hint");
@@ -1073,7 +1073,7 @@ describe("role=link with inner button gets separate hints", () => {
         };
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
         // 2 hints → single-char labels "s" and "a"
         // Type "s" for trend box, "a" for button
@@ -1102,7 +1102,7 @@ describe("clip/clip-path visually-hidden elements", () => {
 
         loadModules([skipLink]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "clip-path: inset(50%) element should not get a hint");
     });
 
@@ -1115,7 +1115,7 @@ describe("clip/clip-path visually-hidden elements", () => {
 
         loadModules([skipLink]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "clip: rect(0,0,0,0) element should not get a hint");
     });
 
@@ -1128,7 +1128,7 @@ describe("clip/clip-path visually-hidden elements", () => {
 
         loadModules([skipLink]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "clip: rect(1px,1px,1px,1px) element should not get a hint");
     });
 
@@ -1141,7 +1141,7 @@ describe("clip/clip-path visually-hidden elements", () => {
 
         loadModules([link]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive(), "clip-path: none should not filter the element");
     });
 });
@@ -1170,7 +1170,7 @@ describe("overlay occlusion", () => {
         };
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "Link behind fixed overlay should not get a hint");
     });
 
@@ -1184,7 +1184,7 @@ describe("overlay occlusion", () => {
         };
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive(), "Topmost link should get a hint");
     });
 
@@ -1209,7 +1209,7 @@ describe("overlay occlusion", () => {
         };
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive(), "Top-only cover should not occlude the link");
     });
 
@@ -1232,7 +1232,7 @@ describe("overlay occlusion", () => {
         };
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "Link with one bottom corner occluded should be filtered");
     });
 });
@@ -1299,7 +1299,7 @@ describe("clickable sibling occlusion", () => {
         (globalThis as any).document.elementsFromPoint = () => [overlay, link];
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "Link behind non-clickable overlay should be filtered");
     });
 
@@ -1319,7 +1319,7 @@ describe("clickable sibling occlusion", () => {
         (globalThis as any).document.elementsFromPoint = () => [menuItem, sidebarLink];
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "Element fully covered by unrelated element should be filtered");
     });
 
@@ -1343,7 +1343,7 @@ describe("clickable sibling occlusion", () => {
         (globalThis as any).document.elementsFromPoint = () => [threadLine, btn];
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive(), "Button behind aria-hidden overlay should get a hint");
     });
 
@@ -1359,7 +1359,7 @@ describe("clickable sibling occlusion", () => {
         (globalThis as any).document.elementsFromPoint = () => [disabledBtn, link];
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "Link behind disabled button overlay should be filtered");
     });
 });
@@ -1390,7 +1390,7 @@ describe("native interactive elements prune subtrees", () => {
         };
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
         const hints = overlay?.querySelectorAll(".tabi-hint");
@@ -1409,7 +1409,7 @@ describe("native interactive elements prune subtrees", () => {
         loadModules([a1, a2]);
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
         const hints = overlay?.querySelectorAll(".tabi-hint");
@@ -1431,7 +1431,7 @@ describe("native interactive elements prune subtrees", () => {
         };
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
         const hints = overlay?.querySelectorAll(".tabi-hint");
@@ -1467,12 +1467,12 @@ describe("treeitem discovery", () => {
 
         // Without role="treeitem" — tabindex="-1" alone is not discoverable
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "tabindex=-1 without role=treeitem should NOT get a hint");
 
         // Add role="treeitem" — now it should be discovered
         item.setAttribute("role", "treeitem");
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive(), "tabindex=-1 WITH role=treeitem should get a hint");
     });
 });
@@ -1497,7 +1497,7 @@ describe("inline expansion walks up to block ancestor", () => {
 
         loadModules([a1]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
         let overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
         let hints = overlay?.querySelectorAll(".tabi-hint");
@@ -1513,7 +1513,7 @@ describe("inline expansion walks up to block ancestor", () => {
         li2.appendChild(span);
 
         loadModules([a2]);
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
         overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
         hints = overlay?.querySelectorAll(".tabi-hint");
@@ -1535,7 +1535,7 @@ describe("inline expansion walks up to block ancestor", () => {
 
         loadModules([a1]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
         let overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
         let hints = overlay?.querySelectorAll(".tabi-hint");
@@ -1550,7 +1550,7 @@ describe("inline expansion walks up to block ancestor", () => {
         h2.appendChild(a2);
 
         loadModules([a2]);
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
         overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
         hints = overlay?.querySelectorAll(".tabi-hint");
@@ -1570,7 +1570,7 @@ describe("inline expansion walks up to block ancestor", () => {
         loadModules([a1, a2]);
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
@@ -1726,7 +1726,7 @@ describe("hints deactivate on resize", () => {
         loadModules([link]);
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive(), "Hints should be active before resize");
 
         // Simulate resize event (use happy-dom's Event via the test window)
@@ -1755,7 +1755,7 @@ describe("overflow:scroll/auto clips elements", () => {
         loadModules([link]);
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive(), "Link should get hint when container has no overflow clipping");
     });
 
@@ -1766,7 +1766,7 @@ describe("overflow:scroll/auto clips elements", () => {
         loadModules([link]);
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "Link outside overflow:scroll container should be filtered out");
     });
 
@@ -1777,7 +1777,7 @@ describe("overflow:scroll/auto clips elements", () => {
         loadModules([link]);
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "Link outside overflow:auto container should be filtered out");
     });
 
@@ -1788,7 +1788,7 @@ describe("overflow:scroll/auto clips elements", () => {
         loadModules([link]);
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive(), "Link inside overflow:scroll container bounds should get hint");
     });
 
@@ -1803,12 +1803,12 @@ describe("overflow:scroll/auto clips elements", () => {
         loadModules([link]);
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(!hintMode.isActive(), "Base case: block container with overflow:hidden clips child");
 
         // With display:contents: container has no box, so overflow has no effect
         container.style.display = "contents";
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive(), "display:contents container can't clip — link should get hint");
     });
 });
@@ -1925,7 +1925,7 @@ describe("DOM problems — overflow clipping with near-zero visible area", () =>
         loadModules([container, skipBtn, input, searchBtn]);
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
         const hints = overlay?.querySelectorAll(".tabi-hint");
@@ -1950,7 +1950,7 @@ describe("DOM problems — overflow clipping with near-zero visible area", () =>
         loadModules([container, btn]);
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
         const hints = overlay?.querySelectorAll(".tabi-hint");
@@ -2262,7 +2262,7 @@ describe("block link hint positioning", () => {
         (globalThis as any).document.elementsFromPoint = () => [link];
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
@@ -2290,7 +2290,7 @@ describe("block link hint positioning", () => {
         (globalThis as any).document.elementsFromPoint = () => [link];
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
@@ -2315,7 +2315,7 @@ describe("block link hint positioning", () => {
         (globalThis as any).document.elementsFromPoint = () => [link];
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
@@ -2352,7 +2352,7 @@ describe("repeating container sizing uses container dimensions", () => {
         loadModules([base]);
         (globalThis as any).document.elementsFromPoint = () => [base];
         let { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         let overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
         assert.ok(!overlay?.querySelector(".tabi-hint-container-glow"),
             "Base: narrow link without repeating container should not get container glow");
@@ -2373,7 +2373,7 @@ describe("repeating container sizing uses container dimensions", () => {
         loadModules([link]);
         (globalThis as any).document.elementsFromPoint = () => [link];
         ({ hintMode } = getState());
-        hintMode.activate(false);
+        hintMode.activate();
         overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
         assert.ok(overlay?.querySelector(".tabi-hint-container-glow"),
             "Delta: link in <li> should get container glow using container dimensions");
@@ -2459,7 +2459,7 @@ describe("shadow DOM elements not falsely occluded", () => {
         (globalThis as any).document.elementsFromPoint = () => [host];
 
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive(),
             "Button inside shadow root should get a hint — shadow host is an ancestor, not a cover");
     });
@@ -2781,7 +2781,7 @@ describe("dedup respects list boundaries in nested trees", () => {
 
         // Base: without list boundary, folder dedup would remove file treeitem
         // Delta: with <ul> between them, both survive as independent items
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive(), "hints should be active");
     });
 });
@@ -2840,7 +2840,7 @@ describe("heading ancestor rect clamping", () => {
 
         loadModules([a1]);
         let hm = getState().hintMode;
-        hm.activate(false);
+        hm.activate();
 
         let overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
         let hint = overlay?.querySelector(".tabi-hint") as HTMLElement;
@@ -2859,7 +2859,7 @@ describe("heading ancestor rect clamping", () => {
 
         loadModules([a2]);
         hm = getState().hintMode;
-        hm.activate(false);
+        hm.activate();
 
         overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
         hint = overlay?.querySelector(".tabi-hint") as HTMLElement;
@@ -2910,7 +2910,7 @@ describe("table row container glow all-or-none", () => {
 
         loadModules([table]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");
@@ -2947,7 +2947,7 @@ describe("table row container glow all-or-none", () => {
 
         loadModules([table]);
         const { hintMode } = getState();
-        hintMode.activate(false);
+        hintMode.activate();
         assert.ok(hintMode.isActive());
 
         const overlay = (globalThis as any).document.documentElement.querySelector(".tabi-hint-overlay");

@@ -39,7 +39,7 @@ async function activateHints(page: import("@playwright/test").Page): Promise<num
       if (hm.isActive()) hm.deactivate();
       kh.setMode(Mode.NORMAL);
     });
-    hm.activate(false);
+    hm.activate();
     const count = document.querySelectorAll(".tabi-hint").length;
     hm.destroy();
     return count;
@@ -112,7 +112,7 @@ test("targets nav text, not aria-hidden badge count", async ({ page }) => {
       if (hm.isActive()) hm.deactivate();
       kh.setMode(Mode.NORMAL);
     });
-    hm.activate(false);
+    hm.activate();
     const hintDiv = document.querySelector(".tabi-hint") as HTMLElement;
     const top = hintDiv ? parseFloat(hintDiv.style.top) : -1;
     hm.destroy();
@@ -161,7 +161,7 @@ test("heading redirect hint sits below h3, not inside it", async ({ page }) => {
       if (hm.isActive()) hm.deactivate();
       kh.setMode(Mode.NORMAL);
     });
-    hm.activate(false);
+    hm.activate();
 
     const heading = document.getElementById("heading")!;
     const headingRect = heading.getBoundingClientRect();
@@ -203,7 +203,7 @@ test("multi-line link hint sits below last line", async ({ page }) => {
       if (hm.isActive()) hm.deactivate();
       kh.setMode(Mode.NORMAL);
     });
-    hm.activate(false);
+    hm.activate();
 
     const link = document.getElementById("link")!;
     const linkRect = link.getBoundingClientRect();
@@ -256,7 +256,7 @@ test("stretched flex link hint centers on content, not full box", async ({ page 
       if (hm.isActive()) hm.deactivate();
       kh.setMode(Mode.NORMAL);
     });
-    hm.activate(false);
+    hm.activate();
 
     const link = document.getElementById("link")!;
     const linkRect = link.getBoundingClientRect();
@@ -316,7 +316,7 @@ test("container element gets glow border and inside-end pill", async ({ page }) 
       if (hm.isActive()) hm.deactivate();
       kh.setMode(Mode.NORMAL);
     });
-    hm.activate(false);
+    hm.activate();
 
     const item = document.getElementById("item")!;
     const itemRect = item.getBoundingClientRect();
@@ -377,7 +377,7 @@ test("hint targets button, not visually-hidden 1x1 span inside it", async ({ pag
       if (hm.isActive()) hm.deactivate();
       kh.setMode(Mode.NORMAL);
     });
-    hm.activate(false);
+    hm.activate();
     const hintDiv = document.querySelector(".tabi-hint") as HTMLElement;
     const top = hintDiv ? parseFloat(hintDiv.style.top) : -1;
     hm.destroy();
@@ -599,7 +599,7 @@ test("hint click dispatches after collapse animation completes", async ({ page }
         if (hm.isActive()) hm.deactivate();
         kh.setMode(Mode.NORMAL);
       });
-      hm.activate(false);
+      hm.activate();
 
       // With a single element, the label is the first hint char "s".
       // Simulate typing it to trigger activateHint.
@@ -661,7 +661,7 @@ test("glow propagates to sibling <tr> without discovered elements", async ({ pag
       if (hm.isActive()) hm.deactivate();
       kh.setMode(Mode.NORMAL);
     });
-    hm.activate(false);
+    hm.activate();
 
     const hints = document.querySelectorAll(".tabi-hint");
     const glows = document.querySelectorAll(".tabi-hint-container-glow");
