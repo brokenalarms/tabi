@@ -3,6 +3,8 @@
 
 import type { KeyBindingMode, ModeValue } from "../types";
 import { Mode, COMMANDS } from "../commands";
+import { bindingsForPreset } from "../keybindings";
+import type { KeyPreset } from "../keybindings";
 
 const INPUT_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
 const NON_TEXT_INPUT_TYPES = new Set([
@@ -188,44 +190,18 @@ export class KeyHandler {
 
   // --- Internals ---
 
-  private initDefaultBindings(): void {
+  private initDefaultBindings(preset: KeyPreset = "homerow"): void {
     const n = Mode.NORMAL;
-    const addBinding = (mode: ModeValue, seq: string, cmd: string) => {
+
+    // Load bindings from the shared preset
+    for (const [seq, cmd] of bindingsForPreset(preset)) {
       if (!(cmd in COMMANDS)) {
         console.warn(`[Tabi] Unknown command "${cmd}" — not in COMMANDS`);
       }
-      this.bind(mode, seq, cmd);
-    };
+      this.bind(n, seq, cmd);
+    }
 
-    // Scrolling
-    addBinding(n, "KeyJ", "scrollDown");
-    addBinding(n, "KeyK", "scrollUp");
-    addBinding(n, "KeyH", "scrollLeft");
-    addBinding(n, "KeyL", "scrollRight");
-    addBinding(n, "KeyD", "scrollHalfPageDown");
-    addBinding(n, "KeyU", "scrollHalfPageUp");
-    addBinding(n, "Shift-KeyG", "scrollToBottom");
-    addBinding(n, "KeyG KeyG", "scrollToTop");
-
-    // History / navigation
-    addBinding(n, "Shift-KeyH", "goBack");
-    addBinding(n, "Shift-KeyL", "goForward");
-    addBinding(n, "KeyR", "pageRefresh");
-
-    // Hints
-    addBinding(n, "KeyF", "activateHints");
-    addBinding(n, "Shift-KeyF", "activateHintsNewTab");
-    addBinding(n, "KeyY", "yankLink");
-    addBinding(n, "KeyM", "multiOpen");
-
-    // Tabs
-    addBinding(n, "KeyT", "openTabSearch");
-    addBinding(n, "KeyX", "closeTab");
-    addBinding(n, "Shift-KeyX", "restoreTab");
-    addBinding(n, "Shift-KeyJ", "tabLeft");
-    addBinding(n, "Shift-KeyK", "tabRight");
-    addBinding(n, "KeyG KeyT", "tabNext");
-    addBinding(n, "KeyG Shift-KeyT", "tabPrev");
+    // Tab-by-number bindings (g1–g9, g0, g^, g$) — not preset-specific
     for (let i = 1; i <= 9; i++) {
       this.bind(n, "KeyG Digit" + i, "goToTab" + i);
     }
@@ -233,16 +209,9 @@ export class KeyHandler {
     this.bind(n, "KeyG Digit0", "goToTabFirst");          // g0
     this.bind(n, "KeyG Shift-Digit4", "goToTabLast");     // g$
 
-    // Navigation
-    addBinding(n, "KeyG KeyI", "focusInput");
-    addBinding(n, "KeyG KeyU", "goUpUrl");
-
-    // Help
-    addBinding(n, "Shift-Slash", "showHelp");
-
     // Mode escape — works in all non-NORMAL modes
     for (const mode of [Mode.INSERT, Mode.HINTS, Mode.TAB_SEARCH]) {
-      addBinding(mode, "Escape", "exitToNormal");
+      this.bind(mode, "Escape", "exitToNormal");
     }
   }
 
