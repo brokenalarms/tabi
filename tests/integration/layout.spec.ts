@@ -447,7 +447,7 @@ test("walkerFilter traces each ancestor of FB contact link", async ({ page }) =>
   // Call walkerFilter directly on each contact <a> and every ancestor
   const trace = await page.evaluate(() => {
     const { walkerFilter } = window.TestHarness;
-    const NF = NodeFilter;
+    const NF = window.NodeFilter;
     const links = document.querySelectorAll('a[href*="/messages/"]');
     return Array.from(links).map(a => {
       // Trace ancestors from body down to <a>
