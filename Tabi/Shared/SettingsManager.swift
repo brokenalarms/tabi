@@ -6,6 +6,7 @@ class SettingsManager {
     private static let appGroupID = "group.com.brokenalarms.tabi"
     private static let keyBindingModeKey = "keyBindingMode"
     private static let themeKey = "theme"
+    private static let isPremiumKey = "isPremium"
 
     private let defaults: UserDefaults
 
@@ -21,5 +22,9 @@ class SettingsManager {
     var theme: String {
         get { defaults.string(forKey: Self.themeKey) ?? "auto" }
         set { defaults.set(newValue, forKey: Self.themeKey) }
+    }
+
+    var isPremium: Bool {
+        defaults.bool(forKey: Self.isPremiumKey)
     }
 }

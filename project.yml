@@ -19,6 +19,7 @@ schemes:
         Tabi Extension: all
     run:
       executable: Tabi
+      storeKitConfiguration: Tabi/Host App/TabiPremium.storekit
 
 targets:
   Tabi:
