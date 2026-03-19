@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
-import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isEmpty, shouldRedirectToHeading, hasListBoundaryBetween } from "../src/modules/elementPredicates";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isEmpty, shouldRedirectToHeading, hasListBoundaryBetween, isInNearbySiblingSubtree } from "../src/modules/elementPredicates";
 import { findBlockAncestor, retryExpandedToggle, captureRetryStrategies, executeRetryStrategies } from "../src/modules/elementTraversals";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
@@ -3022,5 +3022,128 @@ describe("retry click", () => {
         // didChange compares post-click snapshot ("true") vs current ("true") — no change!
         assert.equal(capturedAfter!.didChange(), false,
             "strategy captured after click cannot detect the change");
+    });
+});
+
+// ISSUE: YouTube grid video cards (ytd-grid-video-renderer) repeat as siblings but
+//        aren't detected as repeating containers — only <li> and <tr> qualify.
+// SITE: youtube.com/@channel/videos
+// FIX: Add site-specific custom elements to the repeating container selector.
+describe("site-specific repeating containers", () => {
+    it("ytd-grid-video-renderer siblings are repeating containers", () => {
+        // Base: element inside a plain <div> is NOT in a repeating container
+        const envPlain = createDOM(`<div><a id="solo" href="#">link</a></div>`);
+        const solo = envPlain.document.getElementById("solo") as unknown as HTMLElement;
+        assert.equal(isInRepeatingContainer(solo), false,
+            "Link in a plain div is not in a repeating container");
+        envPlain.cleanup();
+
+        // Delta: element inside ytd-grid-video-renderer with 3+ siblings IS
+        const env = createDOM(`
+            <div id="items">
+                <ytd-grid-video-renderer>
+                    <a id="t" href="/watch?v=1">Video 1</a>
+                </ytd-grid-video-renderer>
+                <ytd-grid-video-renderer>
+                    <a href="/watch?v=2">Video 2</a>
+                </ytd-grid-video-renderer>
+                <ytd-grid-video-renderer>
+                    <a href="/watch?v=3">Video 3</a>
+                </ytd-grid-video-renderer>
+            </div>
+        `);
+        const el = env.document.getElementById("t") as unknown as HTMLElement;
+
+        assert.equal(isInRepeatingContainer(el), true,
+            "Link inside ytd-grid-video-renderer should be in a repeating container");
+
+        const container = getRepeatingContainer(el);
+        assert.equal(container?.tagName.toUpperCase(), "YTD-GRID-VIDEO-RENDERER",
+            "Repeating container should be the ytd-grid-video-renderer element");
+
+        env.cleanup();
+    });
+});
+
+// ISSUE: Deeply nested buttons inside web component wrappers are falsely occluded
+//        by elements from adjacent sibling cards. isInNearbySiblingSubtree stops
+//        walking at depth 4 but the shared parent is 7+ levels up.
+// SITE: youtube.com (ytd-grid-video-renderer cards in horizontal shelves)
+// FIX: Increase SIBLING_DEPTH_LIMIT so the walk reaches the shared parent.
+describe("isInNearbySiblingSubtree with deep nesting", () => {
+    it("exempts deeply nested elements from adjacent sibling subtrees", () => {
+        // Base: shallow nesting (depth 2) is recognized as sibling subtree
+        const envShallow = createDOM(`
+            <div id="parent">
+                <div id="a"><button id="shallow-btn">X</button></div>
+                <div id="b"><a id="shallow-cover" href="#">Y</a></div>
+            </div>
+        `);
+        const shallowBtn = envShallow.document.getElementById("shallow-btn") as unknown as HTMLElement;
+        const shallowCover = envShallow.document.getElementById("shallow-cover") as unknown as HTMLElement;
+        assert.equal(isInNearbySiblingSubtree(shallowBtn, shallowCover), true,
+            "Shallow sibling subtree should be recognized");
+        envShallow.cleanup();
+
+        // Delta: deep nesting (7 levels) should also be recognized
+        const env = createDOM(`
+            <div id="items">
+                <div id="card1">
+                    <div>
+                        <div>
+                            <div>
+                                <div>
+                                    <div>
+                                        <button id="btn">Menu</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="card2">
+                    <div>
+                        <a id="cover" href="#">Link</a>
+                    </div>
+                </div>
+            </div>
+        `);
+        const btn = env.document.getElementById("btn") as unknown as HTMLElement;
+        const cover = env.document.getElementById("cover") as unknown as HTMLElement;
+
+        assert.equal(isInNearbySiblingSubtree(btn, cover), true,
+            "Deeply nested element in adjacent sibling subtree should be exempt");
+
+        env.cleanup();
+    });
+
+    it("stops at sectioning elements to preserve cross-region occlusion", () => {
+        // Base: without sectioning boundary, sibling subtrees are exempt
+        const envNoSection = createDOM(`
+            <div id="app">
+                <div id="hdr"><a id="hdr-link" href="#">Header</a></div>
+                <div id="content"><button id="btn-no-section">Click</button></div>
+            </div>
+        `);
+        const btnNoSection = envNoSection.document.getElementById("btn-no-section") as unknown as HTMLElement;
+        const hdrLinkNoSection = envNoSection.document.getElementById("hdr-link") as unknown as HTMLElement;
+        assert.equal(isInNearbySiblingSubtree(btnNoSection, hdrLinkNoSection), true,
+            "Without sectioning boundary, sibling subtrees are exempt");
+        envNoSection.cleanup();
+
+        // Delta: with <main> boundary, walk stops before reaching shared parent
+        const env = createDOM(`
+            <div id="app">
+                <header><a id="hdr-link" href="#">Header</a></header>
+                <main><button id="btn">Click</button></main>
+            </div>
+        `);
+        const btn = env.document.getElementById("btn") as unknown as HTMLElement;
+        const hdrLink = env.document.getElementById("hdr-link") as unknown as HTMLElement;
+
+        assert.equal(isInNearbySiblingSubtree(btn, hdrLink), false,
+            "Sectioning boundary should prevent cross-region sibling exemption");
+
+        env.cleanup();
     });
 });

@@ -20,7 +20,16 @@ export const CLICKABLE_SELECTOR = [
   ...CLICKABLE_ATTRS,
 ].join(", ");
 
-export const REPEATING_CONTAINER_SELECTOR = "li, tr";
+/** Site-specific custom elements that act as repeating containers.
+ *  Each entry maps a CSS selector to the site where it was observed. */
+const SITE_SPECIFIC_CONTAINERS: { selector: string; site: string }[] = [
+  { selector: "ytd-grid-video-renderer", site: "youtube.com" },
+];
+
+export const REPEATING_CONTAINER_SELECTOR = [
+  "li", "tr",
+  ...SITE_SPECIFIC_CONTAINERS.map(c => c.selector),
+].join(", ");
 
 export const HEADING_ELEMENTS = ["h1", "h2", "h3", "h4", "h5", "h6"];
 export const HEADING_SELECTOR = HEADING_ELEMENTS.join(", ");
