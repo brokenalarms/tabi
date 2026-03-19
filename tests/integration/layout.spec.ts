@@ -622,3 +622,60 @@ test("hint click dispatches after collapse animation completes", async ({ page }
   expect(result.clickedAfter).toBe(true);
 });
 
+// ISSUE: Sibling <tr> rows in a table should get consistent container glow
+// (all-or-none). If one row gets glow, all sibling rows must too.
+// The second row has a tall card-image section in a different <td> column.
+// isOccluded + isInNearbySiblingSubtree might incorrectly filter the button
+// because the sibling walk breaks at <tr> before exempting same-row <td> siblings.
+// SITE: Macquarie banking — account list table with clickable rows
+// Container glow propagates to sibling rows without discovered elements.
+// Row 1 has a button (gets glow). Row 2 has no interactive elements but
+// should still get glow because it's a sibling <tr> in the same <tbody>.
+test("glow propagates to sibling <tr> without discovered elements", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await setupPage(page, `
+    <table style="width:1000px; border-collapse:collapse;">
+      <tbody>
+        <tr id="row1" style="height:50px;">
+          <td style="width:35px; vertical-align:top;">
+            <button id="pin1" style="width:24px;height:24px;">Pin</button>
+          </td>
+          <td style="width:280px;">Savings Account</td>
+          <td style="width:250px;">$135,593.93</td>
+        </tr>
+        <tr id="row2" style="height:50px;">
+          <td style="width:35px;"></td>
+          <td style="width:280px;">Transaction Account</td>
+          <td style="width:250px;">$12,111.35</td>
+        </tr>
+      </tbody>
+    </table>
+  `);
+
+  const result = await page.evaluate(() => {
+    const { KeyHandler, HintMode, Mode } = window.TestHarness;
+    const kh = new KeyHandler();
+    const hm = new HintMode(kh);
+    hm.wireCommands();
+    kh.on("exitToNormal", () => {
+      if (hm.isActive()) hm.deactivate();
+      kh.setMode(Mode.NORMAL);
+    });
+    hm.activate(false);
+
+    const hints = document.querySelectorAll(".tabi-hint");
+    const glows = document.querySelectorAll(".tabi-hint-container-glow");
+
+    const res = {
+      hintCount: hints.length,
+      glowCount: glows.length,
+    };
+    hm.destroy();
+    return res;
+  });
+
+  // Row 1 has 1 button, row 2 has none — glow propagates to row 2
+  expect(result.hintCount).toBe(2);
+  expect(result.glowCount).toBe(2);
+});
+
