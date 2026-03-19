@@ -3116,4 +3116,34 @@ describe("isInNearbySiblingSubtree with deep nesting", () => {
 
         env.cleanup();
     });
+
+    it("stops at sectioning elements to preserve cross-region occlusion", () => {
+        // Base: without sectioning boundary, sibling subtrees are exempt
+        const envNoSection = createDOM(`
+            <div id="app">
+                <div id="hdr"><a id="hdr-link" href="#">Header</a></div>
+                <div id="content"><button id="btn-no-section">Click</button></div>
+            </div>
+        `);
+        const btnNoSection = envNoSection.document.getElementById("btn-no-section") as unknown as HTMLElement;
+        const hdrLinkNoSection = envNoSection.document.getElementById("hdr-link") as unknown as HTMLElement;
+        assert.equal(isInNearbySiblingSubtree(btnNoSection, hdrLinkNoSection), true,
+            "Without sectioning boundary, sibling subtrees are exempt");
+        envNoSection.cleanup();
+
+        // Delta: with <main> boundary, walk stops before reaching shared parent
+        const env = createDOM(`
+            <div id="app">
+                <header><a id="hdr-link" href="#">Header</a></header>
+                <main><button id="btn">Click</button></main>
+            </div>
+        `);
+        const btn = env.document.getElementById("btn") as unknown as HTMLElement;
+        const hdrLink = env.document.getElementById("hdr-link") as unknown as HTMLElement;
+
+        assert.equal(isInNearbySiblingSubtree(btn, hdrLink), false,
+            "Sectioning boundary should prevent cross-region sibling exemption");
+
+        env.cleanup();
+    });
 });
