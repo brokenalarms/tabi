@@ -54,6 +54,9 @@ function resetBrowserShim() {
             async query(_opts: Record<string, unknown>) {
                 return [...mockTabs];
             },
+            async sendMessage(_tabId: number, _message: Record<string, unknown>) {
+                return {};
+            },
             onRemoved: {
                 addListener(fn: (tabId: number) => void) { tabRemovedListeners.push(fn); },
             },
@@ -357,8 +360,6 @@ describe("background.ts tab management", () => {
     });
 
     describe("syncSettings", () => {
-        // Verifies that syncSettings fetches settings from the native host app
-        // via sendNativeMessage and writes them to browser.storage.local.
         it("fetches native settings and writes to storage", async () => {
             nativeMessagesSent = [];
             storageState = {};
@@ -373,8 +374,6 @@ describe("background.ts tab management", () => {
             assert.equal(storageState.isPremium, true);
         });
 
-        // Verifies that only defined fields from the native response are written —
-        // undefined fields are not set in storage (avoids overwriting user overrides).
         it("only writes defined fields to storage", async () => {
             nativeMessageResponse = { isPremium: false };
             await syncSettings();
@@ -384,7 +383,6 @@ describe("background.ts tab management", () => {
             assert.equal(storageState.theme, undefined);
         });
 
-        // Verifies that the syncSettings command is accessible via handleCommand.
         it("is invokable via handleCommand", async () => {
             nativeMessageResponse = { isPremium: true };
             const result = await handleCommand("syncSettings", {});
@@ -392,15 +390,60 @@ describe("background.ts tab management", () => {
             assert.equal(storageState.isPremium, true);
         });
 
-        // Verifies that init() triggers a settings sync from the native host on startup.
         it("runs automatically on init", () => {
             nativeMessagesSent = [];
             nativeMessageResponse = { isPremium: true };
             init();
-            // init() fires syncSettings() asynchronously — the native message
-            // should already be queued by the time init() returns.
             assert.equal(nativeMessagesSent.length, 1);
             assert.deepEqual(nativeMessagesSent[0].message, { command: "getSettings" });
+        });
+    });
+
+    describe("jumpToMark command", () => {
+        it("returns sameTab when sender already on target URL", async () => {
+            const sender = { tab: { id: 2, url: "https://example.com/2" } };
+            const result = await handleCommand("jumpToMark", sender, {
+                command: "jumpToMark",
+                url: "https://example.com/2",
+                scrollY: 100,
+            });
+            assert.equal((result as any).status, "ok");
+            assert.equal((result as any).sameTab, true);
+            assert.equal(activatedTabId, null);
+            assert.equal(createdTabs.length, 0);
+        });
+
+        it("activates existing tab with matching URL", async () => {
+            const sender = makeSender(1);
+            const result = await handleCommand("jumpToMark", sender, {
+                command: "jumpToMark",
+                url: "https://example.com/3",
+                scrollY: 50,
+            });
+            assert.equal((result as any).status, "ok");
+            assert.equal((result as any).sameTab, false);
+            assert.equal(activatedTabId, 3);
+            assert.equal(createdTabs.length, 0);
+        });
+
+        it("opens new tab when no existing tab matches", async () => {
+            const sender = makeSender(1);
+            const result = await handleCommand("jumpToMark", sender, {
+                command: "jumpToMark",
+                url: "https://new-site.com/page",
+                scrollY: 200,
+            });
+            assert.equal((result as any).status, "ok");
+            assert.equal((result as any).sameTab, false);
+            assert.equal(createdTabs.length, 1);
+            assert.equal(createdTabs[0].url, "https://new-site.com/page");
+        });
+
+        it("does nothing without URL", async () => {
+            const result = await handleCommand("jumpToMark", {}, { command: "jumpToMark" });
+            assert.equal(result.status, "ok");
+            assert.equal(activatedTabId, null);
+            assert.equal(createdTabs.length, 0);
         });
     });
 });

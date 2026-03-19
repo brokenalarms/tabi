@@ -6,7 +6,8 @@ type Command =
   | "createTab" | "closeTab" | "switchTab" | "queryTabs"
   | "restoreTab" | "tabLeft" | "tabRight" | "tabNext" | "tabPrev"
   | "goToTab" | "goToTabFirst" | "goToTabLast" | "extensionActive" | "extensionInactive"
-  | "syncSettings";
+  | "syncSettings"
+  | "jumpToMark";
 
 const APP_BUNDLE_ID = "com.brokenalarms.tabi";
 
@@ -23,6 +24,7 @@ declare const browser: {
     remove(tabId: number): Promise<void>;
     update(tabId: number, props: { active: boolean }): Promise<unknown>;
     query(opts: { currentWindow: boolean }): Promise<Array<{ id: number; title: string; url: string; active: boolean }>>;
+    sendMessage(tabId: number, message: Record<string, unknown>): Promise<unknown>;
     onRemoved: { addListener(fn: (tabId: number) => void): void };
     onUpdated: { addListener(fn: (tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string }) => void): void };
     onActivated: { addListener(fn: (activeInfo: { tabId: number }) => void): void };
@@ -50,7 +52,7 @@ interface MessageSender {
   tab?: { id: number; url: string };
 }
 
-type CommandResponse = { status: string; reason?: string } | TabInfo[];
+type CommandResponse = { status: string; reason?: string; sameTab?: boolean } | TabInfo[];
 
 export interface ClosedTab {
   url: string;
@@ -229,6 +231,35 @@ export async function handleCommand(command: Command, sender: MessageSender, mes
     case "syncSettings": {
       await syncSettings();
       break;
+    }
+
+    case "jumpToMark": {
+      const url = message && typeof message.url === "string" ? message.url : undefined;
+      const scrollY = message && typeof message.scrollY === "number" ? message.scrollY : 0;
+      if (!url) break;
+
+      // Check if the current tab already has this URL
+      if (sender.tab && sender.tab.url === url) {
+        return { status: "ok", sameTab: true } as CommandResponse;
+      }
+
+      // Find an existing tab with this URL
+      const tabs = await browser.tabs.query({ currentWindow: true });
+      const existing = tabs.find(t => t.url === url);
+      if (existing) {
+        await browser.tabs.update(existing.id, { active: true });
+        // Send scroll restoration to the target tab
+        try {
+          await browser.tabs.sendMessage(existing.id, { command: "restoreScroll", scrollY });
+        } catch (_) {
+          // Content script may not be loaded yet
+        }
+        return { status: "ok", sameTab: false } as CommandResponse;
+      }
+
+      // No existing tab — open a new one
+      await browser.tabs.create({ url });
+      return { status: "ok", sameTab: false } as CommandResponse;
     }
 
     default:
