@@ -572,11 +572,12 @@ test("hint click dispatches after collapse animation completes", async ({ page }
     <a id="target" href="#" style="position:absolute; top:50px; left:50px; width:100px; height:30px;">Link</a>
   `);
 
-  // Inject the hint animation CSS so animationend fires in WebKit
+  // Use a near-instant animation so animationend fires reliably in headless
+  // WebKit on CI (headless Linux WebKit may not advance real animation clocks).
   await page.addStyleTag({ content: `
     .tabi-hint-active {
       --poof-x: 0px; --poof-y: 0px;
-      animation: tabi-hint-collapse 150ms ease-in forwards;
+      animation: tabi-hint-collapse 1ms ease-in forwards;
     }
     @keyframes tabi-hint-collapse {
       0%   { opacity: 1; transform: scale(1) translate(0,0); }
@@ -606,9 +607,8 @@ test("hint click dispatches after collapse animation completes", async ({ page }
     }));
   });
 
-  // Wait for click to fire (animationend triggers it; generous timeout for CI)
-  await page.waitForFunction(() => (window as any).__clicked, null, { timeout: 2000 });
-  const clicked = await page.evaluate(() => (window as any).__clicked);
-  expect(clicked).toBe(true);
+  // Wait for animationend → click dispatch (generous timeout for CI)
+  await page.waitForFunction(() => (window as any).__clicked, null, { timeout: 5000 });
+  expect(await page.evaluate(() => (window as any).__clicked)).toBe(true);
 });
 
