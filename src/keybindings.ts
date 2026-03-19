@@ -33,10 +33,9 @@ const SHARED: KeyBinding[] = [
   bind("KeyM", "multiOpen", "M"),
 
   // Tabs
-  bind("KeyT", "createTab", "t"),
+  bind("KeyT", "openTabSearch", "T"),
   bind("KeyX", "closeTab", "x"),
   bind("Shift-KeyX", "restoreTab", "X"),
-  bind("Shift-KeyT", "openTabSearch", "T"),
 
   // Navigation
   bind("KeyG KeyI", "focusInput", "gi"),
