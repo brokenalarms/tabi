@@ -167,8 +167,12 @@ export function isSiblingInRepeatingContainer(a: HTMLElement, b: HTMLElement): b
          aItem.parentElement === bItem.parentElement;
 }
 
-/** Maximum ancestor levels to walk when checking for nearby sibling subtrees. */
-const SIBLING_DEPTH_LIMIT = 4;
+/** Maximum ancestor levels to walk when checking for nearby sibling subtrees.
+ *  Modern web component nesting (YouTube, etc.) routinely places interactive
+ *  elements 6-8 levels deep inside card wrappers. A shallow limit causes
+ *  adjacent cards' content to falsely occlude each other. The walk still
+ *  stops early at body/html and repeating containers. */
+const SIBLING_DEPTH_LIMIT = 8;
 
 /** Is the cover in a nearby sibling subtree of the target?
  *  Walks up from the target a bounded number of levels. If an ancestor's parent

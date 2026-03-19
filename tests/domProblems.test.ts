@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
-import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isEmpty, shouldRedirectToHeading, hasListBoundaryBetween } from "../src/modules/elementPredicates";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isEmpty, shouldRedirectToHeading, hasListBoundaryBetween, isInNearbySiblingSubtree } from "../src/modules/elementPredicates";
 import { findBlockAncestor, retryExpandedToggle, captureRetryStrategies, executeRetryStrategies } from "../src/modules/elementTraversals";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
@@ -3060,6 +3060,59 @@ describe("site-specific repeating containers", () => {
         const container = getRepeatingContainer(el);
         assert.equal(container?.tagName.toUpperCase(), "YTD-GRID-VIDEO-RENDERER",
             "Repeating container should be the ytd-grid-video-renderer element");
+
+        env.cleanup();
+    });
+});
+
+// ISSUE: Deeply nested buttons inside web component wrappers are falsely occluded
+//        by elements from adjacent sibling cards. isInNearbySiblingSubtree stops
+//        walking at depth 4 but the shared parent is 7+ levels up.
+// SITE: youtube.com (ytd-grid-video-renderer cards in horizontal shelves)
+// FIX: Increase SIBLING_DEPTH_LIMIT so the walk reaches the shared parent.
+describe("isInNearbySiblingSubtree with deep nesting", () => {
+    it("exempts deeply nested elements from adjacent sibling subtrees", () => {
+        // Base: shallow nesting (depth 2) is recognized as sibling subtree
+        const envShallow = createDOM(`
+            <div id="parent">
+                <div id="a"><button id="shallow-btn">X</button></div>
+                <div id="b"><a id="shallow-cover" href="#">Y</a></div>
+            </div>
+        `);
+        const shallowBtn = envShallow.document.getElementById("shallow-btn") as unknown as HTMLElement;
+        const shallowCover = envShallow.document.getElementById("shallow-cover") as unknown as HTMLElement;
+        assert.equal(isInNearbySiblingSubtree(shallowBtn, shallowCover), true,
+            "Shallow sibling subtree should be recognized");
+        envShallow.cleanup();
+
+        // Delta: deep nesting (7 levels) should also be recognized
+        const env = createDOM(`
+            <div id="items">
+                <div id="card1">
+                    <div>
+                        <div>
+                            <div>
+                                <div>
+                                    <div>
+                                        <button id="btn">Menu</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="card2">
+                    <div>
+                        <a id="cover" href="#">Link</a>
+                    </div>
+                </div>
+            </div>
+        `);
+        const btn = env.document.getElementById("btn") as unknown as HTMLElement;
+        const cover = env.document.getElementById("cover") as unknown as HTMLElement;
+
+        assert.equal(isInNearbySiblingSubtree(btn, cover), true,
+            "Deeply nested element in adjacent sibling subtree should be exempt");
 
         env.cleanup();
     });
