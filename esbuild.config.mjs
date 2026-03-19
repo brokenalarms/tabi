@@ -1,5 +1,8 @@
 import { build } from "esbuild";
-import "./loadEnv.mjs";
+
+// CLI env takes precedence over .env file
+const cliDebug = process.env.TABI_DEBUG;
+await import("./loadEnv.mjs");
 
 const outDir = "Tabi/Safari Extension/Resources";
 
@@ -12,6 +15,6 @@ await build({
   sourcemap: false,
   logLevel: "info",
   define: {
-    __TABI_DEBUG__: process.env.TABI_DEBUG === "1" ? "true" : "false",
+    __TABI_DEBUG__: (cliDebug ?? process.env.TABI_DEBUG) === "1" ? "true" : "false",
   },
 });
