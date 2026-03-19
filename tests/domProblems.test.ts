@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
-import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isEmpty, shouldRedirectToHeading, hasListBoundaryBetween, isInNearbySiblingSubtree } from "../src/modules/elementPredicates";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isEmpty, shouldRedirectToHeading, hasListBoundaryBetween, isInNearbySiblingSubtree, countNestedLinks } from "../src/modules/elementPredicates";
 import { findBlockAncestor, retryExpandedToggle, captureRetryStrategies, executeRetryStrategies } from "../src/modules/elementTraversals";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 

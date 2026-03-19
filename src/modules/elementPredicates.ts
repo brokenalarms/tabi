@@ -281,35 +281,35 @@ export function hasListBoundaryBetween(ancestor: HTMLElement, descendant: HTMLEl
   return false;
 }
 
-/** Does this container have other discovered elements inside it?
+/** How many other discovered elements are inside this container?
  *  Elements behind a list boundary are at a different tree level and are
  *  exempt — they won't visually clash with the container's glow.
  *  Uses a Set for O(1) membership checks instead of scanning the full list. */
-export function hasNestedLinks(container: HTMLElement, el: HTMLElement, discoveredSet: Set<HTMLElement>): boolean {
-  // Walk direct descendants (not behind a list boundary) looking for
-  // any other discovered element. Prune at list boundaries.
-  const walk = (node: HTMLElement): boolean => {
+export function countNestedLinks(container: HTMLElement, el: HTMLElement, discoveredSet: Set<HTMLElement>): number {
+  let count = 0;
+  const walk = (node: HTMLElement): void => {
     for (const child of node.children) {
       const c = child as HTMLElement;
       if (LIST_BOUNDARY_TAGS.has(c.tagName)) continue;
-      if (c !== el && discoveredSet.has(c)) return true;
-      if (walk(c)) return true;
+      if (c !== el && discoveredSet.has(c)) count++;
+      walk(c);
     }
-    return false;
   };
-  return walk(container);
+  walk(container);
+  return count;
 }
 
 
 /** Is this element large and rectangular enough for container-style hint placement?
- *  Checks minimum width, aspect ratio or viewport fraction, and box generation. */
+ *  Rectangular: wide landscape items (nav rows, table rows).
+ *  Tall: portrait cards (video grids) — narrower width threshold but must
+ *  be at least twice the minimum container height. */
 export function isLargeEnoughForGlow(el: HTMLElement, rect: DOMRect): boolean {
   if (!hasBox(el)) return false;
-  if (rect.width <= MINIMUM_CONTAINER_WIDTH) return false;
   if (rect.height < MINIMUM_CONTAINER_HEIGHT) return false;
-  const isRectangular = rect.width / (rect.height || 1) >= 1.5;
-  const isLarge = rect.width > window.innerWidth * 0.25;
-  return isRectangular || isLarge;
+  const isRectangular = rect.width > MINIMUM_CONTAINER_WIDTH && rect.width / (rect.height || 1) >= 1.5;
+  const isTall = rect.width > MINIMUM_CONTAINER_WIDTH / 2 && rect.height > MINIMUM_CONTAINER_HEIGHT * 2;
+  return isRectangular || isTall;
 }
 
 /** Does this element contain a heading (h1–h6) as a descendant? */
