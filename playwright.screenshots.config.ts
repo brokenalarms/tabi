@@ -4,7 +4,7 @@ export default defineConfig({
   testDir: "scripts",
   testMatch: "screenshots.ts",
   use: {
-    browserName: "webkit",
+    browserName: "chromium",
   },
   globalSetup: "./tests/integration/globalSetup.ts",
 });

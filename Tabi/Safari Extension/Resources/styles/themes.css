@@ -74,7 +74,9 @@
 /* ── Help component tokens ────────────────────────────────────────────── */
 
 .tabi-help-modal {
-    --tabi-help-key-color: rgba(255, 255, 255, 0.55);
+    --tabi-help-key-color: rgba(255, 255, 255, 0.7);
+    --tabi-help-key-bg: rgba(255, 255, 255, 0.08);
+    --tabi-help-key-border: rgba(255, 255, 255, 0.12);
     --tabi-help-row-hover: rgba(255, 255, 255, 0.06);
 }
 
@@ -104,7 +106,9 @@
     }
 
     .tabi-help-modal {
-        --tabi-help-key-color: rgba(0, 0, 0, 0.45);
+        --tabi-help-key-color: rgba(0, 0, 0, 0.55);
+        --tabi-help-key-bg: rgba(0, 0, 0, 0.04);
+        --tabi-help-key-border: rgba(0, 0, 0, 0.1);
         --tabi-help-row-hover: rgba(0, 0, 0, 0.04);
     }
 }
