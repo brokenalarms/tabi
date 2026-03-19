@@ -111,7 +111,7 @@ export class HintMode {
     this.keyHandler.setMode(Mode.HINTS);
 
     let elements = discoverElements((el: HTMLElement) => this.getHintRect(el));
-    if (mode === "yank") {
+    if (mode === "yank" || mode === "multi") {
       elements = elements.filter(el =>
         el.tagName.toLowerCase() === "a" && (el as HTMLAnchorElement).href
       );
