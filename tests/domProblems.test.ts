@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
-import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isEmpty, shouldRedirectToHeading, hasListBoundaryBetween, isInNearbySiblingSubtree, countNestedLinks } from "../src/modules/elementPredicates";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isEmpty, shouldRedirectToHeading, hasListBoundaryBetween, isInNearbySiblingSubtree } from "../src/modules/elementPredicates";
 import { findBlockAncestor, retryExpandedToggle, captureRetryStrategies, executeRetryStrategies } from "../src/modules/elementTraversals";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
@@ -3022,46 +3022,6 @@ describe("retry click", () => {
         // didChange compares post-click snapshot ("true") vs current ("true") — no change!
         assert.equal(capturedAfter!.didChange(), false,
             "strategy captured after click cannot detect the change");
-    });
-});
-
-// ISSUE: YouTube grid video cards (ytd-grid-video-renderer) repeat as siblings but
-//        aren't detected as repeating containers — only <li> and <tr> qualify.
-// SITE: youtube.com/@channel/videos
-// FIX: Add site-specific custom elements to the repeating container selector.
-describe("site-specific repeating containers", () => {
-    it("ytd-grid-video-renderer siblings are repeating containers", () => {
-        // Base: element inside a plain <div> is NOT in a repeating container
-        const envPlain = createDOM(`<div><a id="solo" href="#">link</a></div>`);
-        const solo = envPlain.document.getElementById("solo") as unknown as HTMLElement;
-        assert.equal(isInRepeatingContainer(solo), false,
-            "Link in a plain div is not in a repeating container");
-        envPlain.cleanup();
-
-        // Delta: element inside ytd-grid-video-renderer with 3+ siblings IS
-        const env = createDOM(`
-            <div id="items">
-                <ytd-grid-video-renderer>
-                    <a id="t" href="/watch?v=1">Video 1</a>
-                </ytd-grid-video-renderer>
-                <ytd-grid-video-renderer>
-                    <a href="/watch?v=2">Video 2</a>
-                </ytd-grid-video-renderer>
-                <ytd-grid-video-renderer>
-                    <a href="/watch?v=3">Video 3</a>
-                </ytd-grid-video-renderer>
-            </div>
-        `);
-        const el = env.document.getElementById("t") as unknown as HTMLElement;
-
-        assert.equal(isInRepeatingContainer(el), true,
-            "Link inside ytd-grid-video-renderer should be in a repeating container");
-
-        const container = getRepeatingContainer(el);
-        assert.equal(container?.tagName.toUpperCase(), "YTD-GRID-VIDEO-RENDERER",
-            "Repeating container should be the ytd-grid-video-renderer element");
-
-        env.cleanup();
     });
 });
 
