@@ -43,6 +43,7 @@ export interface TabInfo {
   title: string;
   url: string;
   active: boolean;
+  favIconUrl?: string;
 }
 
 export type CommandMessage =

@@ -23,7 +23,7 @@ declare const browser: {
     create(opts: { url?: string; index?: number }): Promise<{ id: number }>;
     remove(tabId: number): Promise<void>;
     update(tabId: number, props: { active: boolean }): Promise<unknown>;
-    query(opts: { currentWindow: boolean }): Promise<Array<{ id: number; title: string; url: string; active: boolean }>>;
+    query(opts: { currentWindow: boolean }): Promise<Array<{ id: number; title: string; url: string; active: boolean; favIconUrl?: string }>>;
     sendMessage(tabId: number, message: Record<string, unknown>): Promise<unknown>;
     onRemoved: { addListener(fn: (tabId: number) => void): void };
     onUpdated: { addListener(fn: (tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string }) => void): void };
@@ -201,7 +201,7 @@ export async function handleCommand(command: Command, sender: MessageSender, mes
 
     case "queryTabs": {
       const tabs = await browser.tabs.query({ currentWindow: true });
-      return tabs.map(t => ({ id: t.id, title: t.title, url: t.url, active: t.active }));
+      return tabs.map(t => ({ id: t.id, title: t.title, url: t.url, active: t.active, favIconUrl: t.favIconUrl }));
     }
 
     case "switchTab": {
@@ -269,23 +269,6 @@ export async function handleCommand(command: Command, sender: MessageSender, mes
   return { status: "ok" };
 }
 
-// Fetch settings from the native Safari extension handler and persist to
-// browser.storage.local so content scripts and the popup can read them.
-// Currently syncs the detected keyboard layout (read-only from Carbon TIS).
-export async function syncNativeSettings(): Promise<void> {
-  try {
-    const response = await browser.runtime.sendNativeMessage(
-      "com.brokenalarms.tabi.Extension",
-      { command: "getSettings" },
-    );
-    if (response && typeof response.keyboardLayout === "string") {
-      await browser.storage.local.set({ keyboardLayout: response.keyboardLayout });
-    }
-  } catch (_) {
-    // Native messaging may not be available (e.g. in tests)
-  }
-}
-
 // Register listeners and populate caches — called at load time in production,
 // and explicitly from tests after the browser shim is installed.
 export function init(): void {
@@ -351,5 +334,4 @@ export function init(): void {
 // Auto-init when running in the browser extension context
 if (typeof browser !== "undefined") {
   init();
-  syncNativeSettings();
 }
