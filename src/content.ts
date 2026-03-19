@@ -306,7 +306,6 @@ browser.runtime.onMessage.addListener((message: unknown) => {
 
 // Request a settings sync from the native host app, then read all settings and initialize.
 browser.runtime.sendMessage({ command: "syncSettings" }).catch(() => {});
-
 browser.storage.local.get(["excludedDomains", "keyBindingMode", "keyLayout", "theme", "isPremium"]).then((result) => {
   const excluded = (result.excludedDomains as string[]) || [];
   if (isDomainExcluded(excluded)) {
