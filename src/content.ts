@@ -275,9 +275,6 @@ browser.runtime.onMessage.addListener((message: unknown) => {
 });
 
 // Request a settings sync from the native host app, then read all settings and initialize.
-// The sync populates browser.storage.local with the latest values from the host app
-// (including isPremium). We don't block initialization on it — if it fails or is slow,
-// we still initialize with whatever storage already has.
 browser.runtime.sendMessage({ command: "syncSettings" }).catch(() => {});
 
 browser.storage.local.get(["excludedDomains", "keyBindingMode", "keyLayout", "theme", "isPremium"]).then((result) => {
