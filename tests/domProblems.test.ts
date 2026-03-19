@@ -7,7 +7,7 @@ import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from ".
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
 import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isEmpty, shouldRedirectToHeading, hasListBoundaryBetween } from "../src/modules/elementPredicates";
-import { findBlockAncestor } from "../src/modules/elementTraversals";
+import { findBlockAncestor, retryExpandedToggle, captureRetryStrategies, executeRetryStrategies } from "../src/modules/elementTraversals";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
 describe("element discovery", () => {
@@ -2943,5 +2943,84 @@ describe("table row container glow all-or-none", () => {
         assert.equal(hints?.length, 2, "propagated row should get a hint too");
         // Both rows get glow
         assert.equal(glows?.length, 2, "glow propagates to sibling container");
+    });
+});
+
+describe("retry click", () => {
+    let cleanup: (() => void) | undefined;
+    afterEach(() => cleanup?.());
+
+    // ISSUE: GitHub "View details" button with aria-expanded toggles on click,
+    //        but retryExpandedToggle captured state AFTER the click, saw the
+    //        post-click value as baseline, and fired a second click that undid
+    //        the toggle.
+    // SITE: GitHub PR timeline
+    // FIX: Capture retry strategy state BEFORE the click so the baseline is
+    //      the true pre-click value. A synchronous toggle is then detected as
+    //      a change and no retry fires.
+    it("captures aria-expanded before click to avoid double-toggling", () => {
+        const env = createDOM(`
+            <div>
+                <button id="toggle" aria-expanded="false" type="button">
+                    <span>View details</span>
+                </button>
+            </div>
+        `);
+        cleanup = env.cleanup;
+
+        const btn = env.document.getElementById("toggle")! as unknown as HTMLElement;
+
+        // Simulate a click handler that synchronously toggles aria-expanded
+        // (as GitHub's js-details-target does)
+        btn.addEventListener("click", () => {
+            const current = btn.getAttribute("aria-expanded");
+            btn.setAttribute("aria-expanded", current === "true" ? "false" : "true");
+        });
+
+        // Base: before any click, aria-expanded is "false"
+        assert.equal(btn.getAttribute("aria-expanded"), "false");
+
+        // Capture strategy BEFORE the click (correct ordering)
+        const captured = captureRetryStrategies(btn);
+        assert.equal(captured.length, 1, "strategy should apply to aria-expanded element");
+
+        // Click toggles aria-expanded synchronously to "true"
+        btn.click();
+        assert.equal(btn.getAttribute("aria-expanded"), "true",
+            "click should toggle aria-expanded to true");
+
+        // didChange sees the pre-click snapshot ("false") vs current ("true") — changed!
+        assert.equal(captured[0].didChange(), true,
+            "strategy captured before click should detect the change");
+    });
+
+    it("capturing after click misses the change and causes double-toggle", () => {
+        const env = createDOM(`
+            <div>
+                <button id="toggle" aria-expanded="false" type="button">
+                    <span>View details</span>
+                </button>
+            </div>
+        `);
+        cleanup = env.cleanup;
+
+        const btn = env.document.getElementById("toggle")! as unknown as HTMLElement;
+
+        btn.addEventListener("click", () => {
+            const current = btn.getAttribute("aria-expanded");
+            btn.setAttribute("aria-expanded", current === "true" ? "false" : "true");
+        });
+
+        // Click first, THEN capture (the old broken ordering)
+        btn.click();
+        assert.equal(btn.getAttribute("aria-expanded"), "true",
+            "click should toggle aria-expanded to true");
+
+        const capturedAfter = retryExpandedToggle(btn);
+        assert.ok(capturedAfter, "strategy should apply");
+
+        // didChange compares post-click snapshot ("true") vs current ("true") — no change!
+        assert.equal(capturedAfter!.didChange(), false,
+            "strategy captured after click cannot detect the change");
     });
 });

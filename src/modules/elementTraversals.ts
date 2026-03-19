@@ -160,6 +160,10 @@ function findFirstContentChild(el: HTMLElement): HTMLElement | null {
 // --- Click retry strategies ---
 // Each strategy is a factory: given an element, returns { didChange, retry }
 // if applicable, or null if not. The closure captures initial state.
+// IMPORTANT: strategies must be created BEFORE the click so they snapshot
+// the pre-click state. Otherwise a synchronous handler that updates
+// aria-expanded (etc.) will cause the retry to see the post-click value
+// as the baseline and double-click, undoing the toggle.
 
 type RetryStrategy = (el: HTMLElement) => {
   didChange: () => boolean;
@@ -168,7 +172,7 @@ type RetryStrategy = (el: HTMLElement) => {
 
 /** For elements with aria-expanded: click the first non-empty descendant
  *  (e.g. a toggle chevron inside a treeitem). */
-const retryExpandedToggle: RetryStrategy = (el) => {
+export const retryExpandedToggle: RetryStrategy = (el) => {
   const before = el.getAttribute("aria-expanded");
   if (before === null) return null;
   return {
@@ -182,20 +186,31 @@ const retryExpandedToggle: RetryStrategy = (el) => {
 
 const RETRY_STRATEGIES: RetryStrategy[] = [retryExpandedToggle];
 
+type CapturedStrategy = { didChange: () => boolean; retry: () => void };
+
+/** Snapshot all applicable retry strategies BEFORE the click.
+ *  Returns captured results to pass to executeRetryStrategies(). */
+export function captureRetryStrategies(element: HTMLElement, strategies = RETRY_STRATEGIES): CapturedStrategy[] {
+  const captured: CapturedStrategy[] = [];
+  for (const strategy of strategies) {
+    const result = strategy(element);
+    if (result) captured.push(result);
+  }
+  return captured;
+}
+
 const nextFrame = (): Promise<void> =>
   new Promise(resolve => requestAnimationFrame(() => resolve()));
 
-/** After a click, try each applicable retry strategy in sequence,
- *  waiting a frame between each to let the previous attempt take effect. */
-export async function retryClick(element: HTMLElement, strategies = RETRY_STRATEGIES): Promise<void> {
-  if (strategies.length === 0) return;
-  const [current, ...remaining] = strategies;
-  const result = current(element);
-  if (!result) return retryClick(element, remaining);
-  await nextFrame();
-  if (result.didChange()) return;
-  result.retry();
-  await nextFrame();
-  if (result.didChange()) return;
-  return retryClick(element, remaining);
+/** After the click, run through pre-captured strategies: if the click
+ *  already toggled the state, do nothing; otherwise retry with an
+ *  alternative click target. */
+export async function executeRetryStrategies(captured: CapturedStrategy[]): Promise<void> {
+  for (const result of captured) {
+    await nextFrame();
+    if (result.didChange()) continue;
+    result.retry();
+    await nextFrame();
+    if (result.didChange()) continue;
+  }
 }

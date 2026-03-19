@@ -8,7 +8,7 @@ import { discoverElements, renderDebugDots } from "./ElementGatherer";
 import { HINT_HEIGHT } from "./constants";
 import { isLargeEnoughForGlow, isFormControl, getRepeatingContainer, hasNestedLinks, isZeroSizeAnchor, shouldRedirectToHeading, hasBox } from "./elementPredicates";
 import { LIST_BOUNDARY_SELECTOR, REPEATING_CONTAINER_SELECTOR } from "./constants";
-import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect, retryClick } from "./elementTraversals";
+import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect, captureRetryStrategies, executeRetryStrategies } from "./elementTraversals";
 
 import { Mode } from "../commands";
 
@@ -651,11 +651,12 @@ export class HintMode {
         element.focus();
         element.style.outline = "none";
         element.addEventListener("blur", () => { element.style.outline = ""; }, { once: true });
+        const captured = captureRetryStrategies(element);
         const opts = { bubbles: true, cancelable: true, view: window };
         element.dispatchEvent(new MouseEvent("mousedown", opts));
         element.dispatchEvent(new MouseEvent("mouseup", opts));
         element.click();
-        retryClick(element);
+        executeRetryStrategies(captured);
       }
 
       // Fade out the ring
