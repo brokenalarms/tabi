@@ -1,7 +1,7 @@
 // ScrollController unit tests — using Node.js built-in test runner
 // Tests scroll target detection, command wiring, and scroll direction.
-// j/k/h/l use a RAF loop (tested via flushRAF); d/u/gg/G use browser
-// scrollBy/scrollTo with behavior:"smooth" (tested via mock calls).
+// j/k/h/l use a RAF loop with velocity smoothing (tested via flushRAF);
+// d/u/gg/G use browser scrollBy/scrollTo with behavior:"smooth" (tested via mock calls).
 
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -174,31 +174,41 @@ describe("ScrollController", () => {
         });
     });
 
-    describe("Scroll commands (j/k/h/l)", () => {
-        it("j starts scrolling down", () => {
+    describe("Scroll commands (j/k/h/l) with ease-in", () => {
+        it("j scrolls down, accelerating smoothly", () => {
             fireKeyDown(makeKeyEvent("KeyJ"));
             flushRAF(200);
             assert.ok(documentScrollingElement.scrollTop > 0, "should scroll down");
         });
 
-        it("k starts scrolling up", () => {
+        it("k scrolls up, accelerating smoothly", () => {
             documentScrollingElement.scrollTop = 500;
             fireKeyDown(makeKeyEvent("KeyK"));
             flushRAF(200);
             assert.ok(documentScrollingElement.scrollTop < 500, "should scroll up");
         });
 
-        it("l starts scrolling right", () => {
+        it("l scrolls right", () => {
             fireKeyDown(makeKeyEvent("KeyL"));
             flushRAF(200);
             assert.ok(documentScrollingElement.scrollLeft > 0, "should scroll right");
         });
 
-        it("h starts scrolling left", () => {
+        it("h scrolls left", () => {
             documentScrollingElement.scrollLeft = 500;
             fireKeyDown(makeKeyEvent("KeyH"));
             flushRAF(200);
             assert.ok(documentScrollingElement.scrollLeft < 500, "should scroll left");
+        });
+
+        it("decelerates on keyup", () => {
+            fireKeyDown(makeKeyEvent("KeyJ"));
+            flushRAF(200);
+            const posAtRelease = documentScrollingElement.scrollTop;
+            fireKeyUp(makeKeyEvent("KeyJ"));
+            flushRAF(600);
+            // Should have coasted a bit further, then stopped
+            assert.ok(documentScrollingElement.scrollTop > posAtRelease, "should coast after keyup");
         });
     });
 
