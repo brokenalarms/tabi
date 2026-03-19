@@ -191,12 +191,12 @@ type CapturedStrategy = { didChange: () => boolean; retry: () => void };
 /** Snapshot all applicable retry strategies BEFORE the click.
  *  Returns captured results to pass to executeRetryStrategies(). */
 export function captureRetryStrategies(element: HTMLElement, strategies = RETRY_STRATEGIES): CapturedStrategy[] {
-  const captured: CapturedStrategy[] = [];
+  const applicable: CapturedStrategy[] = [];
   for (const strategy of strategies) {
-    const result = strategy(element);
-    if (result) captured.push(result);
+    const check = strategy(element);
+    if (check) applicable.push(check);
   }
-  return captured;
+  return applicable;
 }
 
 const nextFrame = (): Promise<void> =>
@@ -205,12 +205,12 @@ const nextFrame = (): Promise<void> =>
 /** After the click, run through pre-captured strategies: if the click
  *  already toggled the state, do nothing; otherwise retry with an
  *  alternative click target. */
-export async function executeRetryStrategies(captured: CapturedStrategy[]): Promise<void> {
-  for (const result of captured) {
+export async function executeRetryStrategies(strategies: CapturedStrategy[]): Promise<void> {
+  for (const strategy of strategies) {
     await nextFrame();
-    if (result.didChange()) return;
-    result.retry();
+    if (strategy.didChange()) return;
+    strategy.retry();
     await nextFrame();
-    if (result.didChange()) return;
+    if (strategy.didChange()) return;
   }
 }
