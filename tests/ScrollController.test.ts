@@ -1,6 +1,7 @@
 // ScrollController unit tests — using Node.js built-in test runner
 // Tests scroll target detection, command wiring, and scroll direction.
-// Animation behavior (smoothness, deceleration) is validated visually in-browser.
+// j/k/h/l use a RAF loop (tested via flushRAF); d/u/gg/G use browser
+// scrollBy/scrollTo with behavior:"smooth" (tested via mock calls).
 
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
@@ -14,7 +15,7 @@ function makeElement(opts: Record<string, any> = {}) {
         overflowX: opts.overflowX || "visible",
         overflowY: opts.overflowY || "visible",
     };
-    return {
+    const el: Record<string, any> = {
         tagName: opts.tag || "DIV",
         scrollWidth: opts.scrollWidth || 100,
         scrollHeight: opts.scrollHeight || 5000,
@@ -24,7 +25,16 @@ function makeElement(opts: Record<string, any> = {}) {
         scrollTop: opts.scrollTop || 0,
         parentElement: opts.parent || null,
         _style: style,
+        scrollBy: mock.fn((arg: ScrollToOptions) => {
+            el.scrollLeft += arg.left || 0;
+            el.scrollTop += arg.top || 0;
+        }),
+        scrollTo: mock.fn((arg: ScrollToOptions) => {
+            if (arg.left !== undefined) el.scrollLeft = arg.left;
+            if (arg.top !== undefined) el.scrollTop = arg.top;
+        }),
     };
+    return el;
 }
 
 let capturedListeners: Record<string, Function[]>,
@@ -84,7 +94,6 @@ function setupDOM() {
     };
 }
 
-// Flush rAF callbacks in 16ms steps up to targetTime.
 function flushRAF(targetTime: number) {
     const step = 16;
     let time = (globalThis as any).performance.now();
@@ -108,6 +117,7 @@ function loadModules() {
 function makeKeyEvent(code: string, opts: Record<string, boolean> = {}) {
     return {
         code,
+        key: "",
         shiftKey: opts.shift || false,
         ctrlKey: opts.ctrl || false,
         altKey: opts.alt || false,
@@ -193,43 +203,44 @@ describe("ScrollController", () => {
     });
 
     describe("Half-page scroll (d/u)", () => {
-        it("d scrolls half page down", () => {
+        it("d scrolls half page down via scrollBy smooth", () => {
             fireKeyDown(makeKeyEvent("KeyD"));
-            flushRAF(5000);
-            assert.equal(
-                documentScrollingElement.scrollTop,
-                Math.round(documentScrollingElement.clientHeight / 2),
-            );
+            assert.equal(documentScrollingElement.scrollBy.mock.callCount(), 1);
+            const call = documentScrollingElement.scrollBy.mock.calls[0];
+            assert.deepStrictEqual(call.arguments[0], {
+                top: Math.round(documentScrollingElement.clientHeight / 2),
+                behavior: "smooth",
+            });
         });
 
-        it("u scrolls half page up", () => {
-            documentScrollingElement.scrollTop = 1000;
+        it("u scrolls half page up via scrollBy smooth", () => {
             fireKeyDown(makeKeyEvent("KeyU"));
-            flushRAF(5000);
-            assert.equal(
-                documentScrollingElement.scrollTop,
-                1000 - Math.round(documentScrollingElement.clientHeight / 2),
-            );
+            assert.equal(documentScrollingElement.scrollBy.mock.callCount(), 1);
+            const call = documentScrollingElement.scrollBy.mock.calls[0];
+            assert.deepStrictEqual(call.arguments[0], {
+                top: -Math.round(documentScrollingElement.clientHeight / 2),
+                behavior: "smooth",
+            });
         });
     });
 
     describe("Absolute scroll (gg/G)", () => {
-        it("gg scrolls to top", () => {
-            documentScrollingElement.scrollTop = 500;
+        it("gg scrolls to top via scrollTo smooth", () => {
             fireKeyDown(makeKeyEvent("KeyG"));
             fireKeyDown(makeKeyEvent("KeyG"));
-            flushRAF(5000);
-            assert.equal(documentScrollingElement.scrollTop, 0);
+            assert.equal(documentScrollingElement.scrollTo.mock.callCount(), 1);
+            const call = documentScrollingElement.scrollTo.mock.calls[0];
+            assert.deepStrictEqual(call.arguments[0], { top: 0, behavior: "smooth" });
         });
 
-        it("G scrolls to bottom", () => {
-            documentScrollingElement.scrollTop = 0;
+        it("G scrolls to bottom via scrollTo smooth", () => {
             fireKeyDown(makeKeyEvent("KeyG", { shift: true }));
-            flushRAF(5000);
-            assert.equal(
-                documentScrollingElement.scrollTop,
-                documentScrollingElement.scrollHeight - documentScrollingElement.clientHeight,
-            );
+            assert.equal(documentScrollingElement.scrollTo.mock.callCount(), 1);
+            const call = documentScrollingElement.scrollTo.mock.calls[0];
+            assert.deepStrictEqual(call.arguments[0], {
+                top: documentScrollingElement.scrollHeight - documentScrollingElement.clientHeight,
+                behavior: "smooth",
+            });
         });
     });
 
