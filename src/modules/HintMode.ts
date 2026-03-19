@@ -724,12 +724,6 @@ export class HintMode {
 
   private updateStatusBar(): void {
     if (!this.statusBar) return;
-    const label = HintMode.MODE_LABELS[this.modeType];
-    if (this.modeType === "multi") {
-      const count = this.multiSelections.length;
-      this.statusBar.textContent = `${label} — ${count} selected, Space or Enter to open`;
-    } else {
-      this.statusBar.textContent = label;
-    }
+    this.statusBar.textContent = HintMode.MODE_LABELS[this.modeType];
   }
 }
