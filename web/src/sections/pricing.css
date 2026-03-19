@@ -1,0 +1,132 @@
+.pricing {
+  padding: 100px 0;
+  text-align: center;
+}
+
+.pricing-subtitle {
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 48px;
+}
+
+.pricing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  max-width: 820px;
+  margin: 0 auto;
+  text-align: left;
+}
+
+.pricing-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.pricing-card--pro {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), 0 8px 32px rgba(232, 85, 62, 0.1);
+}
+
+.pricing-badge {
+  position: absolute;
+  top: -11px;
+  left: 32px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 12px;
+  border-radius: 20px;
+}
+
+.pricing-tier {
+  font-family: var(--font-display);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-bottom: 4px;
+}
+
+.pricing-price {
+  font-family: var(--font-mono);
+  font-size: 2.2rem;
+  font-weight: 600;
+  color: var(--text-bright);
+  margin-bottom: 4px;
+}
+
+.pricing-once {
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-dim);
+  vertical-align: middle;
+}
+
+.pricing-desc {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
+}
+
+.pricing-features {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 28px;
+  flex: 1;
+}
+
+.pricing-features li {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--text);
+  padding: 6px 0;
+  line-height: 1.5;
+}
+
+.pricing-features kbd {
+  font-size: 0.7em;
+  padding: 1px 5px;
+}
+
+.pricing-includes {
+  font-weight: 600;
+  color: var(--text-bright);
+  border-bottom: 1px solid var(--border-light);
+  padding-bottom: 10px;
+  margin-bottom: 2px;
+}
+
+.pcheck {
+  color: var(--green);
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+.pcheck--pro {
+  color: var(--accent);
+}
+
+.pricing-card .btn {
+  text-align: center;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  .pricing {
+    padding: 72px 0;
+  }
+  .pricing-grid {
+    grid-template-columns: 1fr;
+    max-width: 400px;
+  }
+}
