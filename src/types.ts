@@ -7,12 +7,14 @@ export interface TabiSettings {
   keyBindingMode: KeyBindingMode;
   theme: Theme;
   animate: boolean;
+  isPremium: boolean;
 }
 
 export const DEFAULTS: TabiSettings = {
   theme: "auto",
   keyBindingMode: "location",
   animate: true,
+  isPremium: false,
 };
 
 /** Build-time debug flag — set via TABI_DEBUG=1 in .env or environment. */
@@ -25,6 +27,7 @@ export function resolveSettings(storage: Record<string, unknown>): TabiSettings 
     ...(storage.keyBindingMode !== undefined && { keyBindingMode: storage.keyBindingMode as KeyBindingMode }),
     ...(storage.theme !== undefined && { theme: storage.theme as Theme }),
     ...(storage.animate !== undefined && { animate: storage.animate as boolean }),
+    ...(storage.isPremium !== undefined && { isPremium: storage.isPremium as boolean }),
   };
 }
 

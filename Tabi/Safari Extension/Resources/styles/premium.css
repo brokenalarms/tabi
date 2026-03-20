@@ -1,0 +1,38 @@
+/*
+ * Premium upgrade toast — dismissible prompt shown when a free user
+ * triggers a premium feature. Matches the panel frosted-glass style
+ * with an amber accent border.
+ */
+
+.tabi-premium-toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 2147483647;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 20px;
+
+    background: var(--tabi-panel-bg);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 10px;
+    border: 1.5px solid var(--tabi-premium-border);
+    box-shadow: var(--tabi-panel-shadow);
+    color: var(--tabi-panel-color);
+
+    font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+    font-size: 13px;
+    line-height: 1.4;
+    white-space: nowrap;
+    pointer-events: none;
+}
+
+.tabi-premium-cta {
+    color: var(--tabi-premium-accent);
+    font-size: 12px;
+}
