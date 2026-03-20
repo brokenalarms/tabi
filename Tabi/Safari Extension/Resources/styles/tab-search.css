@@ -37,7 +37,7 @@
     padding: 8px 14px;
     cursor: pointer;
     border-bottom: 1px solid var(--tabi-panel-border);
-    transition: background 0.1s;
+    background: transparent;
     display: flex;
     align-items: center;
     gap: 10px;

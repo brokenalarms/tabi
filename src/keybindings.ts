@@ -33,7 +33,8 @@ const SHARED: KeyBinding[] = [
   bind("KeyY", "yankLink", "Y"),
 
   // Tabs
-  bind("KeyT", "openTabSearch", "T"),
+  bind("KeyT", "createTab", "t"),
+  bind("Shift-KeyT", "openTabSearch", "Shift+T"),
   bind("KeyX", "closeTab", "x"),
   bind("Shift-KeyX", "restoreTab", "X"),
 
@@ -136,7 +137,8 @@ export const PRESETS: Record<KeyLayout, PresetMeta> = {
       bind("KeyV", "yankLink", "V"),
 
       // Tabs
-      bind("KeyT", "openTabSearch", "T"),
+      bind("KeyT", "createTab", "t"),
+      bind("Shift-KeyT", "openTabSearch", "Shift+T"),
       bind("KeyX", "closeTab", "x"),
       bind("Shift-KeyX", "restoreTab", "X"),
 
