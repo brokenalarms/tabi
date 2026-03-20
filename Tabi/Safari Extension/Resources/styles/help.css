@@ -57,6 +57,13 @@
     align-items: center;
 }
 
+.tabi-help-premium {
+    margin-left: auto;
+    font-size: 10px;
+    opacity: 0.45;
+    padding-left: 8px;
+}
+
 .tabi-help-hint {
     text-align: center;
     font-size: 10px;

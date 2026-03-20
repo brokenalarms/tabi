@@ -10,6 +10,11 @@
     flex-direction: column;
 }
 
+.tabi-tab-search-input-wrap {
+    position: relative;
+    flex-shrink: 0;
+}
+
 .tabi-tab-search-modal input {
     width: 100%;
     padding: 10px 14px;
@@ -21,7 +26,16 @@
     font-family: inherit;
     outline: none;
     box-sizing: border-box;
-    flex-shrink: 0;
+}
+
+.tabi-tab-search-premium {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    opacity: 0.35;
+    pointer-events: none;
 }
 
 .tabi-tab-search-modal input::placeholder {
