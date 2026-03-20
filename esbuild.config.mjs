@@ -16,5 +16,6 @@ await build({
   logLevel: "info",
   define: {
     __TABI_DEBUG__: (cliDebug ?? process.env.TABI_DEBUG) === "1" ? "true" : "false",
+    __TABI_PREMIUM__: process.env.TABI_PREMIUM === "1" ? "true" : "false",
   },
 });

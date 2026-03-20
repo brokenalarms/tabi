@@ -3,6 +3,7 @@
 // status pill and provides a link to open the full settings page.
 
 import { PremiumPrompt, PREMIUM_FEATURES } from "./modules/PremiumPrompt";
+import { FORCE_PREMIUM } from "./types";
 
 declare const browser: {
   storage: {
@@ -44,10 +45,10 @@ async function init(): Promise<void> {
   // Premium pill
   const pill = document.getElementById("premiumPill");
   if (pill) {
-    updatePremiumPill(pill, stored.isPremium === true);
+    updatePremiumPill(pill, FORCE_PREMIUM || stored.isPremium === true);
   }
 
-  const isPremium = stored.isPremium === true;
+  const isPremium = FORCE_PREMIUM || stored.isPremium === true;
 
   // Gate premium buttons — style as disabled but keep them enabled so clicks
   // fire, letting us show the premium prompt.

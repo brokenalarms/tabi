@@ -7,6 +7,12 @@ export const Mode = {
   TAB_SEARCH: "TAB_SEARCH",
 } as const;
 
+export const PREMIUM_COMMANDS = new Set([
+  "openTabSearch",
+  "setMark",
+  "jumpMark",
+]);
+
 export const COMMANDS: Record<string, string> = {
   scrollDown: "Scroll down",
   scrollUp: "Scroll up",
