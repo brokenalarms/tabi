@@ -46,12 +46,10 @@
 
 .hero-icon-glow {
   flex-shrink: 0;
-  filter: drop-shadow(0 0 40px rgba(212, 160, 32, 0.35));
-  transition: filter 0.4s var(--ease), transform 0.4s var(--ease);
+  transition: transform 0.4s var(--ease);
 }
 
 .hero-icon-glow:hover {
-  filter: drop-shadow(0 0 60px rgba(255, 247, 133, 0.45));
   transform: scale(1.05);
 }
 
@@ -62,6 +60,12 @@
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
+  box-shadow: 0 0 40px rgba(212, 160, 32, 0.35);
+  transition: box-shadow 0.4s var(--ease);
+}
+
+.hero-icon-glow:hover .hero-icon {
+  box-shadow: 0 0 60px rgba(255, 247, 133, 0.45);
 }
 
 .hero-icon-svg {
