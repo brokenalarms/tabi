@@ -2,57 +2,10 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width">
   <meta name="color-scheme" content="light dark">
-  <link rel="stylesheet" href="styles/tabi-theme.css">
-  <link rel="stylesheet" href="styles/popup.css">
+  <style>body { background: transparent; }</style>
 </head>
 <body>
-  <div class="popup">
-    <div class="header">
-      <h1>tabi</h1>
-      <span class="premium-pill" id="premiumPill">Free</span>
-    </div>
-
-    <div class="setting">
-      <label class="setting-label">Key Layout</label>
-      <div class="segmented" id="keyLayout">
-        <button data-value="optimized" class="active">Home Row</button>
-        <button data-value="vim">Vim</button>
-        <button data-value="leftHand" data-premium>Left Hand</button>
-        <button data-value="rightHand" data-premium>Right Hand</button>
-      </div>
-      <p class="hint-text">Home Row is great for everyone. Vim for muscle memory. One-handed layouts are premium.</p>
-    </div>
-
-    <hr>
-
-    <div class="setting">
-      <label class="setting-label">Key Binding Mode</label>
-      <div class="segmented" id="keyBindingMode">
-        <button data-value="character">Character</button>
-        <button data-value="location" class="active">Position</button>
-      </div>
-      <p class="hint-text">Character matches what you type.<br>Position matches physical key location for non-QWERTY.</p>
-    </div>
-
-    <hr>
-
-    <div class="setting">
-      <label class="setting-label">Tag Style</label>
-      <div class="segmented" id="theme">
-        <button data-value="auto" class="active">Auto</button>
-        <button data-value="dark">Dark</button>
-        <button data-value="light">Light</button>
-        <button data-value="classic">Classic</button>
-      </div>
-      <p class="hint-text">Auto contrasts with the page background. Classic is yellow!</p>
-    </div>
-
-    <div class="footer">
-      <a class="settings-link" id="settingsLink" href="#">Open Full Settings ↗</a>
-    </div>
-  </div>
   <script src="popup.js"></script>
 </body>
 </html>

@@ -42,6 +42,10 @@ const SHARED: KeyBinding[] = [
   bind("KeyG KeyI", "focusInput", "gi"),
   bind("KeyG KeyU", "goUpUrl", "gu"),
 
+  // Marks
+  bind("KeyM", "setMark", "m"),
+  bind("Quote", "jumpMark", "'"),
+
   // Help
   bind("Shift-Slash", "showHelp", "?"),
 ];

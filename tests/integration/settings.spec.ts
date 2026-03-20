@@ -69,19 +69,18 @@ test("settings page renders sidebar with all navigation items", async ({ page })
   await setupSettingsPage(page);
 
   const navItems = await page.locator(".nav-item").allTextContents();
-  // Nav items include an icon span prefix (e.g. "⚙Settings")
-  for (const label of ["Settings", "Statistics", "Quick Marks", "Key Layouts", "Premium"]) {
+  for (const label of ["Statistics", "Quick Marks", "Key Layouts", "Premium"]) {
     expect(navItems.some(item => item.includes(label))).toBe(true);
   }
-  expect(navItems).toHaveLength(5);
+  expect(navItems).toHaveLength(4);
 });
 
-test("settings page shows Settings as default active page", async ({ page }) => {
+test("settings page shows Key Layouts as default active page", async ({ page }) => {
   await setupSettingsPage(page);
 
   const activePage = page.locator(".page.active");
   await expect(activePage).toHaveCount(1);
-  await expect(activePage.locator(".page-title")).toHaveText("Settings");
+  await expect(activePage.locator(".page-title")).toHaveText("Key Layouts");
 });
 
 test("sidebar shows Free pill when not premium", async ({ page }) => {
@@ -104,18 +103,34 @@ test("sidebar shows Premium pill when premium is active", async ({ page }) => {
 test("navigation switches active page", async ({ page }) => {
   await setupSettingsPage(page);
 
-  // Click Key Layouts nav item
-  await page.locator(".nav-item", { hasText: "Key Layouts" }).click();
+  await page.locator(".nav-item", { hasText: "Statistics" }).click();
 
   const activePage = page.locator(".page.active");
-  await expect(activePage.locator(".page-title")).toHaveText("Key Layouts");
+  await expect(activePage.locator(".page-title")).toContainText("Statistics");
+});
+
+// ── Tag style visual previews ──────────────────────────────────────
+
+test("key layouts page shows mode color previews with Click, Yank, Multi tags", async ({ page }) => {
+  await setupSettingsPage(page);
+
+  const previews = page.locator(".mode-color-preview");
+  await expect(previews).toHaveCount(3);
+
+  const labels = await page.locator(".mode-color-label").allTextContents();
+  expect(labels).toEqual(["Click", "Yank", "Multi"]);
+
+  const tags = page.locator(".mode-hint-tag");
+  await expect(tags).toHaveCount(3);
+  await expect(tags.nth(0)).toHaveClass(/click/);
+  await expect(tags.nth(1)).toHaveClass(/yank/);
+  await expect(tags.nth(2)).toHaveClass(/multi/);
 });
 
 // ── Premium gate overlay ───────────────────────────────────────────
 
 test("clicking disabled premium layout card shows premium prompt", async ({ page }) => {
   await setupSettingsPage(page);
-  await page.locator(".nav-item", { hasText: "Key Layouts" }).click();
 
   const leftHandCard = page.locator(".layout-card.disabled", { hasText: "Left Hand" });
   await expect(leftHandCard).toBeVisible();
@@ -130,7 +145,6 @@ test("clicking disabled premium layout card shows premium prompt", async ({ page
 
 test("premium prompt dismiss button removes overlay", async ({ page }) => {
   await setupSettingsPage(page);
-  await page.locator(".nav-item", { hasText: "Key Layouts" }).click();
 
   await page.locator(".layout-card.disabled", { hasText: "Left Hand" }).click();
   const overlay = page.locator("[data-tabi-premium-prompt]");
@@ -142,7 +156,6 @@ test("premium prompt dismiss button removes overlay", async ({ page }) => {
 
 test("premium prompt CTA navigates to Premium page", async ({ page }) => {
   await setupSettingsPage(page);
-  await page.locator(".nav-item", { hasText: "Key Layouts" }).click();
 
   await page.locator(".layout-card.disabled", { hasText: "Right Hand" }).click();
   await expect(page.locator("[data-tabi-premium-prompt]")).toBeVisible();
@@ -155,7 +168,6 @@ test("premium prompt CTA navigates to Premium page", async ({ page }) => {
 
 test("premium user does not see disabled layout cards", async ({ page }) => {
   await setupSettingsPage(page, { isPremium: true });
-  await page.locator(".nav-item", { hasText: "Key Layouts" }).click();
 
   const disabledCards = page.locator(".layout-card.disabled");
   await expect(disabledCards).toHaveCount(0);
@@ -375,7 +387,6 @@ test("screenshot: statistics page", async ({ page }) => {
 test("screenshot: key layouts page", async ({ page }) => {
   await setupStyledSettingsPage(page, { isPremium: true });
 
-  await page.locator(".nav-item", { hasText: "Key Layouts" }).click();
   await page.waitForSelector(".layout-cards");
 
   fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
