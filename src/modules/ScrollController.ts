@@ -48,6 +48,8 @@ interface VelocityScroll {
 
 export class ScrollController {
   private keyHandler: KeyHandlerLike;
+  /** Optional callback fired once per discrete scroll action (not per frame). */
+  onAction: (() => void) | null = null;
   private static chaseAnimations = new Map<Element, ChaseAnimation>();
   private static velocity: VelocityScroll | null = null;
   /** Elements whose scroll-behavior we've overridden to "auto". */
@@ -315,7 +317,7 @@ export class ScrollController {
       ["scrollLeft", "x", -1],
     ];
     for (const [cmd, axis, dir] of scrollCmds) {
-      kh.on(cmd, () => ScrollController.startVelocity(axis, dir));
+      kh.on(cmd, () => { ScrollController.startVelocity(axis, dir); this.onAction?.(); });
       kh.onKeyUp(cmd, () => ScrollController.stopVelocity());
     }
 
@@ -324,16 +326,18 @@ export class ScrollController {
       const target = ScrollController.findScrollTarget("y");
       ScrollController.cancelChase(target);
       ScrollController.scrollBy("y", Math.round(target.clientHeight / 2));
+      this.onAction?.();
     });
     kh.on("scrollHalfPageUp", () => {
       ScrollController.stopVelocityImmediate();
       const target = ScrollController.findScrollTarget("y");
       ScrollController.cancelChase(target);
       ScrollController.scrollBy("y", -Math.round(target.clientHeight / 2));
+      this.onAction?.();
     });
 
-    kh.on("scrollToTop", () => ScrollController.scrollToTop());
-    kh.on("scrollToBottom", () => ScrollController.scrollToBottom());
+    kh.on("scrollToTop", () => { ScrollController.scrollToTop(); this.onAction?.(); });
+    kh.on("scrollToBottom", () => { ScrollController.scrollToBottom(); this.onAction?.(); });
 
     kh.on("goBack", () => history.back());
     kh.on("goForward", () => history.forward());

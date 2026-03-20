@@ -39,5 +39,4 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
         response.userInfo = [SFExtensionMessageKey: responseData]
         context.completeRequest(returningItems: [response], completionHandler: nil)
     }
-
 }

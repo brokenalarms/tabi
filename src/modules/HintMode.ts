@@ -78,6 +78,8 @@ export class HintMode {
   private multiSelections: MultiSelection[];
   /** Multi-select: status bar element shown at bottom of viewport. */
   private statusBar: HTMLDivElement | null;
+  /** Optional callback fired when a hint action completes (click, yank, multi). */
+  onAction: ((type: HintModeType) => void) | null;
 
   constructor(keyHandler: KeyHandlerLike) {
     this.keyHandler = keyHandler;
@@ -95,6 +97,7 @@ export class HintMode {
     this.hintPlacementMap = new Map();
     this.multiSelections = [];
     this.statusBar = null;
+    this.onAction = null;
   }
 
   // --- Public API ---
@@ -580,6 +583,7 @@ export class HintMode {
         // so Safari doesn't block execCommand('copy') as click-jacking.
         const url = (match.element as HTMLAnchorElement).href;
         HintMode.copyToClipboard(url);
+        this.onAction?.("yank");
         this.deactivate();
       } else if (this.modeType === "multi") {
         this.selectForMulti(match);
@@ -679,6 +683,8 @@ export class HintMode {
         executeRetryStrategies(captured);
       }
 
+      this.onAction?.("click");
+
       // Fade out the ring
       ring.classList.add("tabi-hint-ring-out");
       ring.addEventListener("animationend", () => ring.remove(), { once: true });
@@ -708,6 +714,8 @@ export class HintMode {
 
   private executeMultiSelections(): void {
     const selections = [...this.multiSelections];
+    // Fire once per multi-select batch, not per link
+    this.onAction?.("multi");
     this.deactivate();
 
     for (const { hint } of selections) {

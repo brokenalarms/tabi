@@ -12,6 +12,7 @@ import { TabSearch } from "./modules/TabSearch";
 import { HelpOverlay } from "./modules/HelpOverlay";
 import { setPremiumStatus } from "./premium";
 import { QuickMarks } from "./modules/QuickMarks";
+import { Statistics } from "./modules/Statistics";
 
 // Browser API (Safari Web Extension)
 declare const browser: {
@@ -116,6 +117,19 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
     quickMarks = new QuickMarks(keyHandler);
   }
 
+  // Statistics tracking (premium feature)
+  let statistics: Statistics | null = null;
+  if (resolved.isPremium) {
+    statistics = new Statistics();
+    statistics.load();
+    hintMode.onAction = (type) => {
+      if (type === "yank") statistics!.record("linksYanked");
+      else statistics!.record("hintsClicked");
+    };
+    tabSearch.onAction = () => statistics!.record("tabsSearched");
+    scrollController.onAction = () => statistics!.record("scrollActions");
+  }
+
   // Listen for live settings changes from browser.storage
   browser.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "local") return;
@@ -140,6 +154,21 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
       } else if (!resolved.isPremium && quickMarks) {
         quickMarks.destroy();
         quickMarks = null;
+      }
+      if (resolved.isPremium && !statistics) {
+        statistics = new Statistics();
+        statistics.load();
+        hintMode.onAction = (type) => {
+          if (type === "yank") statistics!.record("linksYanked");
+          else statistics!.record("hintsClicked");
+        };
+        tabSearch.onAction = () => statistics!.record("tabsSearched");
+        scrollController.onAction = () => statistics!.record("scrollActions");
+      } else if (!resolved.isPremium && statistics) {
+        hintMode.onAction = null;
+        tabSearch.onAction = null;
+        scrollController.onAction = null;
+        statistics = null;
       }
     }
   });
@@ -264,6 +293,7 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   void scrollController;
   void helpOverlay;
   void quickMarks;
+  void statistics;
 }
 
 // Listen for messages from the background script (e.g. scroll restoration after mark jump)
@@ -275,9 +305,6 @@ browser.runtime.onMessage.addListener((message: unknown) => {
 });
 
 // Request a settings sync from the native host app, then read all settings and initialize.
-// The sync populates browser.storage.local with the latest values from the host app
-// (including isPremium). We don't block initialization on it — if it fails or is slow,
-// we still initialize with whatever storage already has.
 browser.runtime.sendMessage({ command: "syncSettings" }).catch(() => {});
 
 browser.storage.local.get(["excludedDomains", "keyBindingMode", "keyLayout", "theme", "isPremium"]).then((result) => {
