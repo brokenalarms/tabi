@@ -13,6 +13,7 @@ import { HelpOverlay } from "./modules/HelpOverlay";
 import { setPremiumStatus } from "./premium";
 import { QuickMarks } from "./modules/QuickMarks";
 import { Statistics } from "./modules/Statistics";
+import { StatsNotification } from "./modules/StatsNotification";
 
 // Browser API (Safari Web Extension)
 declare const browser: {
@@ -119,9 +120,15 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
 
   // Statistics tracking (premium feature)
   let statistics: Statistics | null = null;
+  let statsNotification: StatsNotification | null = null;
   if (resolved.isPremium) {
     statistics = new Statistics();
-    statistics.load();
+    statistics.load().then(() => {
+      if (resolved.autoNotifications && statistics) {
+        statsNotification = new StatsNotification();
+        statsNotification.check(statistics.getCounters());
+      }
+    });
     hintMode.onAction = (type) => {
       if (type === "yank") statistics!.record("linksYanked");
       else statistics!.record("hintsClicked");
@@ -157,7 +164,12 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
       }
       if (resolved.isPremium && !statistics) {
         statistics = new Statistics();
-        statistics.load();
+        statistics.load().then(() => {
+          if (resolved.autoNotifications && statistics) {
+            statsNotification = new StatsNotification();
+            statsNotification.check(statistics.getCounters());
+          }
+        });
         hintMode.onAction = (type) => {
           if (type === "yank") statistics!.record("linksYanked");
           else statistics!.record("hintsClicked");
@@ -169,6 +181,10 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
         tabSearch.onAction = null;
         scrollController.onAction = null;
         statistics = null;
+        if (statsNotification) {
+          statsNotification.dismiss();
+          statsNotification = null;
+        }
       }
     }
   });
@@ -294,6 +310,7 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   void helpOverlay;
   void quickMarks;
   void statistics;
+  void statsNotification;
 }
 
 // Listen for messages from the background script (e.g. scroll restoration after mark jump)
@@ -306,7 +323,7 @@ browser.runtime.onMessage.addListener((message: unknown) => {
 
 // Request a settings sync from the native host app, then read all settings and initialize.
 browser.runtime.sendMessage({ command: "syncSettings" }).catch(() => {});
-browser.storage.local.get(["excludedDomains", "keyBindingMode", "keyLayout", "theme", "isPremium"]).then((result) => {
+browser.storage.local.get(["excludedDomains", "keyBindingMode", "keyLayout", "theme", "isPremium", "autoNotifications"]).then((result) => {
   const excluded = (result.excludedDomains as string[]) || [];
   if (isDomainExcluded(excluded)) {
     browser.runtime.sendMessage({ command: "extensionInactive" });

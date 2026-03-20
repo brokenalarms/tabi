@@ -10,6 +10,7 @@ export interface TabiSettings {
   theme: Theme;
   animate: boolean;
   isPremium: boolean;
+  autoNotifications: boolean;
 }
 
 export const DEFAULTS: TabiSettings = {
@@ -18,6 +19,7 @@ export const DEFAULTS: TabiSettings = {
   keyLayout: "optimized",
   animate: true,
   isPremium: false,
+  autoNotifications: true,
 };
 
 /** Build-time debug flag — set via TABI_DEBUG=1 in .env or environment. */
@@ -32,6 +34,7 @@ export function resolveSettings(storage: Record<string, unknown>): TabiSettings 
     ...(storage.theme !== undefined && { theme: storage.theme as Theme }),
     ...(storage.animate !== undefined && { animate: storage.animate as boolean }),
     ...(storage.isPremium !== undefined && { isPremium: storage.isPremium as boolean }),
+    ...(storage.autoNotifications !== undefined && { autoNotifications: storage.autoNotifications as boolean }),
   };
 }
 
