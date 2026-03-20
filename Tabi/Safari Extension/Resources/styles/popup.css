@@ -142,3 +142,10 @@ hr {
 .settings-link:hover {
   color: var(--tabi-muted);
 }
+
+/* ── Premium-gated buttons ─────────────────────────────── */
+
+.segmented button.premium-gated {
+  opacity: 0.4;
+  cursor: pointer;
+}
