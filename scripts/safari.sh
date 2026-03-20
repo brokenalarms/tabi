@@ -60,20 +60,20 @@ osascript -e '
 
     if (count of savedWindows) = 0 then return
 
-    -- Close all default windows Safari opens on launch
-    repeat with w in windows
-      close w
-    end repeat
-    delay 0.3
-
     repeat with i from 1 to count of savedWindows
       set winInfo to item i of savedWindows
       set urls to tabURLs of winInfo
 
       if (count of urls) > 0 then
-        make new document with properties {URL:item 1 of urls}
-        delay 0.3
-        set w to window 1
+        if i = 1 and (count of windows) > 0 then
+          -- Reuse the default window Safari opened on launch
+          set w to window 1
+          set URL of current tab of w to item 1 of urls
+        else
+          make new document with properties {URL:item 1 of urls}
+          delay 0.3
+          set w to window 1
+        end if
         set bounds of w to winBounds of winInfo
 
         repeat with j from 2 to count of urls
@@ -87,33 +87,6 @@ osascript -e '
           set current tab of w to tab tabIdx of w
         end if
       end if
-    end repeat
-
-    -- Clean up blank tabs and windows
-    set windowsToClose to {}
-    repeat with w in windows
-      set tabsToClose to {}
-      repeat with j from 1 to count of tabs of w
-        set tabURL to URL of tab j of w
-        if tabURL is missing value or tabURL is "" or tabURL starts with "favorites://" then
-          set end of tabsToClose to j
-        end if
-      end repeat
-      if (count of tabsToClose) = (count of tabs of w) then
-        set end of windowsToClose to id of w
-      else
-        repeat with j from (count of tabsToClose) to 1 by -1
-          close tab (item j of tabsToClose) of w
-        end repeat
-      end if
-    end repeat
-    repeat with wid in windowsToClose
-      repeat with w in windows
-        if id of w = wid then
-          close w
-          exit repeat
-        end if
-      end repeat
     end repeat
 
     activate
