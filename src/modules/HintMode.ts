@@ -6,9 +6,9 @@ import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
 import { HINT_HEIGHT, HINT_CHARS } from "./constants";
-import { isLargeEnoughForGlow, isFormControl, getRepeatingContainer, countNestedLinks, isZeroSizeAnchor, shouldRedirectToHeading, hasBox } from "./elementPredicates";
-import { LIST_BOUNDARY_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER_HEIGHT } from "./constants";
-import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect, captureRetryStrategies, executeRetryStrategies } from "./elementTraversals";
+import { isLargeEnoughForGlow, isFormControl, getRepeatingContainer, countNestedLinks, isZeroSizeAnchor, shouldRedirectToHeading, isInRepeatingContainer, hasBox } from "./elementPredicates";
+import { LIST_BOUNDARY_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER_HEIGHT, NATIVE_INTERACTIVE_ELEMENTS } from "./constants";
+import { findControlTarget, findVisibleChild, findSoleContentChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect, captureRetryStrategies, executeRetryStrategies } from "./elementTraversals";
 
 import { Mode } from "../commands";
 import { removeOverlay } from "./overlayUtils";
@@ -283,6 +283,10 @@ export class HintMode {
     }
     if (shouldRedirectToHeading(el)) {
       return getHeading(el)!;
+    }
+    if (!isInRepeatingContainer(el) && !NATIVE_INTERACTIVE_ELEMENTS.includes(el.tagName.toLowerCase())) {
+      const inner = findSoleContentChild(el);
+      if (inner) return inner;
     }
     return el;
   }
