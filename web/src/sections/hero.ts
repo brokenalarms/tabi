@@ -1,4 +1,5 @@
 import './hero.css'
+import { createIcon } from '../icon.ts'
 
 export function createHero(): HTMLElement {
   const section = document.createElement('section')
@@ -6,6 +7,7 @@ export function createHero(): HTMLElement {
   section.id = 'hero'
   section.innerHTML = `
     <div class="container hero-inner">
+      <div class="hero-icon" aria-hidden="true"></div>
       <p class="hero-eyebrow">Safari extension for macOS</p>
       <h1 class="hero-title">
         Click any link.<br />Type two letters.
@@ -29,5 +31,10 @@ export function createHero(): HTMLElement {
       </div>
     </div>
   `
+
+  const iconSlot = section.querySelector('.hero-icon')!
+  const icon = createIcon('hero-icon-svg')
+  iconSlot.appendChild(icon)
+
   return section
 }

@@ -25,6 +25,38 @@
   max-width: 740px;
 }
 
+.hero-icon {
+  margin-bottom: 32px;
+  animation: heroIconEntry 0.8s var(--ease) forwards;
+  opacity: 0;
+}
+
+.hero-icon-svg {
+  width: 120px;
+  height: 120px;
+  border-radius: 28px;
+  filter: drop-shadow(0 0 40px rgba(212, 160, 32, 0.35))
+          drop-shadow(0 8px 24px rgba(0, 0, 0, 0.4));
+  transition: filter 0.4s var(--ease), transform 0.4s var(--ease);
+}
+
+.hero-icon-svg:hover {
+  filter: drop-shadow(0 0 60px rgba(255, 247, 133, 0.45))
+          drop-shadow(0 8px 24px rgba(0, 0, 0, 0.4));
+  transform: scale(1.05);
+}
+
+@keyframes heroIconEntry {
+  from {
+    opacity: 0;
+    transform: translateY(-16px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .hero-eyebrow {
   font-family: var(--font-mono);
   font-size: 12px;
