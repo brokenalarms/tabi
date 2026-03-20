@@ -334,6 +334,19 @@ export class TabSearch {
     }
   }
 
+  private updateSelection(oldIndex: number): void {
+    if (!this.resultsEl) return;
+    const items = this.resultsEl.children;
+    if (oldIndex >= 0 && oldIndex < items.length) {
+      items[oldIndex].classList.remove("selected");
+    }
+    if (this.selectedIndex >= 0 && this.selectedIndex < items.length) {
+      const next = items[this.selectedIndex] as HTMLElement;
+      next.classList.add("selected");
+      next.scrollIntoView({ block: "nearest" });
+    }
+  }
+
   private renderResults(): void {
     if (!this.resultsEl) return;
 
@@ -425,8 +438,9 @@ export class TabSearch {
       event.preventDefault();
       event.stopPropagation();
       if (this.scored.length > 0) {
+        const old = this.selectedIndex;
         this.selectedIndex = (this.selectedIndex + 1) % this.scored.length;
-        this.renderResults();
+        this.updateSelection(old);
       }
       return true;
     }
@@ -436,8 +450,9 @@ export class TabSearch {
       event.preventDefault();
       event.stopPropagation();
       if (this.scored.length > 0) {
+        const old = this.selectedIndex;
         this.selectedIndex = (this.selectedIndex - 1 + this.scored.length) % this.scored.length;
-        this.renderResults();
+        this.updateSelection(old);
       }
       return true;
     }
