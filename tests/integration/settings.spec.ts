@@ -110,24 +110,14 @@ test("navigation switches active page", async ({ page }) => {
 
 // ── Premium gate overlay ───────────────────────────────────────────
 
-test("clicking disabled premium layout button shows premium prompt", async ({ page }) => {
-  // Non-premium user — Left Hand should be disabled
+test("clicking disabled premium layout card shows premium prompt", async ({ page }) => {
   await setupSettingsPage(page);
+  await page.locator(".nav-item", { hasText: "Key Layouts" }).click();
 
-  // The Left Hand button in the Key Layout segmented control
-  const leftHandBtn = page.locator('.segmented button[data-value="leftHand"]');
-  await expect(leftHandBtn).toBeDisabled();
+  const leftHandCard = page.locator(".layout-card.disabled", { hasText: "Left Hand" });
+  await expect(leftHandCard).toBeVisible();
+  await leftHandCard.click();
 
-  // Disabled buttons swallow click events in real browsers, so dispatch
-  // the click on the segmented container with the button as the target —
-  // mirroring how event delegation works when the user clicks.
-  await page.evaluate(() => {
-    const btn = document.querySelector('.segmented button[data-value="leftHand"]') as HTMLElement;
-    const event = new MouseEvent("click", { bubbles: true });
-    btn.dispatchEvent(event);
-  });
-
-  // Premium prompt overlay should appear
   const overlay = page.locator("[data-tabi-premium-prompt]");
   await expect(overlay).toBeVisible();
   await expect(overlay).toContainText("Left Hand Layout");
@@ -137,48 +127,35 @@ test("clicking disabled premium layout button shows premium prompt", async ({ pa
 
 test("premium prompt dismiss button removes overlay", async ({ page }) => {
   await setupSettingsPage(page);
+  await page.locator(".nav-item", { hasText: "Key Layouts" }).click();
 
-  // Trigger the premium prompt via dispatching click on the disabled button
-  await page.evaluate(() => {
-    const btn = document.querySelector('.segmented button[data-value="leftHand"]') as HTMLElement;
-    btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-  });
+  await page.locator(".layout-card.disabled", { hasText: "Left Hand" }).click();
   const overlay = page.locator("[data-tabi-premium-prompt]");
   await expect(overlay).toBeVisible();
 
-  // Click "Maybe later"
   await page.locator("[data-tabi-premium-prompt] button", { hasText: "Maybe later" }).click();
-
-  // Overlay fades out (FADE_MS = 200ms) then is removed
   await expect(overlay).toBeHidden({ timeout: 1000 });
 });
 
 test("premium prompt CTA navigates to Premium page", async ({ page }) => {
   await setupSettingsPage(page);
+  await page.locator(".nav-item", { hasText: "Key Layouts" }).click();
 
-  // Trigger the premium prompt via dispatching click on the disabled button
-  await page.evaluate(() => {
-    const btn = document.querySelector('.segmented button[data-value="rightHand"]') as HTMLElement;
-    btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-  });
+  await page.locator(".layout-card.disabled", { hasText: "Right Hand" }).click();
   await expect(page.locator("[data-tabi-premium-prompt]")).toBeVisible();
 
-  // Click the CTA button (inside the overlay, not the page's upgrade button)
   await page.locator("[data-tabi-premium-prompt] button", { hasText: "Upgrade to Premium" }).click();
 
-  // Should navigate to the Premium page
   const activePage = page.locator(".page.active");
   await expect(activePage).toHaveAttribute("id", "page-premium");
 });
 
-test("premium user does not see disabled layout buttons", async ({ page }) => {
+test("premium user does not see disabled layout cards", async ({ page }) => {
   await setupSettingsPage(page, { isPremium: true });
+  await page.locator(".nav-item", { hasText: "Key Layouts" }).click();
 
-  const leftHandBtn = page.locator('.segmented button[data-value="leftHand"]');
-  await expect(leftHandBtn).toBeEnabled();
-
-  const rightHandBtn = page.locator('.segmented button[data-value="rightHand"]');
-  await expect(rightHandBtn).toBeEnabled();
+  const disabledCards = page.locator(".layout-card.disabled");
+  await expect(disabledCards).toHaveCount(0);
 });
 
 // ── Statistics page ────────────────────────────────────────────────
