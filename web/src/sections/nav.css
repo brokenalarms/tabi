@@ -31,10 +31,17 @@
   color: var(--accent);
 }
 
+.nav-logo-icon-slot {
+  display: flex;
+  align-items: center;
+  line-height: 0;
+}
+
 .nav-logo-icon {
   width: 30px;
   height: 30px;
   border-radius: 7px;
+  display: block;
   filter: drop-shadow(0 0 8px rgba(212, 160, 32, 0.3));
   transition: filter 0.2s var(--ease);
 }

@@ -7,7 +7,10 @@ export function createHero(): HTMLElement {
   section.id = 'hero'
   section.innerHTML = `
     <div class="container hero-inner">
-      <div class="hero-icon" aria-hidden="true"></div>
+      <div class="hero-lockup">
+        <div class="hero-icon" aria-hidden="true"></div>
+        <span class="hero-wordmark">Tabi</span>
+      </div>
       <p class="hero-eyebrow">Safari extension for macOS</p>
       <h1 class="hero-title">
         Click any link.<br />Type two letters.
