@@ -57,6 +57,7 @@ export type CommandMessage =
   | { command: "goToTabFirst" }
   | { command: "goToTabLast" }
   | { command: "extensionActive" }
-  | { command: "extensionInactive" };
+  | { command: "extensionInactive" }
+  | { command: "jumpToMark"; url: string; scrollY: number };
 
 export type ModeValue = "NORMAL" | "INSERT" | "HINTS" | "TAB_SEARCH";

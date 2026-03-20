@@ -47,41 +47,41 @@ interface VelocityScroll {
 }
 
 export class ScrollController {
-  private _keyHandler: KeyHandlerLike;
-  private static _chaseAnimations = new Map<Element, ChaseAnimation>();
-  private static _velocity: VelocityScroll | null = null;
+  private keyHandler: KeyHandlerLike;
+  private static chaseAnimations = new Map<Element, ChaseAnimation>();
+  private static velocity: VelocityScroll | null = null;
   /** Elements whose scroll-behavior we've overridden to "auto". */
-  private static _overriddenElements = new Set<HTMLElement>();
+  private static overriddenElements = new Set<HTMLElement>();
 
   /** Disable CSS scroll-behavior:smooth on the target so direct scrollTop/Left
    *  assignments aren't intercepted by the browser's smooth-scroll animation. */
-  private static _disableSmoothScroll(target: Element): void {
+  private static disableSmoothScroll(target: Element): void {
     const el = target as HTMLElement;
     if (!el.style) return;
-    if (ScrollController._overriddenElements.has(el)) return;
+    if (ScrollController.overriddenElements.has(el)) return;
     const style = getComputedStyle(target);
     if (style.scrollBehavior === "smooth") {
       el.style.scrollBehavior = "auto";
-      ScrollController._overriddenElements.add(el);
+      ScrollController.overriddenElements.add(el);
     }
   }
 
   /** Restore scroll-behavior on a target when all animations on it are done. */
-  private static _restoreSmoothScroll(target: Element): void {
+  private static restoreSmoothScroll(target: Element): void {
     const el = target as HTMLElement;
     if (!el.style) return;
-    if (!ScrollController._overriddenElements.has(el)) return;
+    if (!ScrollController.overriddenElements.has(el)) return;
     // Only restore if no velocity or chase is still active on this target
-    const v = ScrollController._velocity;
+    const v = ScrollController.velocity;
     if (v && v.target === target) return;
-    if (ScrollController._chaseAnimations.has(target)) return;
+    if (ScrollController.chaseAnimations.has(target)) return;
     el.style.scrollBehavior = "";
-    ScrollController._overriddenElements.delete(el);
+    ScrollController.overriddenElements.delete(el);
   }
 
   constructor(keyHandler: KeyHandlerLike) {
-    this._keyHandler = keyHandler;
-    this._wireCommands();
+    this.keyHandler = keyHandler;
+    this.wireCommands();
   }
 
   // --- Scroll target detection ---
@@ -91,7 +91,7 @@ export class ScrollController {
     if (el && el !== document.body && el !== document.documentElement) {
       let current: Element | null = el;
       while (current && current !== document.body && current !== document.documentElement) {
-        if (ScrollController._isScrollable(current, axis)) {
+        if (ScrollController.isScrollable(current, axis)) {
           return current;
         }
         current = current.parentElement;
@@ -100,7 +100,7 @@ export class ScrollController {
     return document.scrollingElement || document.documentElement;
   }
 
-  private static _isScrollable(el: Element, axis: Axis): boolean {
+  private static isScrollable(el: Element, axis: Axis): boolean {
     const style = getComputedStyle(el);
     const overflowProp = axis === "x" ? style.overflowX : style.overflowY;
     if (overflowProp !== "auto" && overflowProp !== "scroll") return false;
@@ -113,12 +113,12 @@ export class ScrollController {
 
   // --- Chase animation (smooth scroll to target) ---
 
-  private static _smoothScroll(
+  private static smoothScroll(
     target: Element,
     deltaX: number,
     deltaY: number,
   ): void {
-    const existing = ScrollController._chaseAnimations.get(target);
+    const existing = ScrollController.chaseAnimations.get(target);
     if (existing) {
       const maxX = target.scrollWidth - target.clientWidth;
       const maxY = target.scrollHeight - target.clientHeight;
@@ -148,8 +148,8 @@ export class ScrollController {
       anim.lastTime = now;
 
       if ("isConnected" in target && !target.isConnected) {
-        ScrollController._chaseAnimations.delete(target);
-        ScrollController._restoreSmoothScroll(target);
+        ScrollController.chaseAnimations.delete(target);
+        ScrollController.restoreSmoothScroll(target);
         return;
       }
 
@@ -162,8 +162,8 @@ export class ScrollController {
           Math.abs(remainingY) < ScrollConfig.snapThreshold) {
         target.scrollLeft = anim.targetX;
         target.scrollTop = anim.targetY;
-        ScrollController._chaseAnimations.delete(target);
-        ScrollController._restoreSmoothScroll(target);
+        ScrollController.chaseAnimations.delete(target);
+        ScrollController.restoreSmoothScroll(target);
         return;
       }
 
@@ -175,35 +175,35 @@ export class ScrollController {
       if (target.scrollLeft === beforeX && target.scrollTop === beforeY) {
         target.scrollLeft = anim.targetX;
         target.scrollTop = anim.targetY;
-        ScrollController._chaseAnimations.delete(target);
-        ScrollController._restoreSmoothScroll(target);
+        ScrollController.chaseAnimations.delete(target);
+        ScrollController.restoreSmoothScroll(target);
         return;
       }
 
       anim.rafId = requestAnimationFrame(step);
     }
 
-    ScrollController._disableSmoothScroll(target);
-    ScrollController._chaseAnimations.set(target, anim);
+    ScrollController.disableSmoothScroll(target);
+    ScrollController.chaseAnimations.set(target, anim);
     anim.rafId = requestAnimationFrame(step);
   }
 
   // --- Velocity scroll ---
 
-  private static _startVelocity(axis: Axis, direction: number): void {
-    const v = ScrollController._velocity;
+  private static startVelocity(axis: Axis, direction: number): void {
+    const v = ScrollController.velocity;
     // Already scrolling in same direction — ignore key repeat
     if (v && v.axis === axis && v.direction === direction) return;
 
     // Stop any existing velocity or chase on this target
-    ScrollController._stopVelocityImmediate();
+    ScrollController.stopVelocityImmediate();
     const target = ScrollController.findScrollTarget(axis);
-    const chase = ScrollController._chaseAnimations.get(target);
+    const chase = ScrollController.chaseAnimations.get(target);
     if (chase) {
       // Don't snap — just stop the previous motion where it is and
       // start the new direction from the current position.
       cancelAnimationFrame(chase.rafId);
-      ScrollController._chaseAnimations.delete(target);
+      ScrollController.chaseAnimations.delete(target);
     }
 
     const vel: VelocityScroll = {
@@ -226,13 +226,12 @@ export class ScrollController {
       vel.lastTime = now;
 
       if ("isConnected" in vel.target && !vel.target.isConnected) {
-        ScrollController._velocity = null;
-        ScrollController._restoreSmoothScroll(vel.target);
+        ScrollController.velocity = null;
+        ScrollController.restoreSmoothScroll(vel.target);
         return;
       }
 
       const px = ScrollConfig.scrollSpeed * (dt / 1000) * vel.direction;
-      const before = vel.axis === "y" ? vel.target.scrollTop : vel.target.scrollLeft;
 
       if (vel.axis === "y") {
         vel.target.scrollTop += px;
@@ -243,30 +242,30 @@ export class ScrollController {
       vel.rafId = requestAnimationFrame(step);
     }
 
-    ScrollController._disableSmoothScroll(target);
-    ScrollController._velocity = vel;
+    ScrollController.disableSmoothScroll(target);
+    ScrollController.velocity = vel;
     vel.rafId = requestAnimationFrame(step);
   }
 
-  private static _stopVelocity(): void {
-    const v = ScrollController._velocity;
+  private static stopVelocity(): void {
+    const v = ScrollController.velocity;
     if (!v) return;
     cancelAnimationFrame(v.rafId);
-    ScrollController._velocity = null;
+    ScrollController.velocity = null;
 
     // Hand off momentum for smooth deceleration
     const remaining = ScrollConfig.scrollStep * v.direction;
     const dx = v.axis === "x" ? remaining : 0;
     const dy = v.axis === "y" ? remaining : 0;
-    ScrollController._smoothScroll(v.target, dx, dy);
+    ScrollController.smoothScroll(v.target, dx, dy);
   }
 
-  private static _stopVelocityImmediate(): void {
-    const v = ScrollController._velocity;
+  private static stopVelocityImmediate(): void {
+    const v = ScrollController.velocity;
     if (!v) return;
     cancelAnimationFrame(v.rafId);
-    ScrollController._velocity = null;
-    ScrollController._restoreSmoothScroll(v.target);
+    ScrollController.velocity = null;
+    ScrollController.restoreSmoothScroll(v.target);
   }
 
   // --- Scroll operations ---
@@ -275,38 +274,38 @@ export class ScrollController {
     const target = ScrollController.findScrollTarget(axis);
     const dx = axis === "x" ? delta : 0;
     const dy = axis === "y" ? delta : 0;
-    ScrollController._smoothScroll(target, dx, dy);
+    ScrollController.smoothScroll(target, dx, dy);
   }
 
   static scrollToTop(): void {
-    ScrollController._stopVelocityImmediate();
+    ScrollController.stopVelocityImmediate();
     const target = ScrollController.findScrollTarget("y");
-    ScrollController._cancelChase(target);
+    ScrollController.cancelChase(target);
     const dy = -target.scrollTop;
-    ScrollController._smoothScroll(target, 0, dy);
+    ScrollController.smoothScroll(target, 0, dy);
   }
 
   static scrollToBottom(): void {
-    ScrollController._stopVelocityImmediate();
+    ScrollController.stopVelocityImmediate();
     const target = ScrollController.findScrollTarget("y");
-    ScrollController._cancelChase(target);
+    ScrollController.cancelChase(target);
     const dy = target.scrollHeight - target.clientHeight - target.scrollTop;
-    ScrollController._smoothScroll(target, 0, dy);
+    ScrollController.smoothScroll(target, 0, dy);
   }
 
-  private static _cancelChase(target: Element): void {
-    const existing = ScrollController._chaseAnimations.get(target);
+  private static cancelChase(target: Element): void {
+    const existing = ScrollController.chaseAnimations.get(target);
     if (existing) {
       cancelAnimationFrame(existing.rafId);
-      ScrollController._chaseAnimations.delete(target);
-      ScrollController._restoreSmoothScroll(target);
+      ScrollController.chaseAnimations.delete(target);
+      ScrollController.restoreSmoothScroll(target);
     }
   }
 
   // --- Command wiring ---
 
-  private _wireCommands(): void {
-    const kh = this._keyHandler;
+  private wireCommands(): void {
+    const kh = this.keyHandler;
 
     // Step scrolls: keydown starts velocity, keyup decelerates
     const scrollCmds: [string, Axis, number][] = [
@@ -316,20 +315,20 @@ export class ScrollController {
       ["scrollLeft", "x", -1],
     ];
     for (const [cmd, axis, dir] of scrollCmds) {
-      kh.on(cmd, () => ScrollController._startVelocity(axis, dir));
-      kh.onKeyUp(cmd, () => ScrollController._stopVelocity());
+      kh.on(cmd, () => ScrollController.startVelocity(axis, dir));
+      kh.onKeyUp(cmd, () => ScrollController.stopVelocity());
     }
 
     kh.on("scrollHalfPageDown", () => {
-      ScrollController._stopVelocityImmediate();
+      ScrollController.stopVelocityImmediate();
       const target = ScrollController.findScrollTarget("y");
-      ScrollController._cancelChase(target);
+      ScrollController.cancelChase(target);
       ScrollController.scrollBy("y", Math.round(target.clientHeight / 2));
     });
     kh.on("scrollHalfPageUp", () => {
-      ScrollController._stopVelocityImmediate();
+      ScrollController.stopVelocityImmediate();
       const target = ScrollController.findScrollTarget("y");
-      ScrollController._cancelChase(target);
+      ScrollController.cancelChase(target);
       ScrollController.scrollBy("y", -Math.round(target.clientHeight / 2));
     });
 
@@ -342,7 +341,7 @@ export class ScrollController {
   }
 
   destroy(): void {
-    ScrollController._stopVelocityImmediate();
+    ScrollController.stopVelocityImmediate();
     const commands = [
       "scrollDown", "scrollUp", "scrollRight", "scrollLeft",
       "scrollHalfPageDown", "scrollHalfPageUp",
@@ -350,7 +349,7 @@ export class ScrollController {
       "goBack", "goForward", "pageRefresh",
     ];
     for (const cmd of commands) {
-      this._keyHandler.off(cmd);
+      this.keyHandler.off(cmd);
     }
   }
 }

@@ -11,11 +11,15 @@ import { HintMode } from "./modules/HintMode";
 import { TabSearch } from "./modules/TabSearch";
 import { HelpOverlay } from "./modules/HelpOverlay";
 import { setPremiumStatus } from "./premium";
+import { QuickMarks } from "./modules/QuickMarks";
 
 // Browser API (Safari Web Extension)
 declare const browser: {
   runtime: {
     sendMessage(message: { command: string; url?: string; index?: number }): Promise<unknown>;
+    onMessage: {
+      addListener(fn: (message: unknown) => void): void;
+    };
   };
   storage: {
     local: {
@@ -106,6 +110,12 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   // Help overlay
   const helpOverlay = new HelpOverlay(keyHandler);
 
+  // Quick marks (premium feature)
+  let quickMarks: QuickMarks | null = null;
+  if (resolved.isPremium) {
+    quickMarks = new QuickMarks(keyHandler);
+  }
+
   // Listen for live settings changes from browser.storage
   browser.storage.onChanged.addListener((changes, areaName) => {
     if (areaName !== "local") return;
@@ -122,8 +132,15 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
     if (changes.theme?.newValue) {
       applyTheme(changes.theme.newValue as Theme);
     }
-    if (changes.isPremium !== undefined) {
+    if (changes.isPremium?.newValue !== undefined) {
       setPremiumStatus(changes.isPremium.newValue as boolean);
+      resolved.isPremium = changes.isPremium.newValue as boolean;
+      if (resolved.isPremium && !quickMarks) {
+        quickMarks = new QuickMarks(keyHandler);
+      } else if (!resolved.isPremium && quickMarks) {
+        quickMarks.destroy();
+        quickMarks = null;
+      }
     }
   });
 
@@ -246,7 +263,16 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   // Suppress unused-variable warnings — these are used via their constructors
   void scrollController;
   void helpOverlay;
+  void quickMarks;
 }
+
+// Listen for messages from the background script (e.g. scroll restoration after mark jump)
+browser.runtime.onMessage.addListener((message: unknown) => {
+  const msg = message as { command?: string; scrollY?: number };
+  if (msg.command === "restoreScroll" && typeof msg.scrollY === "number") {
+    window.scrollTo(0, msg.scrollY);
+  }
+});
 
 // Request a settings sync from the native host app, then read all settings and initialize.
 // The sync populates browser.storage.local with the latest values from the host app

@@ -35,4 +35,6 @@ export const COMMANDS: Record<string, string> = {
   goUpUrl: "Go up one URL level",
   showHelp: "Show this help",
   exitToNormal: "Exit to normal mode",
+  setMark: "Set mark (m + a-z)",
+  jumpMark: "Jump to mark (' + a-z)",
 };
