@@ -28,30 +28,28 @@ fi
 echo "→ Reloading Safari…"
 osascript -e '
   tell application "Safari"
-    -- Save window bounds and active tab index before quitting
-    set savedBounds to {}
-    set savedTabIndices to {}
+    set savedWindows to {}
     if it is running then
       try
         repeat with w in windows
-          set end of savedBounds to bounds of w
+          set winBounds to bounds of w
+          set winURLs to {}
           set currentTab to current tab of w
           set tabIdx to 0
           repeat with j from 1 to count of tabs of w
+            set end of winURLs to URL of tab j of w
             if tab j of w = currentTab then
               set tabIdx to j
-              exit repeat
             end if
           end repeat
-          set end of savedTabIndices to tabIdx
+          set end of savedWindows to {tabURLs:winURLs, tabIndex:tabIdx, winBounds:winBounds}
         end repeat
       end try
       quit
       delay 1.5
     end if
-    set expectedCount to count of savedBounds
+
     activate
-    -- Wait for Safari to be fully ready
     tell application "System Events"
       repeat 20 times
         if frontmost of process "Safari" then exit repeat
@@ -59,71 +57,43 @@ osascript -e '
       end repeat
     end tell
     delay 0.5
-    tell application "System Events"
-      tell process "Safari"
-        click menu item "Reopen All Windows from Last Session" of menu "History" of menu bar 1
-      end tell
-    end tell
-    delay 1
+
+    if (count of savedWindows) = 0 then return
+
+    -- Close the default blank window Safari opens on launch
     try
-      -- Close blank windows (single empty tab)
-      if (count of windows) > expectedCount then
-        set idsToClose to {}
-        repeat with w in windows
-          if (count of tabs of w) = 1 then
-            set tabURL to URL of current tab of w
-            if tabURL is missing value or tabURL is "" or tabURL starts with "favorites://" then
-              set end of idsToClose to id of w
-            end if
-          end if
-        end repeat
-        repeat with wid in idsToClose
-          if (count of windows) > expectedCount then
-            repeat with w in windows
-              if id of w = wid then
-                close w
-                exit repeat
-              end if
-            end repeat
-          end if
-        end repeat
+      if (count of windows) = 1 then
+        set tabURL to URL of current tab of window 1
+        if tabURL is missing value or tabURL is "" or tabURL starts with "favorites://" then
+          close window 1
+        end if
       end if
-      -- Close blank tabs within remaining windows
-      repeat with w in windows
-        if (count of tabs of w) > 1 then
-          set tabsToClose to {}
-          repeat with j from 1 to count of tabs of w
-            set tabURL to URL of tab j of w
-            if tabURL is missing value or tabURL is "" or tabURL starts with "favorites://" then
-              set end of tabsToClose to j
-            end if
-          end repeat
-          -- Close in reverse order so indices stay valid
-          repeat with j from (count of tabsToClose) to 1 by -1
-            close tab (item j of tabsToClose) of w
-          end repeat
-        end if
-      end repeat
     end try
-    -- Bring Safari to the front
+
+    repeat with i from 1 to count of savedWindows
+      set winInfo to item i of savedWindows
+      set urls to tabURLs of winInfo
+
+      if (count of urls) > 0 then
+        make new document with properties {URL:item 1 of urls}
+        delay 0.3
+        set w to window 1
+
+        repeat with j from 2 to count of urls
+          tell w
+            make new tab with properties {URL:item j of urls}
+          end tell
+        end repeat
+
+        set bounds of w to winBounds of winInfo
+        set tabIdx to tabIndex of winInfo
+        if tabIdx > 0 and tabIdx ≤ (count of tabs of w) then
+          set current tab of w to tab tabIdx of w
+        end if
+      end if
+    end repeat
+
     activate
-    -- Restore window bounds and active tabs
-    try
-      set winList to windows
-      repeat with i from 1 to count of savedBounds
-        if i ≤ (count of winList) then
-          set bounds of item i of winList to item i of savedBounds
-        end if
-      end repeat
-      repeat with i from 1 to count of savedTabIndices
-        if i ≤ (count of winList) then
-          set tabIdx to item i of savedTabIndices
-          if tabIdx > 0 and tabIdx ≤ (count of tabs of item i of winList) then
-            set current tab of item i of winList to tab tabIdx of item i of winList
-          end if
-        end if
-      end repeat
-    end try
   end tell
 '
 
