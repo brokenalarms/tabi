@@ -2,8 +2,9 @@
 // Shows all NORMAL-mode bindings in a centered overlay.
 // Dismissed on any keypress or mouse click.
 
-import { COMMANDS } from "../commands";
+import { COMMANDS, PREMIUM_COMMANDS } from "../commands";
 import { removeOverlay } from "./overlayUtils";
+import { isPremiumActive } from "../premium";
 
 interface KeyHandlerLike {
   on(command: string, callback: () => void): void;
@@ -79,7 +80,9 @@ export class HelpOverlay {
         }
 
         const label = COMMANDS[cmd] || cmd;
-        HelpOverlay.addRow(grid, HelpOverlay.formatSequence(seq), label);
+        const baseCmd = cmd.replace(/_.*$/, "");
+        const premium = isPremiumActive() && PREMIUM_COMMANDS.has(baseCmd);
+        HelpOverlay.addRow(grid, HelpOverlay.formatSequence(seq), label, premium);
       }
     }
 
@@ -94,7 +97,7 @@ export class HelpOverlay {
     document.body.appendChild(this.overlay);
   }
 
-  private static addRow(grid: HTMLElement, keyText: string, descText: string): void {
+  private static addRow(grid: HTMLElement, keyText: string, descText: string, premium = false): void {
     const row = document.createElement("div");
     row.className = "tabi-help-row";
     const keyEl = document.createElement("kbd");
@@ -103,6 +106,12 @@ export class HelpOverlay {
     const descEl = document.createElement("span");
     descEl.className = "tabi-help-desc";
     descEl.textContent = descText;
+    if (premium) {
+      const star = document.createElement("span");
+      star.className = "tabi-help-premium";
+      star.textContent = "\u2726";
+      descEl.appendChild(star);
+    }
     row.appendChild(keyEl);
     row.appendChild(descEl);
     grid.appendChild(row);

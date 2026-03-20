@@ -17,7 +17,7 @@ import type { StatCounters } from "./modules/Statistics";
 import { loadMarks } from "./modules/QuickMarks";
 import type { MarkMap } from "./modules/QuickMarks";
 import { COMMANDS } from "./commands";
-import { DEFAULTS } from "./types";
+import { DEFAULTS, FORCE_PREMIUM } from "./types";
 import type { KeyLayout, Theme, KeyBindingMode } from "./types";
 import { PremiumPrompt, PREMIUM_FEATURES } from "./modules/PremiumPrompt";
 
@@ -705,7 +705,7 @@ async function init(): Promise<void> {
     "quickMarks",
   ]);
 
-  isPremium = stored.isPremium === true;
+  isPremium = FORCE_PREMIUM || stored.isPremium === true;
   currentLayout = (stored.keyLayout as KeyLayout) || DEFAULTS.keyLayout;
   currentBindingMode = (stored.keyBindingMode as KeyBindingMode) || DEFAULTS.keyBindingMode;
   currentTheme = (stored.theme as Theme) || DEFAULTS.theme;

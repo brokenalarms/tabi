@@ -268,16 +268,27 @@ export class TabSearch {
     const modal = document.createElement("div");
     modal.className = "tabi-panel tabi-tab-search-modal";
 
+    const inputWrap = document.createElement("div");
+    inputWrap.className = "tabi-tab-search-input-wrap";
+
     this.inputEl = document.createElement("input");
     this.inputEl.type = "text";
     this.inputEl.placeholder = "Search tabs\u2026";
     this.inputEl.setAttribute("autocomplete", "off");
     this.inputEl.setAttribute("spellcheck", "false");
+    inputWrap.appendChild(this.inputEl);
+
+    if (this.premium) {
+      const star = document.createElement("span");
+      star.className = "tabi-tab-search-premium";
+      star.textContent = "\u2726";
+      inputWrap.appendChild(star);
+    }
 
     this.resultsEl = document.createElement("div");
     this.resultsEl.className = "tabi-tab-search-results";
 
-    modal.appendChild(this.inputEl);
+    modal.appendChild(inputWrap);
     modal.appendChild(this.resultsEl);
     this.overlayEl.appendChild(modal);
     document.body.appendChild(this.overlayEl);
