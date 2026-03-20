@@ -1,0 +1,659 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  font-size: 14px;
+  color: var(--tabi-color);
+  background: var(--tabi-bg);
+  min-height: 100vh;
+}
+
+/* ── Layout ──────────────────────────────────────────────── */
+
+.settings-layout {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────── */
+
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  padding: 24px 16px;
+  border-right: 1px solid var(--tabi-separator);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px;
+  margin-bottom: 20px;
+}
+
+.sidebar-header h1 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.sidebar-header .premium-pill {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--tabi-segmented-bg);
+  color: var(--tabi-color-secondary);
+}
+
+.sidebar-header .premium-pill.premium {
+  background: rgba(245, 158, 11, 0.1);
+  border-color: rgba(245, 158, 11, 0.25);
+  color: #d97706;
+}
+
+@media (prefers-color-scheme: dark) {
+  .sidebar-header .premium-pill.premium {
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.12);
+  }
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tabi-color-secondary);
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+
+.nav-item:hover {
+  background: var(--tabi-hover-bg);
+  color: var(--tabi-color);
+}
+
+.nav-item.active {
+  background: var(--tabi-accent);
+  color: #fff;
+}
+
+.nav-icon {
+  font-size: 16px;
+  width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ── Main content ────────────────────────────────────────── */
+
+.main {
+  flex: 1;
+  padding: 32px 40px;
+  max-width: 720px;
+  overflow-y: auto;
+}
+
+.page {
+  display: none;
+}
+
+.page.active {
+  display: block;
+}
+
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 24px;
+  letter-spacing: -0.01em;
+}
+
+/* ── Section ─────────────────────────────────────────────── */
+
+.section {
+  margin-bottom: 28px;
+}
+
+.section-label {
+  display: block;
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 10px;
+  color: var(--tabi-color);
+}
+
+.section-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--tabi-color-secondary);
+  line-height: 1.5;
+}
+
+/* ── Segmented control ───────────────────────────────────── */
+
+.segmented {
+  display: flex;
+  background: var(--tabi-segmented-bg);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 1px;
+}
+
+.segmented button {
+  flex: 1;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  border: none;
+  background: transparent;
+  color: var(--tabi-segmented-color);
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+
+.segmented button:hover {
+  color: var(--tabi-color);
+}
+
+.segmented button.active {
+  background: var(--tabi-accent);
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+}
+
+.segmented button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (prefers-color-scheme: dark) {
+  .segmented button.active {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* ── Toggle switch ───────────────────────────────────────── */
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+}
+
+.toggle-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.toggle-desc {
+  font-size: 12px;
+  color: var(--tabi-color-secondary);
+  margin-top: 2px;
+}
+
+.toggle {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: var(--tabi-segmented-bg);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.toggle input:checked + .toggle-track {
+  background: var(--tabi-accent);
+}
+
+.toggle input:checked + .toggle-track::after {
+  transform: translateX(18px);
+}
+
+/* ── Separator ───────────────────────────────────────────── */
+
+.separator {
+  border: none;
+  border-top: 1px solid var(--tabi-separator);
+  margin: 24px 0;
+}
+
+/* ── Statistics page ─────────────────────────────────────── */
+
+.hero-stat {
+  text-align: center;
+  padding: 28px 0 24px;
+}
+
+.hero-number {
+  font-size: 48px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--tabi-accent);
+  line-height: 1;
+}
+
+.hero-label {
+  font-size: 14px;
+  color: var(--tabi-color-secondary);
+  margin-top: 6px;
+}
+
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.stat-card {
+  background: var(--tabi-input-bg);
+  border: 1px solid var(--tabi-border);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.stat-card-value {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.stat-card-label {
+  font-size: 12px;
+  color: var(--tabi-color-secondary);
+  margin-top: 4px;
+}
+
+.milestone-section {
+  margin-top: 28px;
+}
+
+.milestone-bar-container {
+  background: var(--tabi-segmented-bg);
+  border-radius: 8px;
+  height: 8px;
+  overflow: hidden;
+  margin-top: 12px;
+}
+
+.milestone-bar {
+  height: 100%;
+  background: var(--tabi-accent);
+  border-radius: 8px;
+  transition: width 0.3s ease;
+  min-width: 2px;
+}
+
+.milestone-label {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--tabi-color-secondary);
+}
+
+.milestone-description {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--tabi-color);
+  font-style: italic;
+}
+
+.premium-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  color: #d97706;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+@media (prefers-color-scheme: dark) {
+  .premium-badge {
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.12);
+  }
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--tabi-color-secondary);
+}
+
+.empty-state-icon {
+  font-size: 32px;
+  margin-bottom: 12px;
+}
+
+.empty-state-text {
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ── Quick Marks page ────────────────────────────────────── */
+
+.marks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+}
+
+.mark-card {
+  background: var(--tabi-input-bg);
+  border: 1px solid var(--tabi-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.mark-letter {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: "SF Mono", "Menlo", monospace;
+  color: var(--tabi-accent);
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+  line-height: 1.3;
+}
+
+.mark-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mark-title {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mark-url {
+  font-size: 11px;
+  color: var(--tabi-color-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.mark-delete {
+  background: none;
+  border: none;
+  color: var(--tabi-color-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0 2px;
+  flex-shrink: 0;
+  transition: color 0.15s;
+  font-family: inherit;
+}
+
+.mark-delete:hover {
+  color: #ef4444;
+}
+
+/* ── Key Layouts page ────────────────────────────────────── */
+
+.layout-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.layout-card {
+  background: var(--tabi-input-bg);
+  border: 2px solid var(--tabi-border);
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.layout-card:hover {
+  border-color: var(--tabi-color-secondary);
+}
+
+.layout-card.active {
+  border-color: var(--tabi-accent);
+}
+
+.layout-card.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.layout-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.layout-card-name {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.layout-card-desc {
+  font-size: 11px;
+  color: var(--tabi-color-secondary);
+  line-height: 1.4;
+}
+
+/* Mini keyboard visualization */
+
+.mini-keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 10px;
+}
+
+.mini-kb-row {
+  display: flex;
+  gap: 3px;
+}
+
+.mini-key {
+  width: 22px;
+  height: 22px;
+  border-radius: 3px;
+  background: var(--tabi-segmented-bg);
+  border: 1px solid var(--tabi-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 600;
+  font-family: "SF Mono", "Menlo", monospace;
+  color: var(--tabi-color-secondary);
+  flex-shrink: 0;
+}
+
+.mini-key.highlight {
+  background: var(--tabi-accent);
+  border-color: var(--tabi-accent);
+  color: #fff;
+}
+
+/* Full binding reference table */
+
+.binding-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.binding-table th {
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--tabi-color-secondary);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--tabi-separator);
+}
+
+.binding-table td {
+  padding: 7px 0;
+  font-size: 13px;
+  border-bottom: 1px solid var(--tabi-border);
+}
+
+.binding-key {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: var(--tabi-segmented-bg);
+  border: 1px solid var(--tabi-border);
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── Premium page ────────────────────────────────────────── */
+
+.premium-hero {
+  text-align: center;
+  padding: 32px 0;
+}
+
+.premium-icon {
+  font-size: 40px;
+  margin-bottom: 12px;
+}
+
+.premium-status {
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.premium-subtitle {
+  font-size: 14px;
+  color: var(--tabi-color-secondary);
+}
+
+.feature-list {
+  list-style: none;
+  margin: 24px 0;
+}
+
+.feature-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--tabi-border);
+}
+
+.feature-item:last-child {
+  border-bottom: none;
+}
+
+.feature-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  width: 28px;
+  text-align: center;
+}
+
+.feature-name {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.feature-desc {
+  font-size: 12px;
+  color: var(--tabi-color-secondary);
+  line-height: 1.4;
+}
+
+.upgrade-btn {
+  display: block;
+  width: 100%;
+  padding: 14px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  text-align: center;
+}
+
+.upgrade-btn:hover {
+  opacity: 0.9;
+}
+
+.upgrade-btn.active-plan {
+  background: var(--tabi-segmented-bg);
+  color: var(--tabi-color);
+  cursor: default;
+}
