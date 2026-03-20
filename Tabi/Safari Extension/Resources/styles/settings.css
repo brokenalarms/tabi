@@ -268,84 +268,250 @@ body {
 
 /* ── Statistics page ─────────────────────────────────────── */
 
-.hero-stat {
+.stats-hero {
   text-align: center;
-  padding: 28px 0 24px;
+  padding: 32px 20px;
+  margin-bottom: 20px;
 }
 
-.hero-number {
+.stats-hero-number {
   font-size: 48px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--tabi-accent);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(135deg, #f59e0b, #fbbf24);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
   line-height: 1;
 }
 
-.hero-label {
-  font-size: 14px;
+@media (prefers-color-scheme: light) {
+  .stats-hero-number {
+    background: linear-gradient(135deg, #d97706, #f59e0b);
+    -webkit-background-clip: text;
+    background-clip: text;
+  }
+}
+
+.stats-hero-label {
+  font-size: 15px;
   color: var(--tabi-color-secondary);
-  margin-top: 6px;
+  margin-top: 4px;
+  font-weight: 500;
+}
+
+.stats-hero-sub {
+  font-size: 12px;
+  color: var(--tabi-muted);
+  margin-top: 8px;
 }
 
 .stat-cards {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 12px;
-  margin-bottom: 28px;
+  margin-bottom: 20px;
 }
 
 .stat-card {
   background: var(--tabi-input-bg);
   border: 1px solid var(--tabi-border);
   border-radius: 12px;
-  padding: 16px;
+  padding: 18px;
+  transition: background 0.15s;
+}
+
+.stat-card:hover {
+  background: var(--tabi-hover-bg);
+}
+
+.stat-card.accent-border {
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.stat-card.emerald-border {
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.stat-icon {
+  font-size: 20px;
+  margin-bottom: 8px;
 }
 
 .stat-card-value {
-  font-size: 24px;
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 28px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 .stat-card-label {
   font-size: 12px;
   color: var(--tabi-color-secondary);
-  margin-top: 4px;
+  margin-top: 2px;
+  font-weight: 500;
 }
 
-.milestone-section {
-  margin-top: 28px;
+.stat-detail {
+  font-size: 11px;
+  color: var(--tabi-muted);
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--tabi-border);
 }
 
-.milestone-bar-container {
-  background: var(--tabi-segmented-bg);
-  border-radius: 8px;
-  height: 8px;
-  overflow: hidden;
-  margin-top: 12px;
+/* ── Milestone Timeline ─────────────────────────────────── */
+
+.milestone-graph {
+  position: relative;
+  padding: 0 0 0 48px;
 }
 
-.milestone-bar {
-  height: 100%;
-  background: var(--tabi-accent);
-  border-radius: 8px;
-  transition: width 0.3s ease;
-  min-width: 2px;
+.milestone-track {
+  position: relative;
+  height: 380px;
+  border-left: 2px solid var(--tabi-border);
+  margin-left: 4px;
 }
 
-.milestone-label {
+.milestone-fill {
+  position: absolute;
+  bottom: 0;
+  left: -2px;
+  width: 2px;
+  background: linear-gradient(to top, #10b981, rgba(16, 185, 129, 0.3));
+  border-radius: 2px 2px 0 0;
+  transition: height 1.5s ease-out;
+}
+
+.milestone-marker {
+  position: absolute;
+  left: -8px;
   display: flex;
-  justify-content: space-between;
-  margin-top: 8px;
-  font-size: 12px;
+  align-items: center;
+  transform: translateY(50%);
+}
+
+.milestone-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--tabi-border);
+  background: var(--tabi-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  flex-shrink: 0;
+  z-index: 1;
+}
+
+.milestone-marker.reached .milestone-dot {
+  border-color: #10b981;
+  background: #10b981;
+  color: #fff;
+  font-size: 8px;
+}
+
+.milestone-marker.current .milestone-dot {
+  border-color: #f59e0b;
+  background: #f59e0b;
+  color: #fff;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.4);
+}
+
+.milestone-info {
+  margin-left: 14px;
+  white-space: nowrap;
+}
+
+.milestone-emoji {
+  font-size: 18px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+.milestone-value {
+  font-family: "SF Mono", Menlo, monospace;
+  font-size: 11px;
+  font-weight: 600;
   color: var(--tabi-color-secondary);
 }
 
-.milestone-description {
-  margin-top: 12px;
-  font-size: 13px;
+.milestone-marker.reached .milestone-value {
+  color: #10b981;
+}
+
+.milestone-marker.current .milestone-value {
+  color: #f59e0b;
+}
+
+.milestone-fact {
+  font-size: 11px;
+  color: var(--tabi-muted);
+  margin-left: 4px;
+}
+
+.milestone-marker.reached .milestone-fact {
+  color: var(--tabi-color-secondary);
+}
+
+.milestone-marker.current .milestone-fact {
+  color: var(--tabi-color-secondary);
+  font-weight: 500;
+}
+
+/* ── Notification Toast Preview ─────────────────────────── */
+
+.notification-preview {
+  position: relative;
+  margin-top: 16px;
+}
+
+.notification-toast {
+  background: var(--tabi-input-bg);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 12px;
+  padding: 14px 18px;
+  max-width: 360px;
+  margin-left: auto;
+}
+
+.notification-toast-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #f59e0b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+@media (prefers-color-scheme: light) {
+  .notification-toast-title {
+    color: #d97706;
+  }
+}
+
+.notification-toast-stats {
+  font-size: 12px;
   color: var(--tabi-color);
+  line-height: 1.6;
+}
+
+.notification-toast-fun {
+  font-size: 11px;
+  color: var(--tabi-color-secondary);
+  margin-top: 6px;
   font-style: italic;
+}
+
+.notification-label {
+  font-size: 11px;
+  color: var(--tabi-muted);
+  text-align: right;
+  margin-top: 6px;
 }
 
 .premium-badge {
@@ -470,18 +636,19 @@ body {
 
 .layout-cards {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  margin-bottom: 28px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 20px;
 }
 
 .layout-card {
   background: var(--tabi-input-bg);
   border: 2px solid var(--tabi-border);
   border-radius: 12px;
-  padding: 16px;
+  padding: 14px 10px 12px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
+  text-align: center;
 }
 
 .layout-card:hover {
@@ -497,22 +664,44 @@ body {
   cursor: not-allowed;
 }
 
-.layout-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-
 .layout-card-name {
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 600;
+  margin-bottom: 2px;
 }
 
 .layout-card-desc {
+  font-size: 10px;
+  color: var(--tabi-color-secondary);
+  margin-bottom: 8px;
+}
+
+/* Mode indicator card */
+
+.mode-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--tabi-input-bg);
+  border: 1px solid var(--tabi-border);
+  border-radius: 12px;
+  padding: 14px 20px;
+  margin-bottom: 20px;
+}
+
+.mode-indicator-info {
+  flex: 1;
+}
+
+.mode-indicator-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.mode-indicator-desc {
   font-size: 11px;
   color: var(--tabi-color-secondary);
-  line-height: 1.4;
+  margin-top: 2px;
 }
 
 /* Mini keyboard visualization */
@@ -520,28 +709,23 @@ body {
 .mini-keyboard {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  margin-top: 10px;
+  gap: 2px;
+  align-items: center;
+  margin-top: 6px;
 }
 
 .mini-kb-row {
   display: flex;
-  gap: 3px;
+  gap: 1px;
 }
 
 .mini-key {
-  width: 22px;
-  height: 22px;
-  border-radius: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
   background: var(--tabi-segmented-bg);
-  border: 1px solid var(--tabi-border);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9px;
-  font-weight: 600;
-  font-family: "SF Mono", "Menlo", monospace;
-  color: var(--tabi-color-secondary);
+  border: 0.5px solid var(--tabi-border);
+  font-size: 0;
   flex-shrink: 0;
 }
 
