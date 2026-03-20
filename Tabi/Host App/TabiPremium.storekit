@@ -1,0 +1,83 @@
+{
+  "identifier" : "F5A8C7E2-3D1B-4A9F-B6E0-8C2D4F1A5E37",
+  "nonRenewableSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "1A2B3C4D-5E6F-7A8B-9C0D-1E2F3A4B5C6D",
+      "localizations" : [
+        {
+          "description" : "Unlock all premium features: fuzzy search, yank mode, quick marks, and more.",
+          "displayName" : "Tabi Premium",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.brokenalarms.tabi.premium",
+      "referenceName" : "Tabi Premium",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ],
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitPaymentSheetEnabled" : false
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 4,
+    "minor" : 0
+  }
+}

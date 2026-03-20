@@ -11,6 +11,7 @@ struct ContentView: View {
 struct SetupTab: View {
     @State private var extensionEnabled: Bool?
     @State private var showPrefsFailedAlert = false
+    @StateObject private var store = StoreManager.shared
 
     var body: some View {
         VStack(spacing: 24) {
@@ -44,6 +45,11 @@ struct SetupTab: View {
             } else {
                 enableInstructions
             }
+
+            Divider()
+                .frame(width: 200)
+
+            premiumSection
         }
         .padding(40)
         .onAppear(perform: checkExtensionState)
@@ -54,6 +60,55 @@ struct SetupTab: View {
             Button("OK") {}
         } message: {
             Text("Open Safari, then go to Safari → Settings → Extensions to enable tabi.")
+        }
+    }
+
+    private var premiumSection: some View {
+        VStack(spacing: 12) {
+            if store.isPremium {
+                Label("Premium Active", systemImage: "star.fill")
+                    .foregroundStyle(.orange)
+                    .font(.headline)
+            } else {
+                Text("Upgrade to Premium")
+                    .font(.headline)
+
+                Text("Unlock fuzzy search, yank mode, quick marks, extra layouts, and more.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
+                Button(action: {
+                    Task { await store.purchase() }
+                }) {
+                    Group {
+                        if store.purchaseState == .purchasing {
+                            ProgressView()
+                                .controlSize(.small)
+                                .padding(.horizontal, 8)
+                        } else if let product = store.product {
+                            Text("Buy Premium — \(product.displayPrice)")
+                        } else {
+                            Text("Buy Premium")
+                        }
+                    }
+                    .frame(minWidth: 180)
+                }
+                .controlSize(.large)
+                .disabled(store.product == nil || store.purchaseState == .purchasing)
+
+                Button("Restore Purchases") {
+                    Task { await store.restore() }
+                }
+                .buttonStyle(.link)
+                .font(.subheadline)
+
+                if case .failed(let message) = store.purchaseState {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
         }
     }
 

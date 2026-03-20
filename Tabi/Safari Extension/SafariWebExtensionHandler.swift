@@ -29,6 +29,7 @@ class SafariWebExtensionHandler: NSObject, NSExtensionRequestHandling {
             responseData = [
                 "keyBindingMode": settings.keyBindingMode,
                 "theme": settings.theme,
+                "isPremium": settings.isPremium,
             ]
         default:
             responseData = ["status": "ok"]
