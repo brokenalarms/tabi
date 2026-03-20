@@ -9,8 +9,8 @@ import {
   totalActions,
   timeSaved,
   distanceSaved,
-  SECONDS_PER_ACTION,
 } from "./modules/Statistics";
+import { SECONDS_PER_ACTION } from "./modules/constants";
 import type { StatCounters } from "./modules/Statistics";
 import { loadMarks } from "./modules/QuickMarks";
 import type { MarkMap } from "./modules/QuickMarks";
@@ -240,18 +240,19 @@ interface DistanceMilestone {
   feet: number;
   emoji: string;
   label: string;
+  pct: number;
 }
 
 const DISTANCE_MILESTONES: DistanceMilestone[] = [
-  { feet: 6, emoji: "\ud83e\uddca", label: "1 trip to the fridge" },
-  { feet: 100, emoji: "\ud83d\udc0b", label: "Length of a blue whale" },
-  { feet: 300, emoji: "\ud83c\udfc8", label: "1 football field" },
-  { feet: 1063, emoji: "\ud83d\uddfc", label: "Height of the Eiffel Tower" },
-  { feet: 2717, emoji: "\ud83c\udfd9", label: "Height of Burj Khalifa" },
-  { feet: 29032, emoji: "\ud83c\udfd4", label: "Summit of Mt Everest" },
-  { feet: 35000, emoji: "\u2708\ufe0f", label: "Cruising altitude" },
-  { feet: 137500, emoji: "\ud83c\udfc3", label: "A marathon" },
-  { feet: 330000, emoji: "\ud83e\uddd1\u200d\ud83d\ude80", label: "Edge of space (K\u00e1rm\u00e1n line)" },
+  { feet: 6, emoji: "\ud83e\uddca", label: "1 trip to the fridge", pct: 0 },
+  { feet: 100, emoji: "\ud83d\udc0b", label: "Length of a blue whale", pct: 10 },
+  { feet: 300, emoji: "\ud83c\udfc8", label: "1 football field", pct: 20 },
+  { feet: 1063, emoji: "\ud83d\uddfc", label: "Height of the Eiffel Tower", pct: 32 },
+  { feet: 2717, emoji: "\ud83c\udfd9", label: "Height of Burj Khalifa", pct: 44 },
+  { feet: 29032, emoji: "\ud83c\udfd4", label: "Summit of Mt Everest", pct: 60 },
+  { feet: 35000, emoji: "\u2708\ufe0f", label: "Cruising altitude", pct: 72 },
+  { feet: 137500, emoji: "\ud83c\udfc3", label: "A marathon", pct: 84 },
+  { feet: 330000, emoji: "\ud83e\uddd1\u200d\ud83d\ude80", label: "Edge of space (K\u00e1rm\u00e1n line)", pct: 100 },
 ];
 
 function buildMilestoneTimeline(currentFeet: number): HTMLElement {
@@ -261,14 +262,27 @@ function buildMilestoneTimeline(currentFeet: number): HTMLElement {
   const graph = el("div", { class: "milestone-graph" });
   const track = el("div", { class: "milestone-track" });
 
-  const maxFeet = DISTANCE_MILESTONES[DISTANCE_MILESTONES.length - 1].feet;
-  const fillPercent = Math.min(100, (currentFeet / maxFeet) * 100);
+  // Interpolate a visual percentage for arbitrary feet values
+  function feetToPct(feet: number): number {
+    if (feet <= DISTANCE_MILESTONES[0].feet) return DISTANCE_MILESTONES[0].pct;
+    for (let i = 1; i < DISTANCE_MILESTONES.length; i++) {
+      const prev = DISTANCE_MILESTONES[i - 1];
+      const curr = DISTANCE_MILESTONES[i];
+      if (feet <= curr.feet) {
+        const ratio = (feet - prev.feet) / (curr.feet - prev.feet);
+        return prev.pct + ratio * (curr.pct - prev.pct);
+      }
+    }
+    return 100;
+  }
+
+  const fillPercent = feetToPct(currentFeet);
   const fill = el("div", { class: "milestone-fill" });
   fill.style.height = `${fillPercent}%`;
   track.appendChild(fill);
 
   for (const ms of DISTANCE_MILESTONES) {
-    const pct = Math.min(100, (ms.feet / maxFeet) * 100);
+    const pct = ms.pct;
     const reached = currentFeet >= ms.feet;
 
     const marker = el("div", { class: `milestone-marker${reached ? " reached" : ""}` });
@@ -289,7 +303,7 @@ function buildMilestoneTimeline(currentFeet: number): HTMLElement {
 
   // "You are here" marker if between milestones
   if (currentFeet > 0) {
-    const youPct = Math.min(100, (currentFeet / maxFeet) * 100);
+    const youPct = feetToPct(currentFeet);
     const youMarker = el("div", { class: "milestone-marker current" });
     youMarker.style.bottom = `${youPct}%`;
 
