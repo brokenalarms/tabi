@@ -8,7 +8,9 @@ export function createHero(): HTMLElement {
   section.innerHTML = `
     <div class="container hero-inner">
       <div class="hero-lockup">
-        <div class="hero-icon" aria-hidden="true"></div>
+        <div class="hero-icon-glow" aria-hidden="true">
+          <div class="hero-icon"></div>
+        </div>
         <span class="hero-wordmark">Tabi</span>
       </div>
       <p class="hero-eyebrow">Safari extension for macOS</p>

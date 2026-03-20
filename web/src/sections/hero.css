@@ -44,21 +44,24 @@
   line-height: 1;
 }
 
-.hero-icon {
+.hero-icon-glow {
   flex-shrink: 0;
+  filter: drop-shadow(0 0 40px rgba(212, 160, 32, 0.35));
+  transition: filter 0.4s var(--ease), transform 0.4s var(--ease);
+}
+
+.hero-icon-glow:hover {
+  filter: drop-shadow(0 0 60px rgba(255, 247, 133, 0.45));
+  transform: scale(1.05);
+}
+
+.hero-icon {
   width: 120px;
   height: 120px;
   border-radius: 26px;
   overflow: hidden;
-  filter: drop-shadow(0 0 40px rgba(212, 160, 32, 0.35));
-  transition: filter 0.4s var(--ease), transform 0.4s var(--ease);
   user-select: none;
   -webkit-user-select: none;
-}
-
-.hero-icon:hover {
-  filter: drop-shadow(0 0 60px rgba(255, 247, 133, 0.45));
-  transform: scale(1.05);
 }
 
 .hero-icon-svg {
