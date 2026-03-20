@@ -20,20 +20,35 @@ export const ScrollConfig = {
   scrollSpeed: 800,
   /** Pixels per single j/k tap (keydown→keyup with no hold) */
   scrollStep: 40,
-  /** Smoothing time constant (ms) for deceleration and gg/G */
+  /** Smoothing time constant (ms) for deceleration after key release */
   smoothTimeMs: 80,
+  /** Duration (ms) for commanded scrolls (d/u, gg/G) — ease-in-out curve */
+  scrollDurationMs: 250,
   /** Snap threshold (px) — stop animating when this close to target */
   snapThreshold: 0.5,
 };
 
-// --- Target-chase animation (exponential smoothing) ---
-// Used for gg/G, half-page, and deceleration after key release.
+// --- Target-chase animation ---
+// Two modes:
+//   Exponential smoothing (deceleration after j/k release): converges on target
+//     using a time constant.  Fast for small deltas.
+//   Duration-based ease-in-out (d/u, gg/G): fixed-duration animation with a
+//     cubic ease curve.  Matches native scroll feel for larger jumps.
+
+function easeInOutCubic(t: number): number {
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+}
 
 interface ChaseAnimation {
   targetX: number;
   targetY: number;
   rafId: number;
   lastTime: number;
+  // Duration mode fields (unset → exponential smoothing)
+  startX?: number;
+  startY?: number;
+  startTime?: number;
+  durationMs?: number;
 }
 
 // --- Velocity-based continuous scroll (held keys) ---
@@ -119,6 +134,7 @@ export class ScrollController {
     target: Element,
     deltaX: number,
     deltaY: number,
+    durationMs?: number,
   ): void {
     const existing = ScrollController.chaseAnimations.get(target);
     if (existing) {
@@ -126,6 +142,13 @@ export class ScrollController {
       const maxY = target.scrollHeight - target.clientHeight;
       existing.targetX = Math.max(0, Math.min(maxX, existing.targetX + deltaX));
       existing.targetY = Math.max(0, Math.min(maxY, existing.targetY + deltaY));
+      // If switching to duration mode, reset start position for the new target
+      if (durationMs !== undefined) {
+        existing.startX = target.scrollLeft;
+        existing.startY = target.scrollTop;
+        existing.startTime = undefined; // re-record on next frame
+        existing.durationMs = durationMs;
+      }
       return;
     }
 
@@ -138,8 +161,44 @@ export class ScrollController {
       lastTime: 0,
     };
 
+    if (durationMs !== undefined) {
+      anim.startX = target.scrollLeft;
+      anim.startY = target.scrollTop;
+      anim.durationMs = durationMs;
+    }
+
+    function finish() {
+      target.scrollLeft = anim.targetX;
+      target.scrollTop = anim.targetY;
+      ScrollController.chaseAnimations.delete(target);
+      ScrollController.restoreSmoothScroll(target);
+    }
+
     function step(now: number) {
-      // First frame: record timestamp, no movement yet
+      if ("isConnected" in target && !target.isConnected) {
+        ScrollController.chaseAnimations.delete(target);
+        ScrollController.restoreSmoothScroll(target);
+        return;
+      }
+
+      // --- Duration mode: ease-in-out over fixed time ---
+      if (anim.durationMs !== undefined) {
+        if (anim.startTime === undefined) {
+          anim.startTime = now;
+        }
+        const elapsed = now - anim.startTime;
+        const progress = Math.min(1, elapsed / anim.durationMs);
+        const eased = easeInOutCubic(progress);
+
+        target.scrollLeft = anim.startX! + (anim.targetX - anim.startX!) * eased;
+        target.scrollTop = anim.startY! + (anim.targetY - anim.startY!) * eased;
+
+        if (progress >= 1) { finish(); return; }
+        anim.rafId = requestAnimationFrame(step);
+        return;
+      }
+
+      // --- Exponential mode: deceleration ---
       if (anim.lastTime === 0) {
         anim.lastTime = now;
         anim.rafId = requestAnimationFrame(step);
@@ -149,12 +208,6 @@ export class ScrollController {
       const dt = now - anim.lastTime;
       anim.lastTime = now;
 
-      if ("isConnected" in target && !target.isConnected) {
-        ScrollController.chaseAnimations.delete(target);
-        ScrollController.restoreSmoothScroll(target);
-        return;
-      }
-
       const beforeX = target.scrollLeft;
       const beforeY = target.scrollTop;
       const remainingX = anim.targetX - beforeX;
@@ -162,10 +215,7 @@ export class ScrollController {
 
       if (Math.abs(remainingX) < ScrollConfig.snapThreshold &&
           Math.abs(remainingY) < ScrollConfig.snapThreshold) {
-        target.scrollLeft = anim.targetX;
-        target.scrollTop = anim.targetY;
-        ScrollController.chaseAnimations.delete(target);
-        ScrollController.restoreSmoothScroll(target);
+        finish();
         return;
       }
 
@@ -173,12 +223,8 @@ export class ScrollController {
       target.scrollLeft += remainingX * factor;
       target.scrollTop += remainingY * factor;
 
-      // Sub-pixel rounding prevented movement — snap to close any remaining gap
       if (target.scrollLeft === beforeX && target.scrollTop === beforeY) {
-        target.scrollLeft = anim.targetX;
-        target.scrollTop = anim.targetY;
-        ScrollController.chaseAnimations.delete(target);
-        ScrollController.restoreSmoothScroll(target);
+        finish();
         return;
       }
 
@@ -267,16 +313,18 @@ export class ScrollController {
     if (!v) return;
     cancelAnimationFrame(v.rafId);
     ScrollController.velocity = null;
-    ScrollController.restoreSmoothScroll(v.target);
+    // Don't restore smooth scroll — callers (scrollToTop, scrollHalfPageDown,
+    // etc.) start a new animation right after, so the override must stay.
+    // destroy() handles final cleanup.
   }
 
   // --- Scroll operations ---
 
-  static scrollBy(axis: Axis, delta: number): void {
+  static scrollBy(axis: Axis, delta: number, durationMs?: number): void {
     const target = ScrollController.findScrollTarget(axis);
     const dx = axis === "x" ? delta : 0;
     const dy = axis === "y" ? delta : 0;
-    ScrollController.smoothScroll(target, dx, dy);
+    ScrollController.smoothScroll(target, dx, dy, durationMs);
   }
 
   static scrollToTop(): void {
@@ -284,7 +332,7 @@ export class ScrollController {
     const target = ScrollController.findScrollTarget("y");
     ScrollController.cancelChase(target);
     const dy = -target.scrollTop;
-    ScrollController.smoothScroll(target, 0, dy);
+    ScrollController.smoothScroll(target, 0, dy, ScrollConfig.scrollDurationMs);
   }
 
   static scrollToBottom(): void {
@@ -292,7 +340,7 @@ export class ScrollController {
     const target = ScrollController.findScrollTarget("y");
     ScrollController.cancelChase(target);
     const dy = target.scrollHeight - target.clientHeight - target.scrollTop;
-    ScrollController.smoothScroll(target, 0, dy);
+    ScrollController.smoothScroll(target, 0, dy, ScrollConfig.scrollDurationMs);
   }
 
   private static cancelChase(target: Element): void {
@@ -300,7 +348,11 @@ export class ScrollController {
     if (existing) {
       cancelAnimationFrame(existing.rafId);
       ScrollController.chaseAnimations.delete(target);
-      ScrollController.restoreSmoothScroll(target);
+      // Don't restore smooth scroll here — callers always start a new
+      // animation immediately, which keeps the override active.  The
+      // restore→disable flip between cancelChase and the next smoothScroll
+      // caused Safari to briefly re-enable CSS smooth scrolling, producing
+      // visible jumps on half-page and absolute scroll commands.
     }
   }
 
@@ -325,14 +377,14 @@ export class ScrollController {
       ScrollController.stopVelocityImmediate();
       const target = ScrollController.findScrollTarget("y");
       ScrollController.cancelChase(target);
-      ScrollController.scrollBy("y", Math.round(target.clientHeight / 2));
+      ScrollController.scrollBy("y", Math.round(target.clientHeight / 2), ScrollConfig.scrollDurationMs);
       this.onAction?.();
     });
     kh.on("scrollHalfPageUp", () => {
       ScrollController.stopVelocityImmediate();
       const target = ScrollController.findScrollTarget("y");
       ScrollController.cancelChase(target);
-      ScrollController.scrollBy("y", -Math.round(target.clientHeight / 2));
+      ScrollController.scrollBy("y", -Math.round(target.clientHeight / 2), ScrollConfig.scrollDurationMs);
       this.onAction?.();
     });
 
@@ -346,6 +398,16 @@ export class ScrollController {
 
   destroy(): void {
     ScrollController.stopVelocityImmediate();
+    // Cancel any running chase animations
+    for (const [, chase] of ScrollController.chaseAnimations) {
+      cancelAnimationFrame(chase.rafId);
+    }
+    ScrollController.chaseAnimations.clear();
+    // Restore smooth scroll on all overridden elements
+    for (const el of ScrollController.overriddenElements) {
+      el.style.scrollBehavior = "";
+    }
+    ScrollController.overriddenElements.clear();
     const commands = [
       "scrollDown", "scrollUp", "scrollRight", "scrollLeft",
       "scrollHalfPageDown", "scrollHalfPageUp",
