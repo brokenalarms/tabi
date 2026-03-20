@@ -141,6 +141,16 @@ export function getBlockAncestorRect(el: HTMLElement, rect: DOMRect): DOMRect | 
   return new DOMRect(ancestorRect.left, rect.top, ancestorRect.width, rect.height);
 }
 
+/** Drill through single-child wrappers to find the tightest content element.
+ *  At each level, filters to non-empty children. If exactly one remains,
+ *  recurses into it. Stops (returns null) when zero or multiple non-empty
+ *  children exist — the current level is the content boundary. */
+export function findSoleContentChild(el: HTMLElement): HTMLElement | null {
+  const nonEmpty = (Array.from(el.children) as HTMLElement[]).filter(c => !isEmpty(c));
+  if (nonEmpty.length !== 1) return null;
+  return findSoleContentChild(nonEmpty[0]) ?? nonEmpty[0];
+}
+
 // --- Click retry strategies ---
 // When clicking an element with aria-expanded doesn't toggle it, these
 // strategies try alternative click targets. Each returns true if it
