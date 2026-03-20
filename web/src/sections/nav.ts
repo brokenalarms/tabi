@@ -1,11 +1,15 @@
 import './nav.css'
+import { createIcon } from '../icon.ts'
 
 export function createNav(): HTMLElement {
   const nav = document.createElement('nav')
   nav.className = 'nav'
   nav.innerHTML = `
     <div class="nav-inner container">
-      <a href="#" class="nav-logo">Tabi</a>
+      <a href="#" class="nav-logo">
+        <span class="nav-logo-icon-slot" aria-hidden="true"></span>
+        Tabi
+      </a>
       <div class="nav-links" id="nav-links">
         <a href="#how-it-works">How it works</a>
         <a href="#features">Features</a>
@@ -18,6 +22,10 @@ export function createNav(): HTMLElement {
       </button>
     </div>
   `
+
+  const iconSlot = nav.querySelector('.nav-logo-icon-slot')!
+  const icon = createIcon('nav-logo-icon')
+  iconSlot.appendChild(icon)
 
   const toggle = nav.querySelector<HTMLButtonElement>('#nav-toggle')
   const links = nav.querySelector<HTMLElement>('#nav-links')
