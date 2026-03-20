@@ -66,7 +66,7 @@ function text(tag: keyof HTMLElementTagNameMap, className: string, content: stri
 
 // ── Navigation ────────────────────────────────────────────────
 
-type PageId = "settings" | "statistics" | "quickmarks" | "keylayouts" | "premium";
+type PageId = "statistics" | "quickmarks" | "keylayouts" | "premium";
 
 interface NavEntry {
   id: PageId;
@@ -75,7 +75,6 @@ interface NavEntry {
 }
 
 const NAV_ITEMS: NavEntry[] = [
-  { id: "settings", label: "Settings", icon: "\u2699" },
   { id: "statistics", label: "Statistics", icon: "\ud83d\udcca" },
   { id: "quickmarks", label: "Quick Marks", icon: "\ud83d\udccc" },
   { id: "keylayouts", label: "Key Layouts", icon: "\u2328" },
@@ -84,7 +83,7 @@ const NAV_ITEMS: NavEntry[] = [
 
 // ── State ─────────────────────────────────────────────────────
 
-let currentPage: PageId = "settings";
+let currentPage: PageId = "keylayouts";
 let isPremium = false;
 let currentLayout: KeyLayout = DEFAULTS.keyLayout;
 let currentBindingMode: KeyBindingMode = DEFAULTS.keyBindingMode;
@@ -161,71 +160,6 @@ function buildSection(label: string, hint: string, control: HTMLElement): HTMLEl
   section.appendChild(control);
   if (hint) section.appendChild(text("p", "section-hint", hint));
   return section;
-}
-
-// ── Settings page ─────────────────────────────────────────────
-
-function buildSettingsPage(): HTMLElement {
-  const page = el("div", { class: "page", id: "page-settings" });
-  page.appendChild(text("h2", "page-title", "Settings"));
-
-  // Theme
-  page.appendChild(
-    buildSection(
-      "Tag Style",
-      "Auto contrasts with the page background. Classic is yellow!",
-      buildSegmented(
-        [
-          { value: "auto", label: "Auto" },
-          { value: "dark", label: "Dark" },
-          { value: "light", label: "Light" },
-          { value: "classic", label: "Classic" },
-        ],
-        currentTheme,
-        (v) => {
-          currentTheme = v as Theme;
-          browser.storage.local.set({ theme: v });
-        }
-      )
-    )
-  );
-
-  page.appendChild(el("hr", { class: "separator" }));
-
-  // Animations
-  page.appendChild(
-    buildToggle("Animations", "Smooth transitions when hints appear and disappear", animate, (v) => {
-      animate = v;
-      browser.storage.local.set({ animate: v });
-    })
-  );
-
-  page.appendChild(el("hr", { class: "separator" }));
-
-  // Auto Notifications (premium)
-  const notifToggle = buildToggle(
-    "Weekly Stats Notification",
-    "Show a summary of your keyboard usage once a week",
-    autoNotifications,
-    (v) => {
-      autoNotifications = v;
-      browser.storage.local.set({ autoNotifications: v });
-    }
-  );
-  if (!isPremium) {
-    const input = notifToggle.querySelector("input");
-    if (input) {
-      (input as HTMLInputElement).disabled = true;
-      (input as HTMLInputElement).checked = false;
-    }
-    notifToggle.style.cursor = "pointer";
-    notifToggle.addEventListener("click", () => {
-      premiumPrompt.show("notifications", () => navigate("premium"));
-    });
-  }
-  page.appendChild(notifToggle);
-
-  return page;
 }
 
 // ── Statistics page ───────────────────────────────────────────
@@ -676,9 +610,57 @@ function buildBindingTable(layout: KeyLayout): HTMLElement {
   return table;
 }
 
+function buildModeColorPreviews(): HTMLElement {
+  const row = el("div", { class: "mode-colors" });
+  const modes: { cls: string; label: string }[] = [
+    { cls: "click", label: "Click" },
+    { cls: "yank", label: "Yank" },
+    { cls: "multi", label: "Multi" },
+  ];
+  for (const { cls, label } of modes) {
+    const preview = el("div", { class: "mode-color-preview" });
+    preview.appendChild(el("span", { class: `mode-hint-tag ${cls}`, text: "ab" }));
+    preview.appendChild(el("span", { class: "mode-color-label", text: label }));
+    row.appendChild(preview);
+  }
+  return row;
+}
+
 function buildKeyLayoutsPage(): HTMLElement {
   const page = el("div", { class: "page", id: "page-keylayouts" });
   page.appendChild(text("h2", "page-title", "Key Layouts"));
+
+  // Tag Style
+  const tagSection = buildSection(
+    "Tag Style",
+    "Auto contrasts with the page background. Classic is yellow!",
+    buildSegmented(
+      [
+        { value: "auto", label: "Auto" },
+        { value: "dark", label: "Dark" },
+        { value: "light", label: "Light" },
+        { value: "classic", label: "Classic" },
+      ],
+      currentTheme,
+      (v) => {
+        currentTheme = v as Theme;
+        browser.storage.local.set({ theme: v });
+      }
+    )
+  );
+  tagSection.appendChild(buildModeColorPreviews());
+  page.appendChild(tagSection);
+
+  // Animations
+  page.appendChild(
+    buildToggle("Animations", "Smooth transitions when hints appear and disappear", animate, (v) => {
+      animate = v;
+      browser.storage.local.set({ animate: v });
+    })
+  );
+
+  page.appendChild(el("hr", { class: "separator" }));
+
   page.appendChild(
     text("p", "section-hint", "Choose how commands map to your keyboard. Non-vim layouts are optimized for home-row access.")
   );
@@ -846,7 +828,6 @@ function buildSidebar(): HTMLElement {
 // ── Render ────────────────────────────────────────────────────
 
 const PAGE_BUILDERS: Record<PageId, () => HTMLElement> = {
-  settings: buildSettingsPage,
   statistics: buildStatisticsPage,
   quickmarks: buildQuickMarksPage,
   keylayouts: buildKeyLayoutsPage,
