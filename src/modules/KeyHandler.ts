@@ -4,6 +4,7 @@
 import type { KeyBindingMode, KeyLayout, ModeValue } from "../types";
 import { Mode, COMMANDS } from "../commands";
 import { bindingsForPreset } from "../keybindings";
+import { KEY_TIMEOUT_MS } from "./constants";
 
 const INPUT_TAGS = new Set(["INPUT", "TEXTAREA", "SELECT"]);
 const NON_TEXT_INPUT_TYPES = new Set([
@@ -14,7 +15,6 @@ const NON_TEXT_INPUT_TYPES = new Set([
 const TEXT_INPUT_ROLES = new Set([
   "textbox", "searchbox", "combobox",
 ]);
-const KEY_TIMEOUT_MS = 500;
 
 // Map typed characters to canonical US QWERTY event.code names.
 // In character mode this lets symbol bindings work on any keyboard layout.

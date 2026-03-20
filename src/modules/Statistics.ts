@@ -14,6 +14,8 @@ declare const browser: {
   };
 };
 
+import { SECONDS_PER_ACTION, FEET_PER_REACH } from "./constants";
+
 const STORAGE_KEY = "statistics";
 
 export interface StatCounters {
@@ -32,11 +34,6 @@ const EMPTY_COUNTERS: StatCounters = {
   scrollActions: 0,
 };
 
-/** Seconds saved per action — reaching for the mouse, aiming, clicking. */
-export const SECONDS_PER_ACTION = 1.3;
-
-/** Feet of arm movement saved per mouse reach (rough desk-to-mouse distance). */
-export const FEET_PER_REACH = 1;
 
 export interface Milestone {
   /** Total actions required to reach this milestone. */

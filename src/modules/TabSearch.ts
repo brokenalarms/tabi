@@ -9,6 +9,7 @@
 import type { ModeValue, TabInfo } from "../types";
 import { Mode } from "../commands";
 import { removeOverlay } from "./overlayUtils";
+import { BONUS_PREFIX, BONUS_WORD_BOUNDARY, BONUS_CONTIGUOUS, BASE_CHAR_SCORE } from "./constants";
 
 // Browser API (Safari Web Extension)
 declare const browser: {
@@ -41,10 +42,6 @@ interface ScoredEntry {
 
 // --- Fuzzy scoring constants ---
 const SCORE_NO_MATCH = -1;
-const BONUS_PREFIX = 16;
-const BONUS_WORD_BOUNDARY = 8;
-const BONUS_CONTIGUOUS = 4;
-const BASE_CHAR_SCORE = 1;
 const WORD_SEPARATORS = new Set([" ", "/", ".", "-", "_", ":"]);
 
 /**

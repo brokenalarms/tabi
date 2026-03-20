@@ -1,6 +1,8 @@
 // Premium entitlement gate — controls access to premium features
 // and shows upgrade prompts for free users.
 
+import { PREMIUM_TOAST_DURATION_MS } from "./modules/constants";
+
 let premiumActive = false;
 
 /** Whether premium is currently unlocked. */
@@ -25,7 +27,6 @@ export function guardPremium(featureName: string): boolean {
 
 // ── Upgrade toast ──────────────────────────────────────────────────
 
-const TOAST_DURATION_MS = 5000;
 const TOAST_CLASS = "tabi-premium-toast";
 
 let activeToast: HTMLElement | null = null;
@@ -73,7 +74,7 @@ export function showPremiumPrompt(featureName: string): void {
   dismissTimer = setTimeout(() => {
     dismissToast();
     document.removeEventListener("keydown", onEscapeKey, true);
-  }, TOAST_DURATION_MS);
+  }, PREMIUM_TOAST_DURATION_MS);
 
   // Escape to dismiss
   document.addEventListener("keydown", onEscapeKey, true);

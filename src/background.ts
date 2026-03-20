@@ -1,5 +1,6 @@
 // Tabi background service worker
 // Handles tab management and messaging with content scripts
+import { MAX_CLOSED_TABS } from "./modules/constants";
 
 // Command names handled by the background service worker
 type Command =
@@ -59,7 +60,6 @@ export interface ClosedTab {
   leftNeighborId: number | null;
 }
 
-export const MAX_CLOSED_TABS = 50;
 export const closedTabStack: ClosedTab[] = [];
 
 // Track which tabs have the extension active (not excluded by domain)

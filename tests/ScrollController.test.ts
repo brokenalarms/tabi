@@ -5,7 +5,8 @@
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import { KeyHandler } from "../src/modules/KeyHandler";
-import { ScrollController, ScrollConfig } from "../src/modules/ScrollController";
+import { ScrollController } from "../src/modules/ScrollController";
+import { ScrollConfig } from "../src/modules/constants";
 
 // --- Minimal DOM shim ---
 
