@@ -267,7 +267,9 @@ export class ScrollController {
     if (!v) return;
     cancelAnimationFrame(v.rafId);
     ScrollController.velocity = null;
-    ScrollController.restoreSmoothScroll(v.target);
+    // Don't restore smooth scroll — callers (scrollToTop, scrollHalfPageDown,
+    // etc.) start a new animation right after, so the override must stay.
+    // destroy() handles final cleanup.
   }
 
   // --- Scroll operations ---
@@ -300,7 +302,11 @@ export class ScrollController {
     if (existing) {
       cancelAnimationFrame(existing.rafId);
       ScrollController.chaseAnimations.delete(target);
-      ScrollController.restoreSmoothScroll(target);
+      // Don't restore smooth scroll here — callers always start a new
+      // animation immediately, which keeps the override active.  The
+      // restore→disable flip between cancelChase and the next smoothScroll
+      // caused Safari to briefly re-enable CSS smooth scrolling, producing
+      // visible jumps on half-page and absolute scroll commands.
     }
   }
 
@@ -346,6 +352,16 @@ export class ScrollController {
 
   destroy(): void {
     ScrollController.stopVelocityImmediate();
+    // Cancel any running chase animations
+    for (const [, chase] of ScrollController.chaseAnimations) {
+      cancelAnimationFrame(chase.rafId);
+    }
+    ScrollController.chaseAnimations.clear();
+    // Restore smooth scroll on all overridden elements
+    for (const el of ScrollController.overriddenElements) {
+      el.style.scrollBehavior = "";
+    }
+    ScrollController.overriddenElements.clear();
     const commands = [
       "scrollDown", "scrollUp", "scrollRight", "scrollLeft",
       "scrollHalfPageDown", "scrollHalfPageUp",
