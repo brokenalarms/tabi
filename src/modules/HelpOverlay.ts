@@ -12,39 +12,39 @@ interface KeyHandlerLike {
 }
 
 export class HelpOverlay {
-  private _keyHandler: KeyHandlerLike;
-  private _active: boolean;
-  private _overlay: HTMLDivElement | null;
-  private readonly _onMouseDown: () => void;
-  private readonly _onKeyDown: (event: KeyboardEvent) => void;
+  private keyHandler: KeyHandlerLike;
+  private active: boolean;
+  private overlay: HTMLDivElement | null;
+  private readonly onMouseDown: () => void;
+  private readonly onKeyDown: (event: KeyboardEvent) => void;
 
   constructor(keyHandler: KeyHandlerLike) {
-    this._keyHandler = keyHandler;
-    this._active = false;
-    this._overlay = null;
-    this._onMouseDown = this._deactivate.bind(this);
-    this._onKeyDown = (event: KeyboardEvent) => {
+    this.keyHandler = keyHandler;
+    this.active = false;
+    this.overlay = null;
+    this.onMouseDown = this.deactivate.bind(this);
+    this.onKeyDown = (event: KeyboardEvent) => {
       event.preventDefault();
       event.stopPropagation();
-      this._deactivate();
+      this.deactivate();
     };
-    this._keyHandler.on("showHelp", () => this.activate());
+    this.keyHandler.on("showHelp", () => this.activate());
   }
 
   activate(): void {
-    if (this._active) {
-      this._deactivate();
+    if (this.active) {
+      this.deactivate();
       return;
     }
-    this._active = true;
-    this._createOverlay();
-    document.addEventListener("keydown", this._onKeyDown, true);
-    document.addEventListener("mousedown", this._onMouseDown, true);
+    this.active = true;
+    this.createOverlay();
+    document.addEventListener("keydown", this.onKeyDown, true);
+    document.addEventListener("mousedown", this.onMouseDown, true);
   }
 
-  private _createOverlay(): void {
-    this._overlay = document.createElement("div") as HTMLDivElement;
-    this._overlay.className = "tabi-overlay";
+  private createOverlay(): void {
+    this.overlay = document.createElement("div") as HTMLDivElement;
+    this.overlay.className = "tabi-overlay";
 
     const modal = document.createElement("div");
     modal.className = "tabi-panel tabi-help-modal";
@@ -57,7 +57,7 @@ export class HelpOverlay {
     const grid = document.createElement("div");
     grid.className = "tabi-help-grid";
 
-    const bindings = this._keyHandler.getBindings();
+    const bindings = this.keyHandler.getBindings();
     const normalBindings = bindings.get("NORMAL");
     let goToTabDigitShown = false;
     if (normalBindings) {
@@ -66,20 +66,20 @@ export class HelpOverlay {
         if (/^goToTab\d$/.test(cmd)) {
           if (goToTabDigitShown) continue;
           goToTabDigitShown = true;
-          HelpOverlay._addRow(grid, "g1\u2013g9", "Go to tab by number");
+          HelpOverlay.addRow(grid, "g1\u2013g9", "Go to tab by number");
           continue;
         }
         if (cmd === "goToTabFirst") {
-          HelpOverlay._addRow(grid, "g0 / g^", "First tab");
+          HelpOverlay.addRow(grid, "g0 / g^", "First tab");
           continue;
         }
         if (cmd === "goToTabLast") {
-          HelpOverlay._addRow(grid, "g$", "Last tab");
+          HelpOverlay.addRow(grid, "g$", "Last tab");
           continue;
         }
 
         const label = COMMANDS[cmd] || cmd;
-        HelpOverlay._addRow(grid, HelpOverlay._formatSequence(seq), label);
+        HelpOverlay.addRow(grid, HelpOverlay.formatSequence(seq), label);
       }
     }
 
@@ -90,11 +90,11 @@ export class HelpOverlay {
     hint.textContent = "Press any key to dismiss";
     modal.appendChild(hint);
 
-    this._overlay.appendChild(modal);
-    document.body.appendChild(this._overlay);
+    this.overlay.appendChild(modal);
+    document.body.appendChild(this.overlay);
   }
 
-  private static _addRow(grid: HTMLElement, keyText: string, descText: string): void {
+  private static addRow(grid: HTMLElement, keyText: string, descText: string): void {
     const row = document.createElement("div");
     row.className = "tabi-help-row";
     const keyEl = document.createElement("kbd");
@@ -108,7 +108,7 @@ export class HelpOverlay {
     grid.appendChild(row);
   }
 
-  static _formatSequence(seq: string): string {
+  static formatSequence(seq: string): string {
     return seq.split(" ").map((part) => {
       const modifiers: string[] = [];
       let code = part;
@@ -127,17 +127,17 @@ export class HelpOverlay {
     }).join(" ");
   }
 
-  private _deactivate(): void {
-    if (!this._active) return;
-    this._active = false;
-    document.removeEventListener("keydown", this._onKeyDown, true);
-    document.removeEventListener("mousedown", this._onMouseDown, true);
-    if (this._overlay) removeOverlay(this._overlay);
-    this._overlay = null;
+  private deactivate(): void {
+    if (!this.active) return;
+    this.active = false;
+    document.removeEventListener("keydown", this.onKeyDown, true);
+    document.removeEventListener("mousedown", this.onMouseDown, true);
+    if (this.overlay) removeOverlay(this.overlay);
+    this.overlay = null;
   }
 
   destroy(): void {
-    this._deactivate();
-    this._keyHandler.off("showHelp");
+    this.deactivate();
+    this.keyHandler.off("showHelp");
   }
 }
