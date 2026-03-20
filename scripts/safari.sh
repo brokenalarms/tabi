@@ -60,15 +60,11 @@ osascript -e '
 
     if (count of savedWindows) = 0 then return
 
-    -- Close the default blank window Safari opens on launch
-    try
-      if (count of windows) = 1 then
-        set tabURL to URL of current tab of window 1
-        if tabURL is missing value or tabURL is "" or tabURL starts with "favorites://" then
-          close window 1
-        end if
-      end if
-    end try
+    -- Close all default windows Safari opens on launch
+    repeat with w in windows
+      close w
+    end repeat
+    delay 0.3
 
     repeat with i from 1 to count of savedWindows
       set winInfo to item i of savedWindows
@@ -78,6 +74,7 @@ osascript -e '
         make new document with properties {URL:item 1 of urls}
         delay 0.3
         set w to window 1
+        set bounds of w to winBounds of winInfo
 
         repeat with j from 2 to count of urls
           tell w
@@ -85,12 +82,38 @@ osascript -e '
           end tell
         end repeat
 
-        set bounds of w to winBounds of winInfo
         set tabIdx to tabIndex of winInfo
         if tabIdx > 0 and tabIdx ≤ (count of tabs of w) then
           set current tab of w to tab tabIdx of w
         end if
       end if
+    end repeat
+
+    -- Clean up blank tabs and windows
+    set windowsToClose to {}
+    repeat with w in windows
+      set tabsToClose to {}
+      repeat with j from 1 to count of tabs of w
+        set tabURL to URL of tab j of w
+        if tabURL is missing value or tabURL is "" or tabURL starts with "favorites://" then
+          set end of tabsToClose to j
+        end if
+      end repeat
+      if (count of tabsToClose) = (count of tabs of w) then
+        set end of windowsToClose to id of w
+      else
+        repeat with j from (count of tabsToClose) to 1 by -1
+          close tab (item j of tabsToClose) of w
+        end repeat
+      end if
+    end repeat
+    repeat with wid in windowsToClose
+      repeat with w in windows
+        if id of w = wid then
+          close w
+          exit repeat
+        end if
+      end repeat
     end repeat
 
     activate
