@@ -7,7 +7,7 @@ import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from ".
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
 import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, hasRepeatingPeers, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isEmpty, shouldRedirectToHeading, hasListBoundaryBetween, isInNearbySiblingSubtree, countNestedLinks } from "../src/modules/elementPredicates";
-import { findBlockAncestor, retryExpandedToggle, captureRetryStrategies, executeRetryStrategies } from "../src/modules/elementTraversals";
+import { findBlockAncestor, findSoleContentChild, retryExpandedToggle, captureRetryStrategies, executeRetryStrategies } from "../src/modules/elementTraversals";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
 describe("element discovery", () => {
@@ -3259,6 +3259,70 @@ describe("positioned overlay not exempted by sibling subtree", () => {
         const modal = env.document.getElementById("modal") as unknown as HTMLElement;
         assert.equal(isInNearbySiblingSubtree(link, modal), false,
             "Fixed position sibling should not be exempted");
+        env.cleanup();
+    });
+});
+
+// Facebook: role="button" div wrapping "View 1 reply" through nested spans.
+// The div is 294px wide but the visible text is much narrower.
+// findSoleContentChild drills through single-child wrappers so the hint
+// can position on the tightest content element instead of the wide box.
+describe("findSoleContentChild", () => {
+    it("drills through single-child wrapper chain", () => {
+        const env = createDOM(`
+            <div id="outer" role="button">
+                <span>
+                    <span id="inner">View 1 reply</span>
+                </span>
+            </div>
+        `);
+        const outer = env.document.getElementById("outer") as unknown as HTMLElement;
+        const inner = env.document.getElementById("inner") as unknown as HTMLElement;
+
+        // Base: outer has children so there's something to drill into
+        assert.ok(outer.children.length > 0);
+
+        // Delta: drilling returns the innermost single-child element
+        assert.equal(findSoleContentChild(outer), inner);
+        env.cleanup();
+    });
+
+    it("stops when multiple non-empty children exist", () => {
+        const env = createDOM(`
+            <div id="outer" role="button">
+                <span>text one</span>
+                <span>text two</span>
+            </div>
+        `);
+        const outer = env.document.getElementById("outer") as unknown as HTMLElement;
+
+        // Base: element has children
+        assert.ok(outer.children.length > 1);
+
+        // Delta: multiple children — returns null, no drilling
+        assert.equal(findSoleContentChild(outer), null);
+        env.cleanup();
+    });
+
+    it("returns null for element with no children", () => {
+        const env = createDOM(`<div id="leaf">just text</div>`);
+        const leaf = env.document.getElementById("leaf") as unknown as HTMLElement;
+        assert.equal(findSoleContentChild(leaf), null);
+        env.cleanup();
+    });
+
+    it("skips empty siblings when drilling", () => {
+        const env = createDOM(`
+            <div id="outer">
+                <span></span>
+                <span id="inner">content</span>
+            </div>
+        `);
+        const outer = env.document.getElementById("outer") as unknown as HTMLElement;
+        const inner = env.document.getElementById("inner") as unknown as HTMLElement;
+
+        // Only one non-empty child — drills to it
+        assert.equal(findSoleContentChild(outer), inner);
         env.cleanup();
     });
 });
