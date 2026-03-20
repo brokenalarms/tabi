@@ -179,7 +179,8 @@ const SECTIONING_SELECTOR = "main, header, footer, aside, section, article";
  *  real overlay.
  *  Stops at body/html, repeating containers, and sectioning content elements
  *  to avoid exempting content that bleeds across list or page-region
- *  boundaries. */
+ *  boundaries. Positioned siblings (absolute/fixed) are real overlays — not
+ *  exempt. */
 export function isInNearbySiblingSubtree(el: HTMLElement, cover: HTMLElement): boolean {
   let anc: HTMLElement | null = el;
   while (anc) {
@@ -187,8 +188,24 @@ export function isInNearbySiblingSubtree(el: HTMLElement, cover: HTMLElement): b
     if (anc.matches(SECTIONING_SELECTOR)) break;
     const parent: HTMLElement | null = anc.parentElement;
     if (!parent || parent === document.body || parent === document.documentElement) break;
-    if (parent.contains(cover) && !anc.contains(cover)) return true;
+    if (parent.contains(cover) && !anc.contains(cover)) {
+      if (isPositionedBetween(cover, parent)) return false;
+      return true;
+    }
     anc = parent;
+  }
+  return false;
+}
+
+/** Does any element between `el` and `ancestor` (exclusive) have
+ *  position:absolute or position:fixed? Positioned elements are taken out
+ *  of normal flow — a sibling subtree rooted in one is a real overlay. */
+function isPositionedBetween(el: HTMLElement, ancestor: HTMLElement): boolean {
+  let node: HTMLElement | null = el;
+  while (node && node !== ancestor) {
+    const pos = getComputedStyle(node).position;
+    if (pos === "absolute" || pos === "fixed") return true;
+    node = node.parentElement;
   }
   return false;
 }
