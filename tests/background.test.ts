@@ -300,7 +300,7 @@ describe("background.ts tab management", () => {
         it("returns tab list with id, title, url, active fields", async () => {
             const result = await handleCommand("queryTabs", {}) as unknown as Array<Record<string, unknown>>;
             assert.equal(result.length, 3);
-            assert.deepEqual(Object.keys(result[0]).sort(), ["active", "id", "title", "url"]);
+            assert.deepEqual(Object.keys(result[0]).sort(), ["active", "favIconUrl", "id", "title", "url"]);
             assert.equal(result[1].active, true);
         });
     });

@@ -23,7 +23,7 @@ declare const browser: {
     create(opts: { url?: string; index?: number }): Promise<{ id: number }>;
     remove(tabId: number): Promise<void>;
     update(tabId: number, props: { active: boolean }): Promise<unknown>;
-    query(opts: { currentWindow: boolean }): Promise<Array<{ id: number; title: string; url: string; active: boolean }>>;
+    query(opts: { currentWindow: boolean }): Promise<Array<{ id: number; title: string; url: string; active: boolean; favIconUrl?: string }>>;
     sendMessage(tabId: number, message: Record<string, unknown>): Promise<unknown>;
     onRemoved: { addListener(fn: (tabId: number) => void): void };
     onUpdated: { addListener(fn: (tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string }) => void): void };
@@ -201,7 +201,7 @@ export async function handleCommand(command: Command, sender: MessageSender, mes
 
     case "queryTabs": {
       const tabs = await browser.tabs.query({ currentWindow: true });
-      return tabs.map(t => ({ id: t.id, title: t.title, url: t.url, active: t.active }));
+      return tabs.map(t => ({ id: t.id, title: t.title, url: t.url, active: t.active, favIconUrl: t.favIconUrl }));
     }
 
     case "switchTab": {

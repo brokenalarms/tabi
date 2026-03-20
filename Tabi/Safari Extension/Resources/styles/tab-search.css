@@ -38,6 +38,9 @@
     cursor: pointer;
     border-bottom: 1px solid var(--tabi-panel-border);
     transition: background 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .tabi-tab-search-item:last-child {
@@ -46,6 +49,18 @@
 
 .tabi-tab-search-item.selected {
     background: var(--tabi-tab-item-selected-bg);
+}
+
+.tabi-tab-search-favicon {
+    flex-shrink: 0;
+    width: 16px;
+    height: 16px;
+    border-radius: 2px;
+}
+
+.tabi-tab-search-text {
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
 .tabi-tab-search-item-title {
@@ -63,6 +78,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
     margin-top: 2px;
+}
+
+.tabi-tab-search-item mark {
+    background: var(--tabi-tab-match-bg, rgba(255, 200, 50, 0.35));
+    color: inherit;
+    border-radius: 1px;
+    padding: 0;
 }
 
 .tabi-tab-search-empty {

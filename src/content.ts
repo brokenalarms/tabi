@@ -106,8 +106,8 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   const hintMode = new HintMode(keyHandler);
   hintMode.wireCommands();
 
-  // Tab search overlay
-  const tabSearch = new TabSearch(keyHandler);
+  // Tab search overlay (fuzzy matching is premium)
+  const tabSearch = new TabSearch(keyHandler, resolved.isPremium);
 
   // Help overlay
   const helpOverlay = new HelpOverlay(keyHandler);
@@ -156,6 +156,7 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
     if (changes.isPremium?.newValue !== undefined) {
       setPremiumStatus(changes.isPremium.newValue as boolean);
       resolved.isPremium = changes.isPremium.newValue as boolean;
+      tabSearch.setPremium(resolved.isPremium);
       if (resolved.isPremium && !quickMarks) {
         quickMarks = new QuickMarks(keyHandler);
       } else if (!resolved.isPremium && quickMarks) {
