@@ -3,7 +3,7 @@
 // upgrade CTA. Uses inline styles so it works in any context (content
 // script, settings page, popup).
 
-const FADE_MS = 200;
+import { PREMIUM_PROMPT_FADE_MS } from "./constants";
 
 export interface PremiumFeature {
   name: string;
@@ -65,7 +65,7 @@ export class PremiumPrompt {
       justifyContent: "center",
       background: "rgba(0, 0, 0, 0)",
       zIndex: "2147483647",
-      transition: `background ${FADE_MS}ms`,
+      transition: `background ${PREMIUM_PROMPT_FADE_MS}ms`,
     });
     overlay.addEventListener("click", (e) => {
       if (e.target === overlay) this.dismiss();
@@ -88,7 +88,7 @@ export class PremiumPrompt {
       boxShadow: "0 20px 60px rgba(0, 0, 0, 0.4)",
       transform: "scale(0.95) translateY(8px)",
       opacity: "0",
-      transition: `transform ${FADE_MS}ms ease-out, opacity ${FADE_MS}ms ease-out`,
+      transition: `transform ${PREMIUM_PROMPT_FADE_MS}ms ease-out, opacity ${PREMIUM_PROMPT_FADE_MS}ms ease-out`,
     });
 
     // Icon
@@ -186,7 +186,7 @@ export class PremiumPrompt {
     }
     setTimeout(() => {
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-    }, FADE_MS);
+    }, PREMIUM_PROMPT_FADE_MS);
   }
 
   /** Whether the prompt is currently visible. */

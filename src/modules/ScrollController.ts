@@ -7,6 +7,8 @@
 // RAF loop at a fixed speed, keyup decelerates to a stop via exponential smoothing.
 // This avoids dependence on OS key repeat and produces smooth scrolling from frame 1.
 
+import { ScrollConfig } from "./constants";
+
 type Axis = "x" | "y";
 
 interface KeyHandlerLike {
@@ -14,19 +16,6 @@ interface KeyHandlerLike {
   onKeyUp(command: string, callback: () => void): void;
   off(command: string): void;
 }
-
-export const ScrollConfig = {
-  /** Scroll velocity (px/sec) for held j/k/h/l */
-  scrollSpeed: 800,
-  /** Pixels per single j/k tap (keydown→keyup with no hold) */
-  scrollStep: 40,
-  /** Smoothing time constant (ms) for deceleration after key release */
-  smoothTimeMs: 80,
-  /** Duration (ms) for commanded scrolls (d/u, gg/G) — ease-in-out curve */
-  scrollDurationMs: 250,
-  /** Snap threshold (px) — stop animating when this close to target */
-  snapThreshold: 0.5,
-};
 
 // --- Target-chase animation ---
 // Two modes:

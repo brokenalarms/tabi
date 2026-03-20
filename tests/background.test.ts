@@ -5,6 +5,7 @@
 
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
+import { MAX_CLOSED_TABS } from "../src/modules/constants";
 
 // --- browser API shim ---
 
@@ -119,7 +120,6 @@ import {
     popClosedTab,
     handleCommand,
     syncSettings,
-    MAX_CLOSED_TABS,
     activeTabSet,
     tabUrlCache,
     tabOrder,

@@ -5,7 +5,7 @@
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
-import { HINT_HEIGHT } from "./constants";
+import { HINT_HEIGHT, HINT_CHARS, DRIFT_THRESHOLD, DRIFT_CHECK_INTERVAL, DRIFT_MAX_SAMPLE } from "./constants";
 import { isLargeEnoughForGlow, isFormControl, getRepeatingContainer, countNestedLinks, isZeroSizeAnchor, shouldRedirectToHeading, hasBox } from "./elementPredicates";
 import { LIST_BOUNDARY_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER_HEIGHT } from "./constants";
 import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect, captureRetryStrategies, executeRetryStrategies } from "./elementTraversals";
@@ -52,12 +52,6 @@ type HintPlacement =
 type ContainerGlowStrategy = "any" | "all" | "none";
 const CONTAINER_GLOW_STRATEGY: ContainerGlowStrategy = "all";
 
-const HINT_CHARS = "sadgjklewcmpoh";
-
-/** How far (px) a hinted element may drift before we dismiss hints. */
-const DRIFT_THRESHOLD = 5;
-/** How often (ms) we check for position drift. */
-const DRIFT_CHECK_INTERVAL = 200;
 
 export class HintMode {
   private keyHandler: KeyHandlerLike;
@@ -289,16 +283,15 @@ export class HintMode {
    *  elements have drifted, indicating a real layout shift rather than
    *  a single animated element (e.g. Amazon carousel). */
   private startDriftCheck(): void {
-    const MAX_SAMPLE = 5;
     const entries = [...this.hintPlacementMap.keys()];
     // Evenly spaced sample so we don't just check the first few
-    const step = Math.max(1, Math.floor(entries.length / MAX_SAMPLE));
+    const step = Math.max(1, Math.floor(entries.length / DRIFT_MAX_SAMPLE));
     // Snapshot rects NOW (post-render) rather than using the pre-render rects
     // from hintPlacementMap. Inserting the overlay and hint divs can cause
     // minor layout shifts, especially on large/zoomed viewports — using
     // pre-render rects as the baseline would falsely trigger drift dismissal.
     const sample: Array<[HTMLElement, DOMRect]> = [];
-    for (let i = 0; i < entries.length && sample.length < MAX_SAMPLE; i += step) {
+    for (let i = 0; i < entries.length && sample.length < DRIFT_MAX_SAMPLE; i += step) {
       sample.push([entries[i], entries[i].getBoundingClientRect()]);
     }
 

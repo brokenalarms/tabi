@@ -1,7 +1,7 @@
 // Stateless element predicates — each answers one question about an element.
 // Used by walkerFilter (ElementGatherer) and hint positioning (HintMode).
 
-import { CLICKABLE_SELECTOR, HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER_HEIGHT, MINIMUM_CONTAINER_WIDTH, LIST_BOUNDARY_TAGS, EMBEDDED_CONTENT_ELEMENTS } from "./constants";
+import { CLICKABLE_SELECTOR, HEADING_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER_HEIGHT, MINIMUM_CONTAINER_WIDTH, MINIMUM_REPEATING_SIBLINGS, LIST_BOUNDARY_TAGS, EMBEDDED_CONTENT_ELEMENTS } from "./constants";
 
 // --- Visibility & geometry ---
 
@@ -215,8 +215,6 @@ export function isBlockLevel(el: HTMLElement): boolean {
   return display !== "" && !display.startsWith("inline");
 }
 
-/** Minimum number of repeating siblings to count as a repeating pattern. */
-const MINIMUM_REPEATING_SIBLINGS = 3;
 
 /** Is this element inside a semantic list container (li, tr) that generates a box? */
 function isInListContainer(el: HTMLElement): HTMLElement | null {

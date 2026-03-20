@@ -5,6 +5,7 @@
 
 import type { StatCounters } from "./Statistics";
 import { totalActions, distanceSaved, currentMilestone } from "./Statistics";
+import { STATS_CHECK_INTERVAL_MS, STATS_AUTO_DISMISS_MS, STATS_FADE_MS } from "./constants";
 
 declare const browser: {
   storage: {
@@ -16,15 +17,12 @@ declare const browser: {
 };
 
 const STORAGE_KEY = "lastStatsShown";
-const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-const AUTO_DISMISS_MS = 8000;
-const FADE_MS = 300;
 
 // --- Pure helpers (testable without browser APIs) ---
 
 /** Returns true if enough time has passed since the last notification. */
 export function shouldShow(lastShown: number, now: number): boolean {
-  return now - lastShown >= SEVEN_DAYS_MS;
+  return now - lastShown >= STATS_CHECK_INTERVAL_MS;
 }
 
 /** Formats a foot count into a human-friendly distance string. */
@@ -104,7 +102,7 @@ export class StatsNotification {
       lineHeight: "1.5",
       zIndex: "2147483647",
       pointerEvents: "auto",
-      transition: `opacity ${FADE_MS}ms`,
+      transition: `opacity ${STATS_FADE_MS}ms`,
       opacity: "0",
       boxShadow: "0 4px 24px rgba(0, 0, 0, 0.3)",
     });
@@ -157,7 +155,7 @@ export class StatsNotification {
     });
 
     // Auto-dismiss after 8 seconds
-    this.dismissTimer = setTimeout(() => this.dismiss(), AUTO_DISMISS_MS);
+    this.dismissTimer = setTimeout(() => this.dismiss(), STATS_AUTO_DISMISS_MS);
 
     // Dismiss on any keypress
     this.keyListener = () => this.dismiss();
@@ -178,7 +176,7 @@ export class StatsNotification {
       el.style.opacity = "0";
       setTimeout(() => {
         if (el.parentNode) el.parentNode.removeChild(el);
-      }, FADE_MS);
+      }, STATS_FADE_MS);
       this.el = null;
     }
   }

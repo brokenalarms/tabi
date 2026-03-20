@@ -4,6 +4,7 @@
 // and restores the scroll position.
 
 import type { ModeValue } from "../types";
+import { QUICKMARK_TOAST_DURATION_MS } from "./constants";
 
 declare const browser: {
   runtime: {
@@ -26,7 +27,6 @@ export interface Mark {
 export type MarkMap = Partial<Record<string, Mark>>;
 
 const STORAGE_KEY = "quickMarks";
-const TOAST_DURATION_MS = 1500;
 const LETTERS = "abcdefghijklmnopqrstuvwxyz";
 
 interface KeyHandlerLike {
@@ -122,7 +122,7 @@ export class QuickMarks {
       this.toastTimer = setTimeout(() => {
         this.dismissToast();
       }, 200);
-    }, TOAST_DURATION_MS);
+    }, QUICKMARK_TOAST_DURATION_MS);
   }
 
   private dismissToast(): void {

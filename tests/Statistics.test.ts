@@ -13,11 +13,10 @@ import {
   distanceSaved,
   currentMilestone,
   nextMilestone,
-  SECONDS_PER_ACTION,
-  FEET_PER_REACH,
   MILESTONES,
   type StatCounters,
 } from "../src/modules/Statistics";
+import { SECONDS_PER_ACTION, FEET_PER_REACH } from "../src/modules/constants";
 
 // --- Pure helper tests (no DOM or browser API needed) ---
 
