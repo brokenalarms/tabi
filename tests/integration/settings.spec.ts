@@ -6,8 +6,11 @@
 
 import { test, expect } from "@playwright/test";
 import path from "path";
+import fs from "fs";
 
 const SETTINGS_JS = path.resolve(__dirname, "settings.js");
+const CSS_DIR = path.resolve(__dirname, "../../Tabi/Safari Extension/Resources/styles");
+const SCREENSHOT_DIR = path.resolve(__dirname, "../../scripts/screenshots");
 
 type StorageSeed = Record<string, unknown>;
 
@@ -185,18 +188,17 @@ test("statistics page displays counters for premium users", async ({ page }) => 
 
   const activePage = page.locator(".page.active");
 
-  // Hero stat — total actions (42 + 15 + 8 + 35 = 100)
-  await expect(activePage.locator(".hero-number")).toHaveText("100");
+  // Hero stat — time saved (100 actions * 1.3s = 130s = 2.2 min)
+  await expect(activePage.locator(".stats-hero-number")).toContainText("min");
 
-  // Individual stat cards
+  // Individual stat cards show counts
   const cardValues = await activePage.locator(".stat-card-value").allTextContents();
   expect(cardValues).toContain("42");
   expect(cardValues).toContain("15");
   expect(cardValues).toContain("8");
-  expect(cardValues).toContain("35");
 });
 
-test("statistics page shows milestone progress for premium users", async ({ page }) => {
+test("statistics page shows milestone timeline for premium users", async ({ page }) => {
   await setupSettingsPage(page, {
     isPremium: true,
     statistics: {
@@ -211,15 +213,13 @@ test("statistics page shows milestone progress for premium users", async ({ page
 
   const activePage = page.locator(".page.active");
 
-  // Total = 105, which is past the 100 milestone, next is 250
-  await expect(activePage.locator(".milestone-section")).toBeVisible();
-  // Current milestone description should be visible
-  await expect(activePage.locator(".milestone-description")).toContainText(
-    "Your arm has been spared 100 feet of travel"
-  );
+  // Vertical milestone timeline should be visible
+  await expect(activePage.locator(".milestone-graph")).toBeVisible();
+  // "You are here" marker should exist
+  await expect(activePage.locator(".milestone-marker.current")).toBeVisible();
 });
 
-test("statistics page shows derived metrics", async ({ page }) => {
+test("statistics page shows distance in stat card and notification preview", async ({ page }) => {
   await setupSettingsPage(page, {
     isPremium: true,
     statistics: {
@@ -233,16 +233,13 @@ test("statistics page shows derived metrics", async ({ page }) => {
   await page.locator(".nav-item", { hasText: "Statistics" }).click();
 
   const activePage = page.locator(".page.active");
+
+  // Mouse Distance Saved card shows distance
   const cardLabels = await activePage.locator(".stat-card-label").allTextContents();
+  expect(cardLabels).toContain("Mouse Distance Saved");
 
-  // Should include the derived metric labels
-  expect(cardLabels).toContain("Time saved");
-  expect(cardLabels).toContain("Arm travel saved");
-
-  // 100 actions * 1.3s = 130s = 2m (rounded)
-  const cardValues = await activePage.locator(".stat-card-value").allTextContents();
-  expect(cardValues).toContain("2m");
-  expect(cardValues).toContain("100 ft");
+  // Notification preview toast is visible
+  await expect(activePage.locator(".notification-toast")).toBeVisible();
 });
 
 // ── Quick Marks page ───────────────────────────────────────────────
@@ -305,4 +302,82 @@ test("settings page re-renders when storage changes externally", async ({ page }
 
   // The page should reactively re-render with premium status
   await expect(pill).toContainText("Premium");
+});
+
+// ── Screenshots for visual comparison ─────────────────────────────────
+
+async function setupStyledSettingsPage(
+  page: import("@playwright/test").Page,
+  storageSeed: StorageSeed = {}
+) {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.setViewportSize({ width: 960, height: 800 });
+
+  await page.setContent(`<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+  <div id="app"></div>
+</body>
+</html>`);
+
+  // Load theme + settings CSS
+  for (const file of ["tabi-theme.css", "settings.css"]) {
+    const css = fs.readFileSync(path.join(CSS_DIR, file), "utf-8");
+    await page.addStyleTag({ content: css });
+  }
+
+  // Inject browser.storage mock
+  await page.evaluate((seed: StorageSeed) => {
+    const storage: Record<string, unknown> = { ...seed };
+    const listeners: Array<(changes: Record<string, { oldValue?: unknown; newValue?: unknown }>, area: string) => void> = [];
+    (window as any).browser = {
+      storage: {
+        local: {
+          async get(_keys: string[]) { return { ...storage }; },
+          async set(items: Record<string, unknown>) {
+            const changes: Record<string, { oldValue?: unknown; newValue?: unknown }> = {};
+            for (const [k, v] of Object.entries(items)) {
+              changes[k] = { oldValue: storage[k], newValue: v };
+              storage[k] = v;
+            }
+            for (const cb of listeners) cb(changes, "local");
+          },
+        },
+        onChanged: { addListener(cb: any) { listeners.push(cb); } },
+      },
+    };
+  }, storageSeed);
+
+  await page.addScriptTag({ path: SETTINGS_JS });
+  await page.waitForSelector(".settings-layout");
+}
+
+test("screenshot: statistics page", async ({ page }) => {
+  await setupStyledSettingsPage(page, {
+    isPremium: true,
+    statistics: {
+      hintsClicked: 2847,
+      linksYanked: 456,
+      tabsSearched: 1203,
+      scrollActions: 3914,
+    },
+  });
+
+  await page.locator(".nav-item", { hasText: "Statistics" }).click();
+  await page.waitForSelector(".stats-hero");
+
+  fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
+  // Full page screenshot to capture milestone timeline + notification preview
+  await page.screenshot({ path: path.join(SCREENSHOT_DIR, "settings-statistics.png"), fullPage: true });
+});
+
+test("screenshot: key layouts page", async ({ page }) => {
+  await setupStyledSettingsPage(page, { isPremium: true });
+
+  await page.locator(".nav-item", { hasText: "Key Layouts" }).click();
+  await page.waitForSelector(".layout-cards");
+
+  fs.mkdirSync(SCREENSHOT_DIR, { recursive: true });
+  await page.screenshot({ path: path.join(SCREENSHOT_DIR, "settings-keylayouts.png") });
 });

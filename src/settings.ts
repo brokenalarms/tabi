@@ -9,10 +9,8 @@ import {
   totalActions,
   timeSaved,
   distanceSaved,
-  currentMilestone,
-  nextMilestone,
-  MILESTONES,
 } from "./modules/Statistics";
+import { SECONDS_PER_ACTION } from "./modules/constants";
 import type { StatCounters } from "./modules/Statistics";
 import { loadMarks } from "./modules/QuickMarks";
 import type { MarkMap } from "./modules/QuickMarks";
@@ -234,8 +232,96 @@ function buildSettingsPage(): HTMLElement {
 
 function formatTime(seconds: number): string {
   if (seconds < 60) return `${Math.round(seconds)}s`;
-  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
-  return `${(seconds / 3600).toFixed(1)}h`;
+  if (seconds < 3600) return `${(seconds / 60).toFixed(1)} min`;
+  return `${(seconds / 3600).toFixed(1)} hrs`;
+}
+
+interface DistanceMilestone {
+  feet: number;
+  emoji: string;
+  label: string;
+  pct: number;
+}
+
+const DISTANCE_MILESTONES: DistanceMilestone[] = [
+  { feet: 6, emoji: "\ud83e\uddca", label: "1 trip to the fridge", pct: 0 },
+  { feet: 100, emoji: "\ud83d\udc0b", label: "Length of a blue whale", pct: 10 },
+  { feet: 300, emoji: "\ud83c\udfc8", label: "1 football field", pct: 20 },
+  { feet: 1063, emoji: "\ud83d\uddfc", label: "Height of the Eiffel Tower", pct: 32 },
+  { feet: 2717, emoji: "\ud83c\udfd9", label: "Height of Burj Khalifa", pct: 44 },
+  { feet: 29032, emoji: "\ud83c\udfd4", label: "Summit of Mt Everest", pct: 60 },
+  { feet: 35000, emoji: "\u2708\ufe0f", label: "Cruising altitude", pct: 72 },
+  { feet: 137500, emoji: "\ud83c\udfc3", label: "A marathon", pct: 84 },
+  { feet: 330000, emoji: "\ud83e\uddd1\u200d\ud83d\ude80", label: "Edge of space (K\u00e1rm\u00e1n line)", pct: 100 },
+];
+
+function buildMilestoneTimeline(currentFeet: number): HTMLElement {
+  const section = el("div", { class: "section" });
+  section.appendChild(text("label", "section-label", "Distance Milestones"));
+
+  const graph = el("div", { class: "milestone-graph" });
+  const track = el("div", { class: "milestone-track" });
+
+  // Interpolate a visual percentage for arbitrary feet values
+  function feetToPct(feet: number): number {
+    if (feet <= DISTANCE_MILESTONES[0].feet) return DISTANCE_MILESTONES[0].pct;
+    for (let i = 1; i < DISTANCE_MILESTONES.length; i++) {
+      const prev = DISTANCE_MILESTONES[i - 1];
+      const curr = DISTANCE_MILESTONES[i];
+      if (feet <= curr.feet) {
+        const ratio = (feet - prev.feet) / (curr.feet - prev.feet);
+        return prev.pct + ratio * (curr.pct - prev.pct);
+      }
+    }
+    return 100;
+  }
+
+  const fillPercent = feetToPct(currentFeet);
+  const fill = el("div", { class: "milestone-fill" });
+  fill.style.height = `${fillPercent}%`;
+  track.appendChild(fill);
+
+  for (const ms of DISTANCE_MILESTONES) {
+    const pct = ms.pct;
+    const reached = currentFeet >= ms.feet;
+
+    const marker = el("div", { class: `milestone-marker${reached ? " reached" : ""}` });
+    marker.style.bottom = `${pct}%`;
+
+    const dot = el("div", { class: "milestone-dot" });
+    if (reached) dot.textContent = "\u2713";
+    marker.appendChild(dot);
+
+    const info = el("div", { class: "milestone-info" });
+    info.appendChild(el("span", { class: "milestone-emoji", text: ms.emoji }));
+    info.appendChild(el("span", { class: "milestone-value", text: ms.feet.toLocaleString() + " ft" }));
+    info.appendChild(el("span", { class: "milestone-fact", text: "\u2014 " + ms.label }));
+    marker.appendChild(info);
+
+    track.appendChild(marker);
+  }
+
+  // "You are here" marker if between milestones
+  if (currentFeet > 0) {
+    const youPct = feetToPct(currentFeet);
+    const youMarker = el("div", { class: "milestone-marker current" });
+    youMarker.style.bottom = `${youPct}%`;
+
+    const youDot = el("div", { class: "milestone-dot", text: "\u2605" });
+    youMarker.appendChild(youDot);
+
+    const youInfo = el("div", { class: "milestone-info" });
+    youInfo.appendChild(el("span", { class: "milestone-emoji", text: "\ud83d\udccd" }));
+    youInfo.appendChild(el("span", { class: "milestone-value", text: currentFeet.toLocaleString() + " ft" }));
+    youInfo.appendChild(el("span", { class: "milestone-fact", text: "\u2014 You are here!" }));
+    youMarker.appendChild(youInfo);
+
+    track.appendChild(youMarker);
+  }
+
+  graph.appendChild(track);
+  section.appendChild(graph);
+  return section;
 }
 
 function buildStatisticsPage(): HTMLElement {
@@ -260,74 +346,104 @@ function buildStatisticsPage(): HTMLElement {
     return page;
   }
 
-  // Hero stat — total actions
-  const total = totalActions(counters);
-  const hero = el("div", { class: "hero-stat" });
-  hero.appendChild(text("div", "hero-number", total.toLocaleString()));
-  hero.appendChild(text("div", "hero-label", "total keyboard actions"));
+  // Hero stat — time saved
+  const time = timeSaved(counters);
+  const hero = el("div", { class: "stats-hero" });
+  hero.appendChild(text("div", "stats-hero-number", formatTime(time)));
+  hero.appendChild(text("div", "stats-hero-label", "saved by keeping your hands on the keyboard"));
+  hero.appendChild(
+    text("div", "stats-hero-sub", `Based on ${SECONDS_PER_ACTION}s saved per hint click and tab search`)
+  );
   page.appendChild(hero);
 
-  // 4 stat cards
+  // 4 stat cards with emoji icons and detail lines
+  const dist = distanceSaved(counters);
+  const fridgeTrips = Math.round(dist / 6);
   const cards = el("div", { class: "stat-cards" });
-  const cardData = [
-    { value: counters.hintsClicked, label: "Hints clicked" },
-    { value: counters.linksYanked, label: "Links yanked" },
-    { value: counters.tabsSearched, label: "Tabs searched" },
-    { value: counters.scrollActions, label: "Scroll actions" },
+  const cardData: { icon: string; value: string; label: string; detail: string; cls: string }[] = [
+    {
+      icon: "\ud83c\udfaf",
+      value: counters.hintsClicked.toLocaleString(),
+      label: "Hints Clicked",
+      detail: `~${Math.round((counters.hintsClicked * SECONDS_PER_ACTION) / 60)} min saved reaching for the mouse`,
+      cls: "stat-card accent-border",
+    },
+    {
+      icon: "\ud83d\udd0d",
+      value: counters.tabsSearched.toLocaleString(),
+      label: "Tabs Found",
+      detail: `~${Math.round((counters.tabsSearched * SECONDS_PER_ACTION) / 60)} min saved cycling through tabs`,
+      cls: "stat-card",
+    },
+    {
+      icon: "\ud83d\udccb",
+      value: counters.linksYanked.toLocaleString(),
+      label: "Links Yanked",
+      detail: "No more right-click \u2192 Copy Link",
+      cls: "stat-card",
+    },
+    {
+      icon: "\ud83d\uddb1",
+      value: `${Math.round(dist).toLocaleString()} ft`,
+      label: "Mouse Distance Saved",
+      detail: fridgeTrips > 0
+        ? `That\u2019s about ${fridgeTrips} trip${fridgeTrips !== 1 ? "s" : ""} to the fridge \ud83e\uddca`
+        : "Start clicking hints to save distance!",
+      cls: "stat-card emerald-border",
+    },
   ];
-  for (const { value, label } of cardData) {
-    const card = el("div", { class: "stat-card" });
-    card.appendChild(text("div", "stat-card-value", value.toLocaleString()));
+  for (const { icon, value, label, detail, cls } of cardData) {
+    const card = el("div", { class: cls });
+    card.appendChild(text("div", "stat-icon", icon));
+    card.appendChild(text("div", "stat-card-value", value));
     card.appendChild(text("div", "stat-card-label", label));
+    card.appendChild(text("div", "stat-detail", detail));
     cards.appendChild(card);
   }
   page.appendChild(cards);
 
-  // Derived metrics
-  const derived = el("div", { class: "stat-cards" });
-  const time = timeSaved(counters);
-  const dist = distanceSaved(counters);
-  const derivedCard1 = el("div", { class: "stat-card" });
-  derivedCard1.appendChild(text("div", "stat-card-value", formatTime(time)));
-  derivedCard1.appendChild(text("div", "stat-card-label", "Time saved"));
-  derived.appendChild(derivedCard1);
+  // Vertical milestone timeline
+  page.appendChild(buildMilestoneTimeline(Math.round(dist)));
 
-  const derivedCard2 = el("div", { class: "stat-card" });
-  derivedCard2.appendChild(text("div", "stat-card-value", `${Math.round(dist)} ft`));
-  derivedCard2.appendChild(text("div", "stat-card-label", "Arm travel saved"));
-  derived.appendChild(derivedCard2);
-  page.appendChild(derived);
+  page.appendChild(el("hr", { class: "separator" }));
 
-  // Milestone progress
-  const milestone = currentMilestone(counters);
-  const next = nextMilestone(counters);
-  if (next) {
-    const msSection = el("div", { class: "milestone-section" });
-    msSection.appendChild(text("label", "section-label", "Next Milestone"));
+  // Notification preview
+  const notifSection = el("div", { class: "section" });
+  notifSection.appendChild(text("label", "section-label", "Weekly Notification Preview"));
+  notifSection.appendChild(
+    buildToggle(
+      "Show weekly notification",
+      "Brief stats toast appears once per 7 days",
+      autoNotifications,
+      (v) => {
+        autoNotifications = v;
+        browser.storage.local.set({ autoNotifications: v });
+      }
+    )
+  );
 
-    const barContainer = el("div", { class: "milestone-bar-container" });
-    const bar = el("div", { class: "milestone-bar" });
-    const prevThreshold = milestone ? milestone.threshold : 0;
-    const progress = ((total - prevThreshold) / (next.threshold - prevThreshold)) * 100;
-    bar.style.width = `${Math.min(100, Math.max(1, progress))}%`;
-    barContainer.appendChild(bar);
-    msSection.appendChild(barContainer);
+  const preview = el("div", { class: "notification-preview" });
+  const toast = el("div", { class: "notification-toast" });
+  toast.appendChild(text("div", "notification-toast-title", "\u2726 This Week with Tabi"));
 
-    const labelRow = el("div", { class: "milestone-label" });
-    labelRow.appendChild(text("span", "", `${total} actions`));
-    labelRow.appendChild(text("span", "", `${next.threshold.toLocaleString()} actions`));
-    msSection.appendChild(labelRow);
+  const statsLine = el("div", { class: "notification-toast-stats" });
+  const hBold = el("strong", { text: String(counters.hintsClicked) });
+  const tBold = el("strong", { text: String(counters.tabsSearched) });
+  const yBold = el("strong", { text: String(counters.linksYanked) });
+  statsLine.append(hBold, " hints \u00a0\u00b7\u00a0 ", tBold, " tabs \u00a0\u00b7\u00a0 ", yBold, " yanks");
+  toast.appendChild(statsLine);
 
-    if (milestone) {
-      msSection.appendChild(text("p", "milestone-description", `"${milestone.description}"`));
-    }
-    page.appendChild(msSection);
-  } else if (milestone) {
-    const msSection = el("div", { class: "milestone-section" });
-    msSection.appendChild(text("label", "section-label", "Latest Milestone"));
-    msSection.appendChild(text("p", "milestone-description", `"${milestone.description}"`));
-    page.appendChild(msSection);
-  }
+  toast.appendChild(
+    text(
+      "div",
+      "notification-toast-fun",
+      `Your hand traveled 0 feet to the mouse. That\u2019s 0 trips to the fridge.`
+    )
+  );
+  preview.appendChild(toast);
+  preview.appendChild(text("div", "notification-label", "\u2191 Appears bottom-right, auto-dismisses after 8s"));
+  notifSection.appendChild(preview);
+  page.appendChild(notifSection);
 
   return page;
 }
@@ -563,8 +679,11 @@ function buildBindingTable(layout: KeyLayout): HTMLElement {
 function buildKeyLayoutsPage(): HTMLElement {
   const page = el("div", { class: "page", id: "page-keylayouts" });
   page.appendChild(text("h2", "page-title", "Key Layouts"));
+  page.appendChild(
+    text("p", "section-hint", "Choose how commands map to your keyboard. Non-vim layouts are optimized for home-row access.")
+  );
 
-  // Layout selector cards
+  // Layout selector cards (4-column)
   const cards = el("div", { class: "layout-cards" });
   const layoutKeys = Object.keys(PRESETS) as KeyLayout[];
 
@@ -574,13 +693,16 @@ function buildKeyLayoutsPage(): HTMLElement {
     if (layoutKey === currentLayout) card.classList.add("active");
     if (isLayoutPremium(layoutKey) && !isPremium) card.classList.add("disabled");
 
-    const header = el("div", { class: "layout-card-header" });
-    header.appendChild(text("span", "layout-card-name", preset.label));
+    card.appendChild(text("div", "layout-card-name", preset.label));
+    card.appendChild(text("div", "layout-card-desc", preset.description));
     if (isLayoutPremium(layoutKey)) {
-      header.appendChild(el("span", { class: "premium-badge", text: "Premium" }));
+      const premBadge = el("span", { class: "premium-badge" });
+      premBadge.textContent = "\u2726 Pro";
+      premBadge.style.marginLeft = "0";
+      premBadge.style.marginBottom = "4px";
+      premBadge.style.display = "inline-block";
+      card.appendChild(premBadge);
     }
-    card.appendChild(header);
-    card.appendChild(text("p", "layout-card-desc", preset.description));
     card.appendChild(buildMiniKeyboard(preset));
 
     card.addEventListener("click", () => {
@@ -597,31 +719,44 @@ function buildKeyLayoutsPage(): HTMLElement {
   }
   page.appendChild(cards);
 
-  page.appendChild(el("hr", { class: "separator" }));
-
-  // Binding mode toggle
-  page.appendChild(
-    buildSection(
-      "Key Binding Mode",
-      "Character matches what you type. Position matches physical key location.",
-      buildSegmented(
-        [
-          { value: "character", label: "Character" },
-          { value: "location", label: "Position" },
-        ],
-        currentBindingMode,
-        (v) => {
-          currentBindingMode = v as KeyBindingMode;
-          browser.storage.local.set({ keyBindingMode: v });
-        }
-      )
+  // Mode indicator card
+  const isPosition = currentBindingMode === "location";
+  const modeCard = el("div", { class: "mode-indicator" });
+  const modeInfo = el("div", { class: "mode-indicator-info" });
+  const modeLabel = el("div", { class: "mode-indicator-label" });
+  modeLabel.textContent = "Showing keys for: ";
+  modeLabel.appendChild(el("strong", { text: isPosition ? "Position mode" : "Character mode" }));
+  modeInfo.appendChild(modeLabel);
+  modeInfo.appendChild(
+    text(
+      "div",
+      "mode-indicator-desc",
+      isPosition
+        ? "Physical key positions (QWERTY layout). Actual labels adapt to your keyboard in Character mode."
+        : "Key labels reflect your detected keyboard layout. Commands stay on the same physical keys."
     )
   );
+  modeCard.appendChild(modeInfo);
 
-  page.appendChild(el("hr", { class: "separator" }));
+  const modeToggle = buildSegmented(
+    [
+      { value: "character", label: "Character" },
+      { value: "location", label: "Position" },
+    ],
+    currentBindingMode,
+    (v) => {
+      currentBindingMode = v as KeyBindingMode;
+      browser.storage.local.set({ keyBindingMode: v });
+      refreshPage();
+    }
+  );
+  modeToggle.style.flexShrink = "0";
+  modeToggle.style.marginLeft = "16px";
+  modeCard.appendChild(modeToggle);
+  page.appendChild(modeCard);
 
   // Full keyboard detail card
-  page.appendChild(text("label", "section-label", `${PRESETS[currentLayout].label} Layout`));
+  page.appendChild(text("label", "section-label", `${PRESETS[currentLayout].label} Layout \u2014 Home Row`));
   page.appendChild(buildFullKeyboard(PRESETS[currentLayout]));
   page.appendChild(buildLegend());
 
