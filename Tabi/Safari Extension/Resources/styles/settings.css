@@ -545,10 +545,93 @@ body {
   flex-shrink: 0;
 }
 
-.mini-key.highlight {
-  background: var(--tabi-accent);
-  border-color: var(--tabi-accent);
-  color: #fff;
+/* Command category colors — define RGB channels once, reuse at varying opacities */
+
+.cat-hints { --cat: 245 158 11; }
+.cat-scroll { --cat: 16 185 129; }
+.cat-page { --cat: 56 189 248; }
+.cat-tabs { --cat: 10 132 255; }
+.cat-actions { --cat: 168 85 247; }
+.cat-marks { --cat: 236 72 153; }
+
+@media (prefers-color-scheme: light) {
+  .cat-hints { --cat: 217 119 6; }
+  .cat-scroll { --cat: 5 150 105; }
+  .cat-page { --cat: 8 145 178; }
+  .cat-tabs { --cat: 37 99 235; }
+  .cat-actions { --cat: 124 58 237; }
+  .cat-marks { --cat: 219 39 119; }
+}
+
+.mini-key[class*="cat-"] {
+  background: rgb(var(--cat) / 0.25);
+  border-color: rgb(var(--cat) / 0.35);
+}
+
+/* Full keyboard visualization */
+
+.full-keyboard {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-top: 12px;
+}
+
+.full-kb-row {
+  display: flex;
+  gap: 5px;
+}
+
+.full-key {
+  width: 38px;
+  height: 34px;
+  border-radius: 5px;
+  background: var(--tabi-segmented-bg);
+  border: 1px solid var(--tabi-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: "SF Mono", "Menlo", monospace;
+  color: var(--tabi-color-secondary);
+  flex-shrink: 0;
+}
+
+.full-key[class*="cat-"],
+.binding-key[class*="cat-"] {
+  background: rgb(var(--cat) / 0.1);
+  border-color: rgb(var(--cat) / 0.2);
+  color: rgb(var(--cat));
+}
+
+/* Keyboard legend */
+
+.kb-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.kb-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--tabi-color-secondary);
+  font-weight: 500;
+}
+
+.kb-legend-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.kb-legend-swatch[class*="cat-"] {
+  background: rgb(var(--cat));
 }
 
 /* Full binding reference table */

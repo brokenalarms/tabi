@@ -171,53 +171,6 @@ function buildSettingsPage(): HTMLElement {
   const page = el("div", { class: "page", id: "page-settings" });
   page.appendChild(text("h2", "page-title", "Settings"));
 
-  // Key Layout
-  page.appendChild(
-    buildSection(
-      "Key Layout",
-      "Home Row is great for everyone. Vim for muscle memory. One-handed layouts are premium.",
-      buildSegmented(
-        [
-          { value: "optimized", label: "Home Row" },
-          { value: "vim", label: "Vim" },
-          { value: "leftHand", label: "Left Hand", premium: true },
-          { value: "rightHand", label: "Right Hand", premium: true },
-        ],
-        currentLayout,
-        (v) => {
-          currentLayout = v as KeyLayout;
-          browser.storage.local.set({ keyLayout: v });
-        }
-      )
-    )
-  );
-
-  page.appendChild(el("hr", { class: "separator" }));
-
-  // Key Binding Mode
-  const bindingHint =
-    "Character matches what you type. Position matches physical key location.";
-
-  page.appendChild(
-    buildSection(
-      "Key Binding Mode",
-      bindingHint,
-      buildSegmented(
-        [
-          { value: "character", label: "Character" },
-          { value: "location", label: "Position" },
-        ],
-        currentBindingMode,
-        (v) => {
-          currentBindingMode = v as KeyBindingMode;
-          browser.storage.local.set({ keyBindingMode: v });
-        }
-      )
-    )
-  );
-
-  page.appendChild(el("hr", { class: "separator" }));
-
   // Theme
   page.appendChild(
     buildSection(
@@ -449,41 +402,134 @@ function buildQuickMarksPage(): HTMLElement {
 
 // ── Key Layouts page ──────────────────────────────────────────
 
-// QWERTY keyboard rows for mini visualization
+type CommandCategory = "hints" | "scroll" | "page" | "tabs" | "actions" | "marks";
+
+const COMMAND_CATEGORIES: Record<string, CommandCategory> = {
+  activateHints: "hints",
+  multiOpen: "hints",
+  yankLink: "hints",
+  scrollDown: "scroll",
+  scrollUp: "scroll",
+  scrollLeft: "scroll",
+  scrollRight: "scroll",
+  scrollHalfPageDown: "page",
+  scrollHalfPageUp: "page",
+  scrollToBottom: "page",
+  scrollToTop: "page",
+  createTab: "tabs",
+  openTabSearch: "tabs",
+  closeTab: "tabs",
+  restoreTab: "tabs",
+  tabLeft: "tabs",
+  tabRight: "tabs",
+  tabNext: "tabs",
+  tabPrev: "tabs",
+  goBack: "actions",
+  goForward: "actions",
+  pageRefresh: "actions",
+  showHelp: "actions",
+  focusInput: "actions",
+  goUpUrl: "actions",
+  setMark: "marks",
+  jumpMark: "marks",
+};
+
+const CATEGORY_LABELS: { cat: CommandCategory; label: string }[] = [
+  { cat: "hints", label: "Hints" },
+  { cat: "scroll", label: "Scroll" },
+  { cat: "page", label: "Page" },
+  { cat: "tabs", label: "Tabs" },
+  { cat: "actions", label: "Actions" },
+  { cat: "marks", label: "Marks" },
+];
+
+// QWERTY keyboard rows for visualization
 const KB_ROWS = [
   ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
   ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
   ["z", "x", "c", "v", "b", "n", "m"],
 ];
 
-function getUsedKeys(preset: PresetMeta): Set<string> {
-  const keys = new Set<string>();
+function getKeyCategories(preset: PresetMeta): Map<string, CommandCategory> {
+  const keys = new Map<string, CommandCategory>();
+
+  // Single-key bindings (highest priority)
   for (const binding of preset.bindings) {
-    // Extract the last key from the sequence (the primary key)
-    const parts = binding.sequence.split(" ");
-    const last = parts[parts.length - 1];
-    // Strip modifiers
-    const code = last.replace(/^Shift-/, "");
-    // Convert event.code to char
+    if (binding.sequence.includes(" ")) continue;
+    if (binding.sequence.startsWith("Shift-")) continue;
+    const code = binding.sequence;
     if (code.startsWith("Key")) {
-      keys.add(code.slice(3).toLowerCase());
+      const key = code.slice(3).toLowerCase();
+      const cat = COMMAND_CATEGORIES[binding.command];
+      if (cat) keys.set(key, cat);
     }
   }
+
+  // Shift bindings (fill gaps)
+  for (const binding of preset.bindings) {
+    if (binding.sequence.includes(" ")) continue;
+    if (!binding.sequence.startsWith("Shift-")) continue;
+    const code = binding.sequence.replace(/^Shift-/, "");
+    if (code.startsWith("Key")) {
+      const key = code.slice(3).toLowerCase();
+      const cat = COMMAND_CATEGORIES[binding.command];
+      if (cat && !keys.has(key)) keys.set(key, cat);
+    }
+  }
+
+  // Sequence keys (fill remaining gaps)
+  for (const binding of preset.bindings) {
+    if (!binding.sequence.includes(" ")) continue;
+    for (const part of binding.sequence.split(" ")) {
+      const code = part.replace(/^Shift-/, "");
+      if (code.startsWith("Key")) {
+        const key = code.slice(3).toLowerCase();
+        const cat = COMMAND_CATEGORIES[binding.command];
+        if (cat && !keys.has(key)) keys.set(key, cat);
+      }
+    }
+  }
+
   return keys;
 }
 
-function buildMiniKeyboard(preset: PresetMeta): HTMLElement {
-  const used = getUsedKeys(preset);
-  const kb = el("div", { class: "mini-keyboard" });
+function buildKeyboard(
+  preset: PresetMeta,
+  keyClass: string,
+  rowClass: string,
+  containerClass: string
+): HTMLElement {
+  const categories = getKeyCategories(preset);
+  const kb = el("div", { class: containerClass });
   for (const row of KB_ROWS) {
-    const rowEl = el("div", { class: "mini-kb-row" });
+    const rowEl = el("div", { class: rowClass });
     for (const key of row) {
-      const cls = used.has(key) ? "mini-key highlight" : "mini-key";
+      const cat = categories.get(key);
+      const cls = cat ? `${keyClass} cat-${cat}` : keyClass;
       rowEl.appendChild(el("div", { class: cls, text: key }));
     }
     kb.appendChild(rowEl);
   }
   return kb;
+}
+
+function buildMiniKeyboard(preset: PresetMeta): HTMLElement {
+  return buildKeyboard(preset, "mini-key", "mini-kb-row", "mini-keyboard");
+}
+
+function buildFullKeyboard(preset: PresetMeta): HTMLElement {
+  return buildKeyboard(preset, "full-key", "full-kb-row", "full-keyboard");
+}
+
+function buildLegend(): HTMLElement {
+  const legend = el("div", { class: "kb-legend" });
+  for (const { cat, label } of CATEGORY_LABELS) {
+    const item = el("div", { class: "kb-legend-item" });
+    item.appendChild(el("div", { class: `kb-legend-swatch cat-${cat}` }));
+    item.appendChild(document.createTextNode(label));
+    legend.appendChild(item);
+  }
+  return legend;
 }
 
 function buildBindingTable(layout: KeyLayout): HTMLElement {
@@ -501,7 +547,9 @@ function buildBindingTable(layout: KeyLayout): HTMLElement {
   for (const binding of preset.bindings) {
     const row = el("tr");
     const keyCell = el("td");
-    keyCell.appendChild(el("span", { class: "binding-key", text: binding.display }));
+    const cat = COMMAND_CATEGORIES[binding.command];
+    const keyCls = cat ? `binding-key cat-${cat}` : "binding-key";
+    keyCell.appendChild(el("span", { class: keyCls, text: binding.display }));
     row.appendChild(keyCell);
 
     const desc = COMMANDS[binding.command] || binding.command;
@@ -569,6 +617,13 @@ function buildKeyLayoutsPage(): HTMLElement {
       )
     )
   );
+
+  page.appendChild(el("hr", { class: "separator" }));
+
+  // Full keyboard detail card
+  page.appendChild(text("label", "section-label", `${PRESETS[currentLayout].label} Layout`));
+  page.appendChild(buildFullKeyboard(PRESETS[currentLayout]));
+  page.appendChild(buildLegend());
 
   page.appendChild(el("hr", { class: "separator" }));
 
