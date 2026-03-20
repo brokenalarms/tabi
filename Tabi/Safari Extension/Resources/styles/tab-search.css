@@ -34,7 +34,8 @@
     top: 50%;
     transform: translateY(-50%);
     font-size: 12px;
-    opacity: 0.35;
+    color: var(--tabi-tab-input-color);
+    opacity: 0.5;
     pointer-events: none;
 }
 
