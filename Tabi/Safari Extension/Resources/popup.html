@@ -9,15 +9,18 @@
 </head>
 <body>
   <div class="popup">
-    <h1>Tabi</h1>
+    <div class="header">
+      <h1>tabi</h1>
+      <span class="premium-pill" id="premiumPill">Free</span>
+    </div>
 
     <div class="setting">
       <label class="setting-label">Key Binding Mode</label>
       <div class="segmented" id="keyBindingMode">
-        <button data-value="character">By Character</button>
-        <button data-value="location" class="active">By Position</button>
+        <button data-value="character">Character</button>
+        <button data-value="location" class="active">Position</button>
       </div>
-      <p class="hint">Character matches what you type. <br/> Position matches by physical key location, regardless of layout location, for non-QWERTY users.</p>
+      <p class="hint-text">Character matches what you type.<br>Position matches physical key location for non-QWERTY.</p>
     </div>
 
     <hr>
@@ -30,7 +33,11 @@
         <button data-value="light">Light</button>
         <button data-value="classic">Classic</button>
       </div>
-      <p class="hint">Auto selects light or dark in order to best contrast with page background. <br/> Classic is yellow!</p>
+      <p class="hint-text">Auto contrasts with the page background. Classic is yellow!</p>
+    </div>
+
+    <div class="footer">
+      <a class="settings-link" id="settingsLink" href="#">Open Full Settings ↗</a>
     </div>
   </div>
   <script src="popup.js"></script>

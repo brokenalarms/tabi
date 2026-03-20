@@ -1,5 +1,6 @@
 // Popup settings UI — reads/writes browser.storage.local and updates
-// the segmented button state to reflect persisted values.
+// the segmented button state to reflect persisted values. Shows premium
+// status pill and provides a link to open the full settings page.
 
 declare const browser: {
   storage: {
@@ -7,6 +8,12 @@ declare const browser: {
       get(keys: string[]): Promise<Record<string, unknown>>;
       set(items: Record<string, unknown>): Promise<void>;
     };
+  };
+  runtime: {
+    getURL(path: string): string;
+  };
+  tabs: {
+    create(options: { url: string }): Promise<unknown>;
   };
 };
 
@@ -21,11 +28,23 @@ function activateButton(container: HTMLElement, value: string): void {
   }
 }
 
+function updatePremiumPill(pill: HTMLElement, isPremium: boolean): void {
+  pill.classList.toggle("premium", isPremium);
+  pill.textContent = isPremium ? "\u2726 Premium" : "Free";
+}
+
 // Load persisted settings and wire click handlers.
 async function init(): Promise<void> {
-  const keys = SETTINGS.map(s => s.key);
+  const keys = [...SETTINGS.map(s => s.key), "isPremium"];
   const stored = await browser.storage.local.get(keys);
 
+  // Premium pill
+  const pill = document.getElementById("premiumPill");
+  if (pill) {
+    updatePremiumPill(pill, stored.isPremium === true);
+  }
+
+  // Segmented controls
   for (const { id, key, fallback } of SETTINGS) {
     const container = document.getElementById(id);
     if (!container) continue;
@@ -38,6 +57,16 @@ async function init(): Promise<void> {
       if (!btn || !btn.dataset.value) return;
       activateButton(container, btn.dataset.value);
       browser.storage.local.set({ [key]: btn.dataset.value });
+    });
+  }
+
+  // Settings link — opens full settings page in a new tab
+  const settingsLink = document.getElementById("settingsLink");
+  if (settingsLink) {
+    settingsLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      browser.tabs.create({ url: browser.runtime.getURL("settings.html") });
+      window.close();
     });
   }
 }
