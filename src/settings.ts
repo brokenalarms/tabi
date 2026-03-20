@@ -171,53 +171,6 @@ function buildSettingsPage(): HTMLElement {
   const page = el("div", { class: "page", id: "page-settings" });
   page.appendChild(text("h2", "page-title", "Settings"));
 
-  // Key Layout
-  page.appendChild(
-    buildSection(
-      "Key Layout",
-      "Home Row is great for everyone. Vim for muscle memory. One-handed layouts are premium.",
-      buildSegmented(
-        [
-          { value: "optimized", label: "Home Row" },
-          { value: "vim", label: "Vim" },
-          { value: "leftHand", label: "Left Hand", premium: true },
-          { value: "rightHand", label: "Right Hand", premium: true },
-        ],
-        currentLayout,
-        (v) => {
-          currentLayout = v as KeyLayout;
-          browser.storage.local.set({ keyLayout: v });
-        }
-      )
-    )
-  );
-
-  page.appendChild(el("hr", { class: "separator" }));
-
-  // Key Binding Mode
-  const bindingHint =
-    "Character matches what you type. Position matches physical key location.";
-
-  page.appendChild(
-    buildSection(
-      "Key Binding Mode",
-      bindingHint,
-      buildSegmented(
-        [
-          { value: "character", label: "Character" },
-          { value: "location", label: "Position" },
-        ],
-        currentBindingMode,
-        (v) => {
-          currentBindingMode = v as KeyBindingMode;
-          browser.storage.local.set({ keyBindingMode: v });
-        }
-      )
-    )
-  );
-
-  page.appendChild(el("hr", { class: "separator" }));
-
   // Theme
   page.appendChild(
     buildSection(

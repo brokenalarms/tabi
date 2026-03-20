@@ -545,12 +545,28 @@ body {
   flex-shrink: 0;
 }
 
-.mini-key.cat-hints { background: rgba(245, 158, 11, 0.25); border-color: rgba(245, 158, 11, 0.35); }
-.mini-key.cat-scroll { background: rgba(16, 185, 129, 0.25); border-color: rgba(16, 185, 129, 0.35); }
-.mini-key.cat-page { background: rgba(56, 189, 248, 0.25); border-color: rgba(56, 189, 248, 0.35); }
-.mini-key.cat-tabs { background: rgba(10, 132, 255, 0.25); border-color: rgba(10, 132, 255, 0.35); }
-.mini-key.cat-actions { background: rgba(168, 85, 247, 0.25); border-color: rgba(168, 85, 247, 0.35); }
-.mini-key.cat-marks { background: rgba(236, 72, 153, 0.25); border-color: rgba(236, 72, 153, 0.35); }
+/* Command category colors — define RGB channels once, reuse at varying opacities */
+
+.cat-hints { --cat: 245 158 11; }
+.cat-scroll { --cat: 16 185 129; }
+.cat-page { --cat: 56 189 248; }
+.cat-tabs { --cat: 10 132 255; }
+.cat-actions { --cat: 168 85 247; }
+.cat-marks { --cat: 236 72 153; }
+
+@media (prefers-color-scheme: light) {
+  .cat-hints { --cat: 217 119 6; }
+  .cat-scroll { --cat: 5 150 105; }
+  .cat-page { --cat: 8 145 178; }
+  .cat-tabs { --cat: 37 99 235; }
+  .cat-actions { --cat: 124 58 237; }
+  .cat-marks { --cat: 219 39 119; }
+}
+
+.mini-key[class*="cat-"] {
+  background: rgb(var(--cat) / 0.25);
+  border-color: rgb(var(--cat) / 0.35);
+}
 
 /* Full keyboard visualization */
 
@@ -582,12 +598,12 @@ body {
   flex-shrink: 0;
 }
 
-.full-key.cat-hints { background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.2); color: var(--tabi-cat-hints); }
-.full-key.cat-scroll { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); color: var(--tabi-cat-scroll); }
-.full-key.cat-page { background: rgba(56, 189, 248, 0.1); border-color: rgba(56, 189, 248, 0.2); color: var(--tabi-cat-page); }
-.full-key.cat-tabs { background: rgba(10, 132, 255, 0.1); border-color: rgba(10, 132, 255, 0.2); color: var(--tabi-cat-tabs); }
-.full-key.cat-actions { background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.2); color: var(--tabi-cat-actions); }
-.full-key.cat-marks { background: rgba(236, 72, 153, 0.1); border-color: rgba(236, 72, 153, 0.2); color: var(--tabi-cat-marks); }
+.full-key[class*="cat-"],
+.binding-key[class*="cat-"] {
+  background: rgb(var(--cat) / 0.1);
+  border-color: rgb(var(--cat) / 0.2);
+  color: rgb(var(--cat));
+}
 
 /* Keyboard legend */
 
@@ -614,12 +630,9 @@ body {
   flex-shrink: 0;
 }
 
-.kb-legend-swatch.cat-hints { background: var(--tabi-cat-hints); }
-.kb-legend-swatch.cat-scroll { background: var(--tabi-cat-scroll); }
-.kb-legend-swatch.cat-page { background: var(--tabi-cat-page); }
-.kb-legend-swatch.cat-tabs { background: var(--tabi-cat-tabs); }
-.kb-legend-swatch.cat-actions { background: var(--tabi-cat-actions); }
-.kb-legend-swatch.cat-marks { background: var(--tabi-cat-marks); }
+.kb-legend-swatch[class*="cat-"] {
+  background: rgb(var(--cat));
+}
 
 /* Full binding reference table */
 
@@ -655,13 +668,6 @@ body {
   font-size: 12px;
   font-weight: 600;
 }
-
-.binding-key.cat-hints { background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.2); color: var(--tabi-cat-hints); }
-.binding-key.cat-scroll { background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); color: var(--tabi-cat-scroll); }
-.binding-key.cat-page { background: rgba(56, 189, 248, 0.1); border-color: rgba(56, 189, 248, 0.2); color: var(--tabi-cat-page); }
-.binding-key.cat-tabs { background: rgba(10, 132, 255, 0.1); border-color: rgba(10, 132, 255, 0.2); color: var(--tabi-cat-tabs); }
-.binding-key.cat-actions { background: rgba(168, 85, 247, 0.1); border-color: rgba(168, 85, 247, 0.2); color: var(--tabi-cat-actions); }
-.binding-key.cat-marks { background: rgba(236, 72, 153, 0.1); border-color: rgba(236, 72, 153, 0.2); color: var(--tabi-cat-marks); }
 
 /* ── Premium page ────────────────────────────────────────── */
 
