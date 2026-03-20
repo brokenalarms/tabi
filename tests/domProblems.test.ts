@@ -3199,3 +3199,66 @@ describe("isInNearbySiblingSubtree with deep nesting", () => {
         env.cleanup();
     });
 });
+
+// ISSUE: Positioned overlays (dialogs, popovers with position:absolute/fixed) in sibling
+//        subtrees are falsely exempted by isInNearbySiblingSubtree — elements behind them
+//        leak through and get hints when they should be occluded.
+// SITE: qantas.com — login dialog covers nav help link, but help link still gets a hint
+// FIX: isInNearbySiblingSubtree checks whether the cover has a positioned ancestor
+//      (absolute/fixed) between it and the shared parent — positioned siblings are real
+//      overlays, not adjacent flow content.
+describe("positioned overlay not exempted by sibling subtree", () => {
+    it("positioned sibling overlay is not exempted", () => {
+        // Base: static sibling IS exempted (normal flow content)
+        const envStatic = createDOM(`
+            <div>
+                <nav><a id="link" href="#">Help</a></nav>
+                <div id="cover" style="position: static;">
+                    <button>Close</button>
+                </div>
+            </div>
+        `);
+        const staticLink = envStatic.document.getElementById("link") as unknown as HTMLElement;
+        const staticCover = envStatic.document.getElementById("cover") as unknown as HTMLElement;
+        assert.equal(isInNearbySiblingSubtree(staticLink, staticCover), true,
+            "Static sibling subtree should be exempted (flow content)");
+        envStatic.cleanup();
+
+        // Delta: position:absolute sibling is NOT exempted (overlay)
+        const env = createDOM(`
+            <div>
+                <nav><a id="link" href="#">Help</a></nav>
+                <div id="dialog" role="dialog" style="position: absolute; top: 100px;">
+                    <button id="close">X</button>
+                </div>
+            </div>
+        `);
+        const link = env.document.getElementById("link") as unknown as HTMLElement;
+        const dialog = env.document.getElementById("dialog") as unknown as HTMLElement;
+        assert.equal(isInNearbySiblingSubtree(link, dialog), false,
+            "Positioned sibling overlay should not be exempted");
+
+        // Also test with the cover being a child of the positioned element
+        const closeBtn = env.document.getElementById("close") as unknown as HTMLElement;
+        assert.equal(isInNearbySiblingSubtree(link, closeBtn), false,
+            "Child of positioned sibling overlay should not be exempted");
+
+        env.cleanup();
+    });
+
+    it("fixed position sibling overlay is not exempted", () => {
+        const env = createDOM(`
+            <div>
+                <nav><a id="link" href="#">Help</a></nav>
+                <div id="modal" style="position: fixed; top: 0; left: 0;">
+                    <p>Modal content</p>
+                </div>
+            </div>
+        `);
+        const link = env.document.getElementById("link") as unknown as HTMLElement;
+        const modal = env.document.getElementById("modal") as unknown as HTMLElement;
+        assert.equal(isInNearbySiblingSubtree(link, modal), false,
+            "Fixed position sibling should not be exempted");
+        env.cleanup();
+    });
+});

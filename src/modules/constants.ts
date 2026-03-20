@@ -49,9 +49,6 @@ export const HINT_HEIGHT =
 
 // ── Hint behavior ───────────────────────────────────────────
 export const HINT_CHARS = "sadgjklewcmpoh";
-export const DRIFT_THRESHOLD = 5;
-export const DRIFT_CHECK_INTERVAL = 200;
-export const DRIFT_MAX_SAMPLE = 5;
 
 // ── Scroll tuning ───────────────────────────────────────────
 export const ScrollConfig = {

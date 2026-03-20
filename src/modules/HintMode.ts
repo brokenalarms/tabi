@@ -5,7 +5,7 @@
 import type { ModeValue } from "../types";
 import { DEFAULTS } from "../types";
 import { discoverElements, renderDebugDots } from "./ElementGatherer";
-import { HINT_HEIGHT, HINT_CHARS, DRIFT_THRESHOLD, DRIFT_CHECK_INTERVAL, DRIFT_MAX_SAMPLE } from "./constants";
+import { HINT_HEIGHT, HINT_CHARS } from "./constants";
 import { isLargeEnoughForGlow, isFormControl, getRepeatingContainer, countNestedLinks, isZeroSizeAnchor, shouldRedirectToHeading, hasBox } from "./elementPredicates";
 import { LIST_BOUNDARY_SELECTOR, REPEATING_CONTAINER_SELECTOR, MINIMUM_CONTAINER_HEIGHT } from "./constants";
 import { findControlTarget, findVisibleChild, getHeading, getLinkContentRect, getBlockAncestorRect, getHeadingAncestorRect, clampRect, captureRetryStrategies, executeRetryStrategies } from "./elementTraversals";
@@ -65,7 +65,6 @@ export class HintMode {
   private readonly onMouseDown: () => void;
   private readonly onScroll: () => void;
   private readonly onResize: () => void;
-  private driftTimer: ReturnType<typeof setInterval> | null;
   /** Resolved hint placement for each discovered element. Populated in activate(). */
   private hintPlacementMap: Map<HTMLElement, HintPlacement>;
   /** Multi-select: accumulated selections waiting for Space to execute. */
@@ -87,7 +86,6 @@ export class HintMode {
     this.onMouseDown = this.deactivate.bind(this);
     this.onScroll = this.deactivate.bind(this);
     this.onResize = this.deactivate.bind(this);
-    this.driftTimer = null;
     this.hintPlacementMap = new Map();
     this.multiSelections = [];
     this.statusBar = null;
@@ -208,7 +206,6 @@ export class HintMode {
     document.addEventListener("mousedown", this.onMouseDown, true);
     window.addEventListener("scroll", this.onScroll, true);
     window.addEventListener("resize", this.onResize);
-    this.startDriftCheck();
   }
 
   deactivate(): void {
@@ -224,10 +221,6 @@ export class HintMode {
     document.removeEventListener("mousedown", this.onMouseDown, true);
     window.removeEventListener("scroll", this.onScroll, true);
     window.removeEventListener("resize", this.onResize);
-    if (this.driftTimer !== null) {
-      clearInterval(this.driftTimer);
-      this.driftTimer = null;
-    }
 
     // Remove any orphaned focus rings (e.g. deactivation interrupted the
     // hint collapse animation before afterCollapse could clean up).
@@ -274,41 +267,6 @@ export class HintMode {
   destroy(): void {
     this.deactivate();
     this.unwireCommands();
-  }
-
-  // --- Layout drift detection ---
-
-  /** Periodically check whether hinted elements have shifted from their
-   *  original positions. Dismisses hints when a majority of sampled
-   *  elements have drifted, indicating a real layout shift rather than
-   *  a single animated element (e.g. Amazon carousel). */
-  private startDriftCheck(): void {
-    const entries = [...this.hintPlacementMap.keys()];
-    // Evenly spaced sample so we don't just check the first few
-    const step = Math.max(1, Math.floor(entries.length / DRIFT_MAX_SAMPLE));
-    // Snapshot rects NOW (post-render) rather than using the pre-render rects
-    // from hintPlacementMap. Inserting the overlay and hint divs can cause
-    // minor layout shifts, especially on large/zoomed viewports — using
-    // pre-render rects as the baseline would falsely trigger drift dismissal.
-    const sample: Array<[HTMLElement, DOMRect]> = [];
-    for (let i = 0; i < entries.length && sample.length < DRIFT_MAX_SAMPLE; i += step) {
-      sample.push([entries[i], entries[i].getBoundingClientRect()]);
-    }
-
-    this.driftTimer = setInterval(() => {
-      let drifted = 0;
-      for (const [el, original] of sample) {
-        const current = el.getBoundingClientRect();
-        if (Math.abs(current.top - original.top) > DRIFT_THRESHOLD ||
-            Math.abs(current.left - original.left) > DRIFT_THRESHOLD) {
-          drifted++;
-        }
-      }
-      // Majority of sampled elements must have drifted
-      if (drifted > sample.length / 2) {
-        this.deactivate();
-      }
-    }, DRIFT_CHECK_INTERVAL);
   }
 
   // --- Hint target element ---
@@ -646,8 +604,8 @@ export class HintMode {
     document.documentElement.appendChild(ring);
 
     const afterCollapse = (): void => {
-      // If hints were already torn down (e.g. by mutation observer during
-      // the collapse animation), skip the click — the target may have
+      // If hints were already torn down during the collapse animation
+      // (e.g. scroll or resize), skip the click — the target may have
       // moved and the ring was already cleaned up by deactivate().
       const wasActive = this.active;
       this.deactivate();
