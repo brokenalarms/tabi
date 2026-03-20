@@ -59,15 +59,14 @@ osascript -e '
       end repeat
     end tell
     delay 0.5
-    -- Reopen all windows from previous session via History menu
     tell application "System Events"
       tell process "Safari"
         click menu item "Reopen All Windows from Last Session" of menu "History" of menu bar 1
       end tell
     end tell
     delay 1
-    -- If Safari has more windows than we saved, close blank extras
     try
+      -- Close blank windows (single empty tab)
       if (count of windows) > expectedCount then
         set idsToClose to {}
         repeat with w in windows
@@ -89,6 +88,22 @@ osascript -e '
           end if
         end repeat
       end if
+      -- Close blank tabs within remaining windows
+      repeat with w in windows
+        if (count of tabs of w) > 1 then
+          set tabsToClose to {}
+          repeat with j from 1 to count of tabs of w
+            set tabURL to URL of tab j of w
+            if tabURL is missing value or tabURL is "" or tabURL starts with "favorites://" then
+              set end of tabsToClose to j
+            end if
+          end repeat
+          -- Close in reverse order so indices stay valid
+          repeat with j from (count of tabsToClose) to 1 by -1
+            close tab (item j of tabsToClose) of w
+          end repeat
+        end if
+      end repeat
     end try
     -- Bring Safari to the front
     activate
