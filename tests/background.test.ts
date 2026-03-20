@@ -15,6 +15,9 @@ let activatedTabId: number | null;
 let actionState: Record<number, Record<string, unknown>>;
 let tabRemovedListeners: Array<(tabId: number) => void>;
 let tabUpdatedListeners: Array<(tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string }) => void>;
+let nativeMessagesSent: Array<{ appId: string; message: Record<string, unknown> }>;
+let nativeMessageResponse: Record<string, unknown>;
+let storageState: Record<string, unknown>;
 
 function resetBrowserShim() {
     mockTabs = [
@@ -28,6 +31,9 @@ function resetBrowserShim() {
     actionState = {};
     tabRemovedListeners = [];
     tabUpdatedListeners = [];
+    nativeMessagesSent = [];
+    nativeMessageResponse = {};
+    storageState = {};
 
     const g = globalThis as Record<string, unknown>;
     g.browser = {
@@ -80,6 +86,17 @@ function resetBrowserShim() {
         },
         runtime: {
             onMessage: { addListener() {} },
+            async sendNativeMessage(appId: string, message: Record<string, unknown>) {
+                nativeMessagesSent.push({ appId, message });
+                return nativeMessageResponse;
+            },
+        },
+        storage: {
+            local: {
+                async set(items: Record<string, unknown>) {
+                    Object.assign(storageState, items);
+                },
+            },
         },
     };
 }
@@ -98,6 +115,7 @@ import {
     pushClosedTab,
     popClosedTab,
     handleCommand,
+    syncSettings,
     MAX_CLOSED_TABS,
     activeTabSet,
     tabUrlCache,
@@ -335,6 +353,54 @@ describe("background.ts tab management", () => {
             const result = await handleCommand("switchTab", {}, {});
             assert.equal(result.status, "ok");
             assert.equal(activatedTabId, null);
+        });
+    });
+
+    describe("syncSettings", () => {
+        // Verifies that syncSettings fetches settings from the native host app
+        // via sendNativeMessage and writes them to browser.storage.local.
+        it("fetches native settings and writes to storage", async () => {
+            nativeMessagesSent = [];
+            storageState = {};
+            nativeMessageResponse = { keyBindingMode: "character", theme: "dark", isPremium: true };
+            await syncSettings();
+
+            assert.equal(nativeMessagesSent.length, 1);
+            assert.equal(nativeMessagesSent[0].appId, "com.brokenalarms.tabi");
+            assert.deepEqual(nativeMessagesSent[0].message, { command: "getSettings" });
+            assert.equal(storageState.keyBindingMode, "character");
+            assert.equal(storageState.theme, "dark");
+            assert.equal(storageState.isPremium, true);
+        });
+
+        // Verifies that only defined fields from the native response are written —
+        // undefined fields are not set in storage (avoids overwriting user overrides).
+        it("only writes defined fields to storage", async () => {
+            nativeMessageResponse = { isPremium: false };
+            await syncSettings();
+
+            assert.equal(storageState.isPremium, false);
+            assert.equal(storageState.keyBindingMode, undefined);
+            assert.equal(storageState.theme, undefined);
+        });
+
+        // Verifies that the syncSettings command is accessible via handleCommand.
+        it("is invokable via handleCommand", async () => {
+            nativeMessageResponse = { isPremium: true };
+            const result = await handleCommand("syncSettings", {});
+            assert.equal(result.status, "ok");
+            assert.equal(storageState.isPremium, true);
+        });
+
+        // Verifies that init() triggers a settings sync from the native host on startup.
+        it("runs automatically on init", () => {
+            nativeMessagesSent = [];
+            nativeMessageResponse = { isPremium: true };
+            init();
+            // init() fires syncSettings() asynchronously — the native message
+            // should already be queued by the time init() returns.
+            assert.equal(nativeMessagesSent.length, 1);
+            assert.deepEqual(nativeMessagesSent[0].message, { command: "getSettings" });
         });
     });
 });

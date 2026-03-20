@@ -5,7 +5,10 @@
 type Command =
   | "createTab" | "closeTab" | "switchTab" | "queryTabs"
   | "restoreTab" | "tabLeft" | "tabRight" | "tabNext" | "tabPrev"
-  | "goToTab" | "goToTabFirst" | "goToTabLast" | "extensionActive" | "extensionInactive";
+  | "goToTab" | "goToTabFirst" | "goToTabLast" | "extensionActive" | "extensionInactive"
+  | "syncSettings";
+
+const APP_BUNDLE_ID = "com.brokenalarms.tabi";
 
 interface TabInfo {
   id: number;
@@ -33,6 +36,12 @@ declare const browser: {
   runtime: {
     onMessage: {
       addListener(fn: (message: unknown, sender: MessageSender, sendResponse: (response: unknown) => void) => boolean | void): void;
+    };
+    sendNativeMessage(applicationId: string, message: Record<string, unknown>): Promise<Record<string, unknown>>;
+  };
+  storage: {
+    local: {
+      set(items: Record<string, unknown>): Promise<void>;
     };
   };
 };
@@ -88,6 +97,16 @@ export function pushClosedTab(url: string | null | undefined, leftNeighborId: nu
 
 export function popClosedTab(): ClosedTab | null {
   return closedTabStack.pop() || null;
+}
+
+/** Fetch settings from the native host app and write them to browser.storage.local. */
+export async function syncSettings(): Promise<void> {
+  const response = await browser.runtime.sendNativeMessage(APP_BUNDLE_ID, { command: "getSettings" });
+  const settings: Record<string, unknown> = {};
+  if (response.keyBindingMode !== undefined) settings.keyBindingMode = response.keyBindingMode;
+  if (response.theme !== undefined) settings.theme = response.theme;
+  if (response.isPremium !== undefined) settings.isPremium = response.isPremium;
+  await browser.storage.local.set(settings);
 }
 
 export async function handleCommand(command: Command, sender: MessageSender, message?: Record<string, unknown>): Promise<CommandResponse> {
@@ -207,6 +226,11 @@ export async function handleCommand(command: Command, sender: MessageSender, mes
       break;
     }
 
+    case "syncSettings": {
+      await syncSettings();
+      break;
+    }
+
     default:
       return { status: "unknown_command" };
   }
@@ -253,6 +277,9 @@ export function init(): void {
       if (tab.url) tabUrlCache.set(tab.id, tab.url);
     }
   }).catch(() => {});
+
+  // Sync settings from native host app on startup
+  syncSettings().catch(() => {});
 
   browser.runtime.onMessage.addListener((message: unknown, sender: MessageSender, sendResponse: (response: unknown) => void) => {
     const msg = message as Record<string, unknown> | null;
