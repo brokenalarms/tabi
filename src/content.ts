@@ -1,7 +1,8 @@
 // Tabi content script
 // Runs on every page to handle keyboard navigation
 
-import type { KeyBindingMode, ModeValue, Theme } from "./types";
+import type { KeyBindingMode, KeyLayout, ModeValue, Theme } from "./types";
+import { isLayoutPremium } from "./keybindings";
 import { resolveSettings } from "./types";
 import { Mode } from "./commands";
 import { KeyHandler } from "./modules/KeyHandler";
@@ -86,6 +87,9 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
 
   // Apply initial settings
   keyHandler.setKeyBindingMode(resolved.keyBindingMode);
+  if (!isLayoutPremium(resolved.keyLayout) || resolved.isPremium) {
+    keyHandler.setLayout(resolved.keyLayout);
+  }
   applyTheme(resolved.theme);
   setPremiumStatus(resolved.isPremium);
 
@@ -108,6 +112,12 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
 
     if (changes.keyBindingMode?.newValue) {
       keyHandler.setKeyBindingMode(changes.keyBindingMode.newValue as KeyBindingMode);
+    }
+    if (changes.keyLayout?.newValue) {
+      const layout = changes.keyLayout.newValue as KeyLayout;
+      if (!isLayoutPremium(layout) || resolved.isPremium) {
+        keyHandler.setLayout(layout);
+      }
     }
     if (changes.theme?.newValue) {
       applyTheme(changes.theme.newValue as Theme);
@@ -244,7 +254,7 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
 // we still initialize with whatever storage already has.
 browser.runtime.sendMessage({ command: "syncSettings" }).catch(() => {});
 
-browser.storage.local.get(["excludedDomains", "keyBindingMode", "theme", "isPremium"]).then((result) => {
+browser.storage.local.get(["excludedDomains", "keyBindingMode", "keyLayout", "theme", "isPremium"]).then((result) => {
   const excluded = (result.excludedDomains as string[]) || [];
   if (isDomainExcluded(excluded)) {
     browser.runtime.sendMessage({ command: "extensionInactive" });
