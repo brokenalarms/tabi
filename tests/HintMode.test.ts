@@ -55,7 +55,7 @@ describe("HintMode", () => {
             const link = makeElement("A", { href: "https://example.com", top: 10, left: 10 });
             loadModules([link]);
             const { hintMode, keyHandler } = getState();
-            hintMode.activate(false);
+            hintMode.activate();
             assert.equal(keyHandler.getMode(), "HINTS");
             assert.ok(hintMode.isActive());
         });
@@ -65,7 +65,7 @@ describe("HintMode", () => {
             const link = makeElement("A", { href: "https://example.com", top: 10, left: 10 });
             loadModules([link]);
             const { hintMode, keyHandler } = getState();
-            hintMode.activate(false);
+            hintMode.activate();
             hintMode.deactivate();
             assert.equal(keyHandler.getMode(), "NORMAL");
             assert.ok(!hintMode.isActive());
@@ -75,7 +75,7 @@ describe("HintMode", () => {
         it("deactivates if no visible elements found", () => {
             loadModules([]);
             const { hintMode, keyHandler } = getState();
-            hintMode.activate(false);
+            hintMode.activate();
             assert.equal(keyHandler.getMode(), "NORMAL");
             assert.ok(!hintMode.isActive());
         });
@@ -91,7 +91,7 @@ describe("HintMode", () => {
             }
             loadModules(links);
             const { hintMode } = getState();
-            hintMode.activate(false);
+            hintMode.activate();
             assert.ok(hintMode.isActive());
 
             // Type first char — should filter
@@ -105,7 +105,7 @@ describe("HintMode", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
             const { hintMode, keyHandler } = getState();
-            hintMode.activate(false);
+            hintMode.activate();
             fireKeyDown(makeKeyEvent("Escape"));
             assert.ok(!hintMode.isActive());
             assert.equal(keyHandler.getMode(), "NORMAL");
@@ -119,7 +119,7 @@ describe("HintMode", () => {
             }
             loadModules(links);
             const { hintMode } = getState();
-            hintMode.activate(false);
+            hintMode.activate();
 
             fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
             fireKeyDown(makeKeyEvent("Backspace"));
@@ -132,7 +132,7 @@ describe("HintMode", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
             const { hintMode, keyHandler } = getState();
-            hintMode.activate(false);
+            hintMode.activate();
 
             fireKeyDown(makeKeyEvent("KeyZ", { key: "z" }));
             assert.ok(!hintMode.isActive());
@@ -144,7 +144,7 @@ describe("HintMode", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
             const { hintMode, keyHandler } = getState();
-            hintMode.activate(false);
+            hintMode.activate();
             assert.ok(hintMode.isActive());
 
             // With 1 element, label is "s". Typing "a" (a valid hint char but
@@ -159,7 +159,7 @@ describe("HintMode", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
             const { hintMode, keyHandler } = getState();
-            hintMode.activate(false);
+            hintMode.activate();
 
             fireMouseDown();
             assert.ok(!hintMode.isActive());
@@ -178,7 +178,7 @@ describe("HintMode", () => {
             keyHandler.on("scrollDown", () => { scrollDownCalled = true; });
 
             // Activate and cancel hints
-            hintMode.activate(false);
+            hintMode.activate();
             assert.ok(hintMode.isActive());
             fireKeyDown(makeKeyEvent("KeyZ", { key: "z" })); // non-hint key cancels
             assert.ok(!hintMode.isActive());
@@ -199,7 +199,7 @@ describe("HintMode", () => {
             keyHandler.on("scrollDown", () => { scrollDownCalled = true; });
 
             // Activate hints, type valid hint char that doesn't match any prefix
-            hintMode.activate(false);
+            hintMode.activate();
             fireKeyDown(makeKeyEvent("KeyA", { key: "a" })); // label is "s", "a" doesn't match
             assert.ok(!hintMode.isActive());
 
@@ -216,7 +216,7 @@ describe("HintMode", () => {
             let scrollDownCalled = false;
             keyHandler.on("scrollDown", () => { scrollDownCalled = true; });
 
-            hintMode.activate(false);
+            hintMode.activate();
             fireKeyDown(makeKeyEvent("Escape"));
             assert.ok(!hintMode.isActive());
 
@@ -233,7 +233,7 @@ describe("HintMode", () => {
             let scrollDownCalled = false;
             keyHandler.on("scrollDown", () => { scrollDownCalled = true; });
 
-            hintMode.activate(false);
+            hintMode.activate();
             fireKeyDown(makeKeyEvent("KeyS", { key: "s" })); // activates the hint
             assert.ok(!hintMode.isActive());
 
@@ -252,7 +252,7 @@ describe("HintMode", () => {
             }
             loadModules(links);
             const { hintMode } = getState();
-            hintMode.activate(false);
+            hintMode.activate();
 
             // Simulate a non-QWERTY layout: physical KeyD produces "h" on this layout.
             // The hint label "sh" should match when user types key="s" then key="h",
@@ -269,7 +269,7 @@ describe("HintMode", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
             const { hintMode } = getState();
-            hintMode.activate(false);
+            hintMode.activate();
 
             // Label is "s". Send event with code=KeyO but key="s" (remapped layout).
             // Should still match because we use event.key.
@@ -285,7 +285,7 @@ describe("HintMode", () => {
             const { hintMode, keyHandler } = getState();
             keyHandler.setKeyBindingMode("character");
 
-            hintMode.activate(false);
+            hintMode.activate();
             assert.ok(hintMode.isActive());
 
             // Label is "s". Physical KeyD with key="s" (simulating remapped layout).
@@ -302,7 +302,7 @@ describe("HintMode", () => {
             const { hintMode, keyHandler } = getState();
             keyHandler.setKeyBindingMode("location");
 
-            hintMode.activate(false);
+            hintMode.activate();
 
             // Same test — physical KeyD with key="s"
             fireKeyDown(makeKeyEvent("KeyD", { key: "s" }));
@@ -317,7 +317,7 @@ describe("HintMode", () => {
             const link = makeElement("A", { href: "https://example.com", top: 10, left: 0 });
             loadModules([link]);
             const { hintMode } = getState();
-            hintMode.activate(false);
+            hintMode.activate();
 
             // With 1 element, label is single char "s"
             fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
@@ -325,14 +325,14 @@ describe("HintMode", () => {
             assert.ok(!hintMode.isActive());
         });
 
-        // F-mode (new tab) sends message to background for links
-        it("sends createTab message for F-mode on links", () => {
+        // Shift held during hint typing sends createTab for links
+        it("sends createTab message when shift held on hint keypress", () => {
             const link = makeElement("A", { href: "https://example.com", top: 10, left: 0 });
             loadModules([link]);
             const { hintMode } = getState();
-            hintMode.activate(true);
+            hintMode.activate();
 
-            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
+            fireKeyDown(makeKeyEvent("KeyS", { key: "s", shift: true }));
             assert.equal((globalThis as any).browser.runtime.sendMessage.mock.callCount(), 1);
             const msg = (globalThis as any).browser.runtime.sendMessage.mock.calls[0].arguments[0];
             assert.equal(msg.command, "createTab");
@@ -340,14 +340,14 @@ describe("HintMode", () => {
             assert.ok(!hintMode.isActive());
         });
 
-        // F-mode falls back to click for non-link elements
-        it("falls back to click for non-link elements in F-mode", () => {
+        // Shift held falls back to click for non-link elements
+        it("falls back to click for non-link elements when shift held", () => {
             const btn = makeElement("BUTTON", { top: 10, left: 0 });
             loadModules([btn]);
             const { hintMode } = getState();
-            hintMode.activate(true);
+            hintMode.activate();
 
-            fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
+            fireKeyDown(makeKeyEvent("KeyS", { key: "s", shift: true }));
             assert.equal(btn.click.mock.callCount(), 1);
         });
 
@@ -361,7 +361,7 @@ describe("HintMode", () => {
             link.setAttribute("target", "_blank");
             loadModules([link]);
             const { hintMode } = getState();
-            hintMode.activate(false); // f-mode (current tab)
+            hintMode.activate(); // f-mode (current tab)
 
             fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
             // Should use createTab, NOT element.click()
@@ -449,7 +449,7 @@ describe("HintMode", () => {
 
             loadModules([link]);
             const { hintMode } = getState();
-            hintMode.activate(false);
+            hintMode.activate();
             assert.ok(hintMode.isActive());
 
             const overlay = document.documentElement.querySelector(".tabi-hint-overlay");
@@ -471,7 +471,7 @@ describe("HintMode", () => {
 
             loadModules([link]);
             const { hintMode } = getState();
-            hintMode.activate(false);
+            hintMode.activate();
             assert.ok(hintMode.isActive());
 
             const overlay = document.documentElement.querySelector(".tabi-hint-overlay");
@@ -492,7 +492,7 @@ describe("HintMode", () => {
 
             loadModules([link]);
             const { hintMode } = getState();
-            hintMode.activate(false);
+            hintMode.activate();
 
             const overlay = document.documentElement.querySelector(".tabi-hint-overlay");
             const hint = overlay?.querySelector(".tabi-hint") as HTMLElement;

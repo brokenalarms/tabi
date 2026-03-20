@@ -99,12 +99,12 @@ export class HintMode {
 
   // --- Public API ---
 
-  activate(shiftHeld: boolean, mode: HintModeType = "click"): void {
+  activate(mode: HintModeType = "click"): void {
     if (this.active) {
       this.deactivate();
       return;
     }
-    this.willOpenNewTab = shiftHeld;
+    this.willOpenNewTab = false;
     this.modeType = mode;
     this.active = true;
     this.typed = "";
@@ -263,15 +263,13 @@ export class HintMode {
   }
 
   wireCommands(): void {
-    this.keyHandler.on("activateHints", () => this.activate(false));
-    this.keyHandler.on("activateHintsNewTab", () => this.activate(true));
-    this.keyHandler.on("yankLink", () => this.activate(false, "yank"));
-    this.keyHandler.on("multiOpen", () => this.activate(false, "multi"));
+    this.keyHandler.on("activateHints", () => this.activate());
+    this.keyHandler.on("yankLink", () => this.activate("yank"));
+    this.keyHandler.on("multiOpen", () => this.activate("multi"));
   }
 
   unwireCommands(): void {
     this.keyHandler.off("activateHints");
-    this.keyHandler.off("activateHintsNewTab");
     this.keyHandler.off("yankLink");
     this.keyHandler.off("multiOpen");
   }
@@ -523,9 +521,13 @@ export class HintMode {
       return true;
     }
 
-    const dismissCodes: Record<HintModeType, string> = { click: "KeyF", yank: "KeyY", multi: "KeyM" };
-    const dismissCode = dismissCodes[this.modeType];
-    if (event.code === dismissCode && !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey) {
+    const dismissKeys: Record<HintModeType, { code: string; shift: boolean }> = {
+      click: { code: "KeyF", shift: false },
+      yank: { code: "KeyY", shift: false },
+      multi: { code: "KeyF", shift: true },
+    };
+    const dismiss = dismissKeys[this.modeType];
+    if (event.code === dismiss.code && event.shiftKey === dismiss.shift && !event.ctrlKey && !event.altKey && !event.metaKey) {
       event.preventDefault();
       event.stopPropagation();
       this.deactivate();

@@ -20,7 +20,6 @@ export const COMMANDS: Record<string, string> = {
   goForward: "Go forward",
   pageRefresh: "Refresh page",
   activateHints: "Open link (current tab)",
-  activateHintsNewTab: "Open link (new tab)",
   yankLink: "Copy link URL (yank)",
   multiOpen: "Multi-open links (new tabs)",
   createTab: "New tab",

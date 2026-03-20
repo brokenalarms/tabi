@@ -28,9 +28,8 @@ function bind(sequence: string, command: string, display: string): KeyBinding {
 const SHARED: KeyBinding[] = [
   // Hints
   bind("KeyF", "activateHints", "F"),
-  bind("Shift-KeyF", "activateHintsNewTab", "Shift+F"),
+  bind("Shift-KeyF", "multiOpen", "Shift+F"),
   bind("KeyY", "yankLink", "Y"),
-  bind("KeyM", "multiOpen", "M"),
 
   // Tabs
   bind("KeyT", "openTabSearch", "T"),
