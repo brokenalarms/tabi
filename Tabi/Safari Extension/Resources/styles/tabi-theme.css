@@ -24,6 +24,14 @@
     --tabi-segmented-border: #444;
     --tabi-segmented-color: #ccc;
     --tabi-segmented-hover: #333;
+
+    /* Command category colors */
+    --tabi-cat-hints: #f59e0b;
+    --tabi-cat-scroll: #34d399;
+    --tabi-cat-page: #22d3ee;
+    --tabi-cat-tabs: #60a5fa;
+    --tabi-cat-actions: #a78bfa;
+    --tabi-cat-marks: #f472b6;
 }
 
 @media (prefers-color-scheme: light) {
@@ -41,5 +49,12 @@
         --tabi-segmented-border: #ccc;
         --tabi-segmented-color: #333;
         --tabi-segmented-hover: #e8e8e8;
+
+        --tabi-cat-hints: #d97706;
+        --tabi-cat-scroll: #059669;
+        --tabi-cat-page: #0891b2;
+        --tabi-cat-tabs: #2563eb;
+        --tabi-cat-actions: #7c3aed;
+        --tabi-cat-marks: #db2777;
     }
 }
