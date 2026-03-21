@@ -74,6 +74,8 @@ export type CommandMessage =
   | { command: "goToTabLast" }
   | { command: "extensionActive" }
   | { command: "extensionInactive" }
-  | { command: "jumpToMark"; url: string; scrollY: number };
+  | { command: "jumpToMark"; url: string; scrollY: number }
+  | { command: "tabHistoryBack" }
+  | { command: "tabHistoryForward" };
 
 export type ModeValue = "NORMAL" | "INSERT" | "HINTS" | "TAB_SEARCH" | "MARK";

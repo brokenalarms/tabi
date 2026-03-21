@@ -214,6 +214,7 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   const tabCommands = [
     "createTab", "closeTab", "restoreTab",
     "tabLeft", "tabRight", "tabNext", "tabPrev",
+    "tabHistoryBack", "tabHistoryForward",
   ];
   for (const cmd of tabCommands) {
     keyHandler.on(cmd, () => {

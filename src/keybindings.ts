@@ -37,6 +37,8 @@ const SHARED: KeyBinding[] = [
   bind("Shift-KeyT", "openTabSearch", "Shift+T"),
   bind("KeyX", "closeTab", "x"),
   bind("Shift-KeyX", "restoreTab", "X"),
+  bind("BracketLeft", "tabHistoryBack", "["),
+  bind("BracketRight", "tabHistoryForward", "]"),
 
   // Navigation
   bind("KeyG KeyI", "focusInput", "gi"),
@@ -145,6 +147,8 @@ export const PRESETS: Record<KeyLayout, PresetMeta> = {
       bind("Shift-KeyT", "openTabSearch", "Shift+T"),
       bind("KeyX", "closeTab", "x"),
       bind("Shift-KeyX", "restoreTab", "X"),
+      bind("BracketLeft", "tabHistoryBack", "["),
+      bind("BracketRight", "tabHistoryForward", "]"),
 
       // Navigation
       bind("KeyG KeyR", "focusInput", "gr"),
@@ -192,6 +196,8 @@ export const PRESETS: Record<KeyLayout, PresetMeta> = {
       bind("KeyP", "openTabSearch", "P"),
       bind("Period", "closeTab", "."),
       bind("Shift-Period", "restoreTab", ">"),
+      bind("BracketLeft", "tabHistoryBack", "["),
+      bind("BracketRight", "tabHistoryForward", "]"),
 
       // Navigation
       bind("KeyI", "focusInput", "I"),

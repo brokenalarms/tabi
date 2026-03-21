@@ -88,4 +88,5 @@ export const FEET_PER_REACH = 1;
 
 // ── Background ──────────────────────────────────────────────
 export const MAX_CLOSED_TABS = 50;
+export const MAX_TAB_HISTORY = 100;
 
