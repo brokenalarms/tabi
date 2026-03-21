@@ -35,8 +35,10 @@ declare const browser: {
     disable(tabId: number): Promise<void>;
     setBadgeText(opts: { text: string; tabId: number }): Promise<void>;
     setTitle(opts: { title: string; tabId: number }): Promise<void>;
+    onClicked: { addListener(fn: (tab: { id: number }) => void): void };
   };
   runtime: {
+    getURL(path: string): string;
     onMessage: {
       addListener(fn: (message: unknown, sender: MessageSender, sendResponse: (response: unknown) => void) => boolean | void): void;
     };
@@ -311,6 +313,18 @@ export function init(): void {
 
   // Sync settings from native host app on startup
   syncSettings().catch(() => {});
+
+  // Open or focus settings tab when toolbar icon is clicked
+  browser.action.onClicked.addListener(async () => {
+    const settingsUrl = browser.runtime.getURL("settings.html");
+    const tabs = await browser.tabs.query({ currentWindow: true });
+    const existing = tabs.find(t => t.url.startsWith(settingsUrl));
+    if (existing) {
+      await browser.tabs.update(existing.id, { active: true });
+    } else {
+      await browser.tabs.create({ url: settingsUrl });
+    }
+  });
 
   browser.runtime.onMessage.addListener((message: unknown, sender: MessageSender, sendResponse: (response: unknown) => void) => {
     const msg = message as Record<string, unknown> | null;
