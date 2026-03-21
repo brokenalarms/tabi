@@ -180,20 +180,23 @@ interface DistanceMilestone {
 }
 
 const DISTANCE_MILESTONES: DistanceMilestone[] = [
-  { feet: 6, emoji: "\ud83e\uddca", label: "1 trip to the fridge", pct: 0 },
-  { feet: 100, emoji: "\ud83d\udc0b", label: "Length of a blue whale", pct: 10 },
-  { feet: 300, emoji: "\ud83c\udfc8", label: "1 football field", pct: 20 },
-  { feet: 1063, emoji: "\ud83d\uddfc", label: "Height of the Eiffel Tower", pct: 32 },
-  { feet: 2717, emoji: "\ud83c\udfd9", label: "Height of Burj Khalifa", pct: 44 },
-  { feet: 29032, emoji: "\ud83c\udfd4", label: "Summit of Mt Everest", pct: 60 },
-  { feet: 35000, emoji: "\u2708\ufe0f", label: "Cruising altitude", pct: 72 },
-  { feet: 137500, emoji: "\ud83c\udfc3", label: "A marathon", pct: 84 },
-  { feet: 330000, emoji: "\ud83e\uddd1\u200d\ud83d\ude80", label: "Edge of space (K\u00e1rm\u00e1n line)", pct: 100 },
+  { feet: 100, emoji: "\ud83d\udeb2", label: "First pedal stroke", pct: 0 },
+  { feet: 500, emoji: "\ud83c\udfd5\ufe0f", label: "S24O overnighter", pct: 6 },
+  { feet: 2000, emoji: "\ud83c\udfdc\ufe0f", label: "White Rim Trail (100 mi)", pct: 14 },
+  { feet: 5000, emoji: "\u26f0\ufe0f", label: "Kokopelli Trail (142 mi)", pct: 24 },
+  { feet: 10000, emoji: "\ud83c\udf3e", label: "Katy Trail (240 mi)", pct: 32 },
+  { feet: 20000, emoji: "\ud83c\udf3f", label: "C&O Canal + GAP (340 mi)", pct: 42 },
+  { feet: 40000, emoji: "\ud83c\udfd4\ufe0f", label: "Colorado Trail (486 mi)", pct: 52 },
+  { feet: 75000, emoji: "\ud83c\udf32", label: "Oregon Timber Trail (670 mi)", pct: 62 },
+  { feet: 125000, emoji: "\ud83c\udf35", label: "Arizona Trail (800 mi)", pct: 72 },
+  { feet: 200000, emoji: "\ud83d\udc2b", label: "Silk Road Mountain Race (1,689 km)", pct: 82 },
+  { feet: 350000, emoji: "\ud83c\udf0a", label: "Baja Divide (1,700 mi)", pct: 90 },
+  { feet: 500000, emoji: "\ud83d\udeb5", label: "Great Divide (2,768 mi)", pct: 100 },
 ];
 
 function buildMilestoneTimeline(currentFeet: number): HTMLElement {
   const section = el("div", { class: "section" });
-  section.appendChild(text("label", "section-label", "Distance Milestones"));
+  section.appendChild(text("label", "section-label", "Route Milestones"));
 
   const graph = el("div", { class: "milestone-graph" });
   const track = el("div", { class: "milestone-track" });
@@ -223,6 +226,7 @@ function buildMilestoneTimeline(currentFeet: number): HTMLElement {
 
     const marker = el("div", { class: `milestone-marker${reached ? " reached" : ""}` });
     marker.style.bottom = `${pct}%`;
+    marker.title = `${ms.label} — ${ms.feet.toLocaleString()} ft saved`;
 
     const dot = el("div", { class: "milestone-dot" });
     if (reached) dot.textContent = "\u2713";
@@ -247,7 +251,7 @@ function buildMilestoneTimeline(currentFeet: number): HTMLElement {
     youMarker.appendChild(youDot);
 
     const youInfo = el("div", { class: "milestone-info" });
-    youInfo.appendChild(el("span", { class: "milestone-emoji", text: "\ud83d\udccd" }));
+    youInfo.appendChild(el("span", { class: "milestone-emoji", text: "\ud83d\udeb4" }));
     youInfo.appendChild(el("span", { class: "milestone-value", text: currentFeet.toLocaleString() + " ft" }));
     youInfo.appendChild(el("span", { class: "milestone-fact", text: "\u2014 You are here!" }));
     youMarker.appendChild(youInfo);
@@ -294,7 +298,6 @@ function buildStatisticsPage(): HTMLElement {
 
   // 4 stat cards with emoji icons and detail lines
   const dist = distanceSaved(counters);
-  const fridgeTrips = Math.round(dist / 6);
   const cards = el("div", { class: "stat-cards" });
   const cardData: { icon: string; value: string; label: string; detail: string; cls: string }[] = [
     {
@@ -319,11 +322,11 @@ function buildStatisticsPage(): HTMLElement {
       cls: "stat-card",
     },
     {
-      icon: "\ud83d\uddb1",
+      icon: "\ud83d\udeb2",
       value: `${Math.round(dist).toLocaleString()} ft`,
       label: "Mouse Distance Saved",
-      detail: fridgeTrips > 0
-        ? `That\u2019s about ${fridgeTrips} trip${fridgeTrips !== 1 ? "s" : ""} to the fridge \ud83e\uddca`
+      detail: dist > 0
+        ? `${(dist / 5280).toFixed(1)} miles of arm travel saved`
         : "Start clicking hints to save distance!",
       cls: "stat-card emerald-border",
     },

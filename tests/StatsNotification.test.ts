@@ -101,8 +101,8 @@ describe("StatsNotification pure helpers", () => {
     };
 
     const body = buildNotificationBody(counters);
-    // 50 actions = second milestone: "You've saved a minute of mouse-reaching"
-    assert.ok(body.includes("saved a minute"));
+    // 50 actions = second milestone: "First gravel segment cleared"
+    assert.ok(body.includes("gravel segment"));
   });
 });
 
