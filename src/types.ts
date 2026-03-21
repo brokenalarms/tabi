@@ -69,4 +69,4 @@ export type CommandMessage =
   | { command: "extensionInactive" }
   | { command: "jumpToMark"; url: string; scrollY: number };
 
-export type ModeValue = "NORMAL" | "INSERT" | "HINTS" | "TAB_SEARCH";
+export type ModeValue = "NORMAL" | "INSERT" | "HINTS" | "TAB_SEARCH" | "MARK";

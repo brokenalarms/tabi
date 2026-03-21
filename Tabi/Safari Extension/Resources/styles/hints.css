@@ -113,6 +113,11 @@
     pointer-events: none;
 }
 
+.tabi-mode-bar-fade {
+    opacity: 0;
+    transition: opacity 0.3s ease-out;
+}
+
 .tabi-hint-container-glow {
     position: absolute;
     z-index: 2147483646;
