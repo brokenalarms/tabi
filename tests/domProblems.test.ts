@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { makeElement, makeKeyEvent, loadModules, fireKeyDown, getState } from "./hintTestHelpers";
 import { createDOM } from "./helpers/dom";
 import { discoverElements, walkerFilter } from "../src/modules/ElementGatherer";
-import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, hasRepeatingPeers, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isEmpty, shouldRedirectToHeading, hasListBoundaryBetween, isInNearbySiblingSubtree, countNestedLinks } from "../src/modules/elementPredicates";
+import { hasBox, hasHeadingContent, isBlockLevel, isInRepeatingContainer, getRepeatingContainer, hasRepeatingPeers, isSiblingInRepeatingContainer, isAnchorToLabelTarget, isInSameLabel, isInSameDialog, isEmpty, shouldRedirectToHeading, hasListBoundaryBetween, isInNearbySiblingSubtree, countNestedLinks } from "../src/modules/elementPredicates";
 import { findBlockAncestor, findSoleContentChild, retryExpandedToggle, captureRetryStrategies, executeRetryStrategies } from "../src/modules/elementTraversals";
 import { CLICKABLE_SELECTOR } from "../src/modules/constants";
 
@@ -3323,6 +3323,97 @@ describe("findSoleContentChild", () => {
 
         // Only one non-empty child — drills to it
         assert.equal(findSoleContentChild(outer), inner);
+        env.cleanup();
+    });
+});
+
+// ISSUE: Modal popover dialogs contain positioned wrapper/scroller elements that
+//        elementsFromPoint returns as covers, causing all interactive elements
+//        inside the dialog to appear occluded except those at high z-levels.
+// SITE: Amazon checkout — 'Add an address' modal popover
+// FIX: isInSameDialog exempts covers that share a common dialog ancestor with
+//      the target — positioned elements within the same dialog are structural,
+//      not blocking overlays from other page sections.
+describe("isInSameDialog", () => {
+    it("elements in the same dialog are not occluders", () => {
+        const env = createDOM(`
+            <div>
+                <nav><a id="link" href="#">Help</a></nav>
+                <div id="dialog" role="dialog" aria-modal="true">
+                    <div id="scroller" style="position: absolute; overflow: auto;">
+                        <input id="input" type="text">
+                        <button id="submit">Submit</button>
+                    </div>
+                </div>
+            </div>
+        `);
+        const input = env.document.getElementById("input") as unknown as HTMLElement;
+        const scroller = env.document.getElementById("scroller") as unknown as HTMLElement;
+        const submit = env.document.getElementById("submit") as unknown as HTMLElement;
+        const link = env.document.getElementById("link") as unknown as HTMLElement;
+
+        // Base: elements NOT in a dialog are not exempted
+        assert.equal(isInSameDialog(link, scroller), false,
+            "Element outside dialog should not be exempted from dialog cover");
+
+        // Delta: elements INSIDE the same dialog are exempted
+        assert.equal(isInSameDialog(input, scroller), true,
+            "Input and scroller in same dialog should be exempted");
+        assert.equal(isInSameDialog(input, submit), true,
+            "Sibling elements in same dialog should be exempted");
+
+        env.cleanup();
+    });
+
+    it("works with native dialog element", () => {
+        const env = createDOM(`
+            <dialog id="dlg" open>
+                <div id="overlay" style="position: absolute;">
+                    <form>
+                        <input id="field" type="text">
+                    </form>
+                </div>
+            </dialog>
+        `);
+        const field = env.document.getElementById("field") as unknown as HTMLElement;
+        const overlay = env.document.getElementById("overlay") as unknown as HTMLElement;
+
+        assert.equal(isInSameDialog(field, overlay), true,
+            "Elements in native <dialog> should be exempted");
+        env.cleanup();
+    });
+
+    it("works with role=alertdialog", () => {
+        const env = createDOM(`
+            <div role="alertdialog">
+                <div id="backdrop" style="position: fixed;"></div>
+                <button id="ok">OK</button>
+            </div>
+        `);
+        const ok = env.document.getElementById("ok") as unknown as HTMLElement;
+        const backdrop = env.document.getElementById("backdrop") as unknown as HTMLElement;
+
+        assert.equal(isInSameDialog(ok, backdrop), true,
+            "Elements in alertdialog should be exempted");
+        env.cleanup();
+    });
+
+    it("elements in different dialogs are not exempted", () => {
+        const env = createDOM(`
+            <div>
+                <div role="dialog" id="d1">
+                    <button id="btn1">Close</button>
+                </div>
+                <div role="dialog" id="d2">
+                    <div id="cover2" style="position: absolute;">overlay</div>
+                </div>
+            </div>
+        `);
+        const btn1 = env.document.getElementById("btn1") as unknown as HTMLElement;
+        const cover2 = env.document.getElementById("cover2") as unknown as HTMLElement;
+
+        assert.equal(isInSameDialog(btn1, cover2), false,
+            "Elements in different dialogs should not be exempted");
         env.cleanup();
     });
 });

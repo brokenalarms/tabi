@@ -124,6 +124,7 @@ export function isOccluded(el: HTMLElement, rect: DOMRect): boolean {
     if (isEmpty(cover)) return false;
     if (isSiblingInRepeatingContainer(el, cover)) return false;
     if (isInSameLabel(el, cover)) return false;
+    if (isInSameDialog(el, cover)) return false;
     if (isInNearbySiblingSubtree(el, cover)) return false;
     return true;
   };
@@ -145,6 +146,17 @@ export function isOccluded(el: HTMLElement, rect: DOMRect): boolean {
     }
   }
   return false;
+}
+
+const DIALOG_SELECTOR = 'dialog, [role="dialog"], [role="alertdialog"], [aria-modal="true"]';
+
+/** Are both elements inside the same dialog/modal container?
+ *  Positioned elements within a dialog are structural (backdrops, scrollers,
+ *  content wrappers) — not blocking overlays from other page sections.
+ *  Covers that share a dialog ancestor with the target are exempt. */
+export function isInSameDialog(a: HTMLElement, b: HTMLElement): boolean {
+  const aDialog = a.closest(DIALOG_SELECTOR);
+  return aDialog !== null && aDialog.contains(b);
 }
 
 /** Are both elements inside the same <label>?
