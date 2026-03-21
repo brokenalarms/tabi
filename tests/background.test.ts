@@ -82,6 +82,7 @@ function resetBrowserShim() {
                 if (!actionState[id]) actionState[id] = {};
                 actionState[id].badgeText = opts.text;
             },
+            onClicked: { addListener() {} },
             async setTitle(opts: { tabId: number; title: string }) {
                 const id = opts.tabId;
                 if (!actionState[id]) actionState[id] = {};
@@ -89,6 +90,7 @@ function resetBrowserShim() {
             },
         },
         runtime: {
+            getURL(path: string) { return `safari-extension://test/${path}`; },
             onMessage: { addListener() {} },
             async sendNativeMessage(appId: string, message: Record<string, unknown>) {
                 nativeMessagesSent.push({ appId, message });

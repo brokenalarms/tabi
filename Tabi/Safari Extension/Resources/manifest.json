@@ -37,7 +37,6 @@
         }
     ],
     "action": {
-        "default_popup": "popup.html",
         "default_icon": {
             "48": "images/icon-48.png",
             "96": "images/icon-96.png",
