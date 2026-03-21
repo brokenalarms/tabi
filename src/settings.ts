@@ -386,6 +386,86 @@ function buildStatisticsPage(): HTMLElement {
 
 // ── Quick Marks page ──────────────────────────────────────────
 
+function usedMarkLetters(): Set<string> {
+  return new Set(Object.keys(marks));
+}
+
+function buildAddMarkForm(): HTMLElement {
+  const form = el("div", { class: "add-mark-form" });
+
+  const letterInput = el("input", {
+    class: "add-mark-letter",
+    type: "text",
+    maxlength: "1",
+    placeholder: "a",
+  });
+
+  const urlInput = el("input", {
+    class: "add-mark-url",
+    type: "url",
+    placeholder: "https://example.com",
+  });
+
+  const titleInput = el("input", {
+    class: "add-mark-title",
+    type: "text",
+    placeholder: "Title (optional)",
+  });
+
+  const saveBtn = el("button", { class: "add-mark-save", text: "Add Mark" });
+  saveBtn.disabled = true;
+
+  const errorEl = el("div", { class: "add-mark-error" });
+
+  function validate(): string | null {
+    const letter = letterInput.value.toLowerCase();
+    if (!letter || letter < "a" || letter > "z") return "Letter must be a\u2013z";
+    if (usedMarkLetters().has(letter)) return `Mark "${letter}" already exists`;
+    const url = urlInput.value.trim();
+    if (!url) return "URL is required";
+    try { new URL(url); } catch { return "Invalid URL"; }
+    return null;
+  }
+
+  function updateState(): void {
+    const err = validate();
+    saveBtn.disabled = err !== null;
+    errorEl.textContent = "";
+  }
+
+  letterInput.addEventListener("input", () => {
+    letterInput.value = letterInput.value.toLowerCase().replace(/[^a-z]/g, "");
+    updateState();
+  });
+  urlInput.addEventListener("input", updateState);
+  titleInput.addEventListener("input", updateState);
+
+  saveBtn.addEventListener("click", async () => {
+    const err = validate();
+    if (err) {
+      errorEl.textContent = err;
+      return;
+    }
+    const letter = letterInput.value.toLowerCase();
+    const url = urlInput.value.trim();
+    const title = titleInput.value.trim() || url;
+    marks[letter] = { url, scrollY: 0, title };
+    await browser.storage.local.set({ quickMarks: marks });
+    refreshPage();
+  });
+
+  const row = el("div", { class: "add-mark-row" });
+  row.appendChild(letterInput);
+  row.appendChild(urlInput);
+  row.appendChild(titleInput);
+  row.appendChild(saveBtn);
+
+  form.appendChild(row);
+  form.appendChild(errorEl);
+
+  return form;
+}
+
 function buildQuickMarksPage(): HTMLElement {
   const page = el("div", { class: "page", id: "page-quickmarks" });
 
@@ -421,33 +501,34 @@ function buildQuickMarksPage(): HTMLElement {
   if (entries.length === 0) {
     const empty = el("div", { class: "empty-state" });
     empty.appendChild(text("div", "empty-state-icon", "\ud83d\udccc"));
-    empty.appendChild(text("div", "empty-state-text", "No marks set yet. Press m + a-z on any page to create one."));
+    empty.appendChild(text("div", "empty-state-text", "No marks set yet."));
     page.appendChild(empty);
-    return page;
+  } else {
+    const grid = el("div", { class: "marks-grid" });
+    for (const [letter, mark] of entries) {
+      if (!mark) continue;
+      const card = el("div", { class: "mark-card" });
+      card.appendChild(text("span", "mark-letter", letter));
+
+      const info = el("div", { class: "mark-info" });
+      info.appendChild(text("div", "mark-title", mark.title || "Untitled"));
+      info.appendChild(text("div", "mark-url", mark.url));
+      card.appendChild(info);
+
+      const deleteBtn = el("button", { class: "mark-delete", title: "Delete mark", text: "\u00d7" });
+      deleteBtn.addEventListener("click", async () => {
+        delete marks[letter];
+        await browser.storage.local.set({ quickMarks: marks });
+        refreshPage();
+      });
+      card.appendChild(deleteBtn);
+
+      grid.appendChild(card);
+    }
+    page.appendChild(grid);
   }
 
-  const grid = el("div", { class: "marks-grid" });
-  for (const [letter, mark] of entries) {
-    if (!mark) continue;
-    const card = el("div", { class: "mark-card" });
-    card.appendChild(text("span", "mark-letter", letter));
-
-    const info = el("div", { class: "mark-info" });
-    info.appendChild(text("div", "mark-title", mark.title || "Untitled"));
-    info.appendChild(text("div", "mark-url", mark.url));
-    card.appendChild(info);
-
-    const deleteBtn = el("button", { class: "mark-delete", title: "Delete mark", text: "\u00d7" });
-    deleteBtn.addEventListener("click", async () => {
-      delete marks[letter];
-      await browser.storage.local.set({ quickMarks: marks });
-      refreshPage();
-    });
-    card.appendChild(deleteBtn);
-
-    grid.appendChild(card);
-  }
-  page.appendChild(grid);
+  page.appendChild(buildAddMarkForm());
 
   return page;
 }

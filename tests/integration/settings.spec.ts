@@ -274,6 +274,65 @@ test("quick marks page shows empty state for premium users with no marks", async
   await expect(activePage).toContainText("No marks set yet");
 });
 
+test("quick marks page shows add-mark form for premium users", async ({ page }) => {
+  await setupSettingsPage(page, { isPremium: true });
+
+  await page.locator(".nav-item", { hasText: "Quick Marks" }).click();
+
+  const form = page.locator(".add-mark-form");
+  await expect(form).toBeVisible();
+  await expect(form.locator(".add-mark-letter")).toBeVisible();
+  await expect(form.locator(".add-mark-url")).toBeVisible();
+  await expect(form.locator(".add-mark-title")).toBeVisible();
+  await expect(form.locator(".add-mark-save")).toBeDisabled();
+});
+
+test("add-mark form creates a new mark and refreshes the page", async ({ page }) => {
+  await setupSettingsPage(page, { isPremium: true });
+
+  await page.locator(".nav-item", { hasText: "Quick Marks" }).click();
+
+  // Fill out the form
+  await page.locator(".add-mark-letter").fill("a");
+  await page.locator(".add-mark-url").fill("https://example.com/page");
+  await page.locator(".add-mark-title").fill("Example Page");
+
+  // Save button should be enabled
+  await expect(page.locator(".add-mark-save")).toBeEnabled();
+  await page.locator(".add-mark-save").click();
+
+  // Page should refresh and show the new mark card
+  const markCard = page.locator(".mark-card");
+  await expect(markCard).toHaveCount(1);
+  await expect(markCard.locator(".mark-letter")).toHaveText("a");
+  await expect(markCard.locator(".mark-title")).toHaveText("Example Page");
+});
+
+test("add-mark form disables save for duplicate letter", async ({ page }) => {
+  await setupSettingsPage(page, {
+    isPremium: true,
+    quickMarks: { b: { url: "https://existing.com", scrollY: 0, title: "Existing" } },
+  });
+
+  await page.locator(".nav-item", { hasText: "Quick Marks" }).click();
+
+  await page.locator(".add-mark-letter").fill("b");
+  await page.locator(".add-mark-url").fill("https://new.com");
+
+  await expect(page.locator(".add-mark-save")).toBeDisabled();
+});
+
+test("add-mark form disables save for invalid URL", async ({ page }) => {
+  await setupSettingsPage(page, { isPremium: true });
+
+  await page.locator(".nav-item", { hasText: "Quick Marks" }).click();
+
+  await page.locator(".add-mark-letter").fill("c");
+  await page.locator(".add-mark-url").fill("not-a-url");
+
+  await expect(page.locator(".add-mark-save")).toBeDisabled();
+});
+
 // ── Premium page ───────────────────────────────────────────────────
 
 test("premium page shows upgrade CTA for non-premium users", async ({ page }) => {
