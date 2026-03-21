@@ -386,13 +386,13 @@ describe("HintMode", () => {
             assert.equal(keyHandler.getMode(), "HINTS");
         });
 
-        // Shift+F triggers new-tab hint activation
-        it("Shift+F triggers new-tab hint activation", () => {
+        // B triggers batch hint activation
+        it("B triggers batch hint activation", () => {
             const link = makeElement("A", { href: "#", top: 10, left: 0 });
             loadModules([link]);
             const { hintMode } = getState();
 
-            fireKeyDown(makeKeyEvent("KeyF", { shift: true }));
+            fireKeyDown(makeKeyEvent("KeyB"));
             assert.ok(hintMode.isActive());
         });
 

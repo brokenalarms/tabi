@@ -28,7 +28,7 @@ export const COMMANDS: Record<string, string> = {
   pageRefresh: "Refresh page",
   activateHints: "Open link (current tab)",
   yankLink: "Copy link URL (yank)",
-  multiOpen: "Multi-open links (new tabs)",
+  multiOpen: "Batch-open links (new tabs)",
   createTab: "New tab",
   closeTab: "Close tab",
   restoreTab: "Restore tab",

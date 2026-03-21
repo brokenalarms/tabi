@@ -483,7 +483,7 @@ export class HintMode {
     const dismissKeys: Record<HintModeType, { code: string; shift: boolean }> = {
       click: { code: "KeyF", shift: false },
       yank: { code: "KeyY", shift: false },
-      multi: { code: "KeyF", shift: true },
+      multi: { code: "KeyB", shift: false },
     };
     const dismiss = dismissKeys[this.modeType];
     if (event.code === dismiss.code && event.shiftKey === dismiss.shift && !event.ctrlKey && !event.altKey && !event.metaKey) {
