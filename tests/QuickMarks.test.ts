@@ -5,7 +5,7 @@
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { createDOM, type DOMEnvironment } from "./helpers/dom";
-import { loadMarks, saveMark, getMark, type Mark, type MarkMap } from "../src/modules/QuickMarks";
+import { loadMarks, saveMark, getMark, summarizeUrl, type Mark, type MarkMap } from "../src/modules/QuickMarks";
 
 // --- Pure storage helper tests (no DOM needed) ---
 
@@ -52,6 +52,51 @@ describe("QuickMarks storage helpers", () => {
 
     assert.deepEqual(getMark(map, "c"), mark);
     assert.equal(getMark(map, "z"), undefined);
+  });
+});
+
+// --- URL summary tests ---
+
+describe("summarizeUrl", () => {
+  // Verifies that a URL with no path shows only the host.
+  it("returns host only for root URL", () => {
+    assert.equal(summarizeUrl("https://github.com/"), "github.com");
+    assert.equal(summarizeUrl("https://github.com"), "github.com");
+  });
+
+  // Verifies that www prefix is stripped.
+  it("strips www prefix", () => {
+    assert.equal(summarizeUrl("https://www.example.com/page"), "example.com/page");
+  });
+
+  // Verifies single path segment shows host/segment without ellipsis.
+  it("shows host/segment for single path segment", () => {
+    assert.equal(summarizeUrl("https://github.com/ralph"), "github.com/ralph");
+  });
+
+  // Verifies deep paths get ellipsis between host and last segment.
+  it("shows host/…/last for deep paths", () => {
+    assert.equal(
+      summarizeUrl("https://github.com/user/repo/pulls"),
+      "github.com/\u2026/pulls",
+    );
+    assert.equal(
+      summarizeUrl("https://amazon.com/dp/B08N5WRWNW/checkout"),
+      "amazon.com/\u2026/checkout",
+    );
+  });
+
+  // Verifies trailing slashes are ignored.
+  it("ignores trailing slash", () => {
+    assert.equal(
+      summarizeUrl("https://github.com/user/repo/"),
+      "github.com/\u2026/repo",
+    );
+  });
+
+  // Verifies invalid URLs are returned as-is.
+  it("returns raw string for invalid URL", () => {
+    assert.equal(summarizeUrl("not-a-url"), "not-a-url");
   });
 });
 
@@ -134,7 +179,7 @@ describe("QuickMarks class", () => {
 
     const bar = document.querySelector(".tabi-mark-mode-bar");
     assert.ok(bar, "status bar should appear");
-    assert.match(bar!.textContent || "", /Set mark/);
+    assert.equal(bar!.textContent, "m");
   });
 
   // Verifies that typing a letter in set mark mode saves the mark and exits.
@@ -163,6 +208,47 @@ describe("QuickMarks class", () => {
 
     // Mode should return to NORMAL
     assert.equal(currentMode, "NORMAL");
+  });
+
+  // Verifies that setMark confirmation shows prefix + letter + URL summary.
+  it("setMark confirmation shows key sequence and URL summary", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    await commands.get("setMark")!();
+    modeKeyDelegate!(new KeyboardEvent("keydown", {
+      code: "KeyA", key: "a", bubbles: true, cancelable: true,
+    }));
+
+    await new Promise(r => setTimeout(r, 10));
+
+    // Status bar shows "ma → localhost" (happy-dom URL is https://localhost/)
+    const bars = document.querySelectorAll(".tabi-mark-mode-bar");
+    const lastBar = bars[bars.length - 1];
+    assert.ok(lastBar);
+    assert.equal(lastBar!.textContent, "ma \u2192 localhost");
+  });
+
+  // Verifies that jumpMark confirmation shows prefix + letter + URL summary.
+  it("jumpMark confirmation shows key sequence and URL summary", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    storedData.quickMarks = {
+      b: { url: "https://github.com/user/repo/pulls", scrollY: 0, title: "PRs" },
+    };
+
+    await commands.get("jumpMark")!();
+    modeKeyDelegate!(new KeyboardEvent("keydown", {
+      code: "KeyB", key: "b", bubbles: true, cancelable: true,
+    }));
+
+    await new Promise(r => setTimeout(r, 10));
+
+    const bars = document.querySelectorAll(".tabi-mark-mode-bar");
+    const lastBar = bars[bars.length - 1];
+    assert.ok(lastBar);
+    assert.equal(lastBar!.textContent, "\'b \u2192 github.com/\u2026/pulls");
   });
 
   // Verifies that mark mode captures non-letter keys without leaking them.
@@ -211,7 +297,7 @@ describe("QuickMarks class", () => {
     assert.equal(currentMode, "MARK");
     const bar = document.querySelector(".tabi-mark-mode-bar");
     assert.ok(bar);
-    assert.match(bar!.textContent || "", /Jump to mark/);
+    assert.equal(bar!.textContent, "'");
   });
 
   // Verifies that typing a letter in jump mode sends jumpToMark message.
@@ -251,11 +337,11 @@ describe("QuickMarks class", () => {
 
     assert.equal(sentMessages.length, 0);
 
-    // Status bar should show "not set" feedback
+    // Status bar should show "'z — not set" feedback
     const bars = document.querySelectorAll(".tabi-mark-mode-bar");
     const lastBar = bars[bars.length - 1];
     assert.ok(lastBar);
-    assert.match(lastBar!.textContent || "", /not set/);
+    assert.equal(lastBar!.textContent, "'z \u2014 not set");
   });
 
   // Verifies that deactivate cleans up all DOM elements and resets mode.

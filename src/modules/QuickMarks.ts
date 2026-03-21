@@ -13,6 +13,23 @@ import { Mode } from "../commands";
 import { MARK_PANEL_DELAY_MS } from "./constants";
 import { removeOverlay } from "./overlayUtils";
 
+export function summarizeUrl(raw: string): string {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return raw;
+  }
+  const host = url.hostname.replace(/^www\./, "");
+  const path = url.pathname.replace(/\/$/, "");
+  if (!path || path === "/") return host;
+
+  const segments = path.split("/").filter(Boolean);
+  const last = segments[segments.length - 1];
+  if (segments.length <= 1) return `${host}/${last}`;
+  return `${host}/\u2026/${last}`;
+}
+
 declare const browser: {
   runtime: {
     sendMessage(message: Record<string, unknown>): Promise<unknown>;
@@ -49,21 +66,26 @@ export class QuickMarks {
   private keyHandler: KeyHandlerLike;
   private active: boolean;
   private subMode: MarkSubMode;
+  private prefixKey: string;
   private statusBar: HTMLDivElement | null;
   private panelOverlay: HTMLDivElement | null;
   private panelTimer: ReturnType<typeof setTimeout> | null;
   private marks: MarkMap;
 
-  constructor(keyHandler: KeyHandlerLike) {
+  constructor(keyHandler: KeyHandlerLike, prefixKey: { set: string; jump: string } = { set: "m", jump: "'" }) {
     this.keyHandler = keyHandler;
     this.active = false;
     this.subMode = "set";
+    this.prefixKey = prefixKey.set;
     this.statusBar = null;
     this.panelOverlay = null;
     this.panelTimer = null;
     this.marks = {};
+    this.prefixKeys = prefixKey;
     this.wireCommands();
   }
+
+  private prefixKeys: { set: string; jump: string };
 
   // --- Public API ---
 
@@ -102,6 +124,7 @@ export class QuickMarks {
     }
     this.active = true;
     this.subMode = subMode;
+    this.prefixKey = subMode === "set" ? this.prefixKeys.set : this.prefixKeys.jump;
     this.keyHandler.setMode(Mode.MARK);
 
     this.marks = await this.loadMarksFromStorage();
@@ -153,19 +176,21 @@ export class QuickMarks {
     };
     const marks = { ...this.marks, [letter]: mark };
     await browser.storage.local.set({ [STORAGE_KEY]: marks });
-    this.updateStatusBar(`Mark ${letter} set`);
+    const summary = summarizeUrl(mark.url);
+    this.updateStatusBar(`${this.prefixKey}${letter} → ${summary}`);
     this.deactivateAfterConfirmation();
   }
 
   async jumpToMark(letter: string): Promise<void> {
     const mark = this.marks[letter];
     if (!mark) {
-      this.updateStatusBar(`Mark ${letter} not set`);
+      this.updateStatusBar(`${this.prefixKey}${letter} — not set`);
       this.deactivateAfterConfirmation();
       return;
     }
 
-    this.updateStatusBar(`Jump → ${letter}`);
+    const summary = summarizeUrl(mark.url);
+    this.updateStatusBar(`${this.prefixKey}${letter} → ${summary}`);
 
     const response = await browser.runtime.sendMessage({
       command: "jumpToMark",
@@ -193,7 +218,7 @@ export class QuickMarks {
   private createStatusBar(): void {
     this.statusBar = document.createElement("div");
     this.statusBar.className = "tabi-panel tabi-mode-bar tabi-mark-mode-bar";
-    this.updateStatusBar(this.subMode === "set" ? "Set mark…" : "Jump to mark…");
+    this.updateStatusBar(this.prefixKey);
     document.documentElement.appendChild(this.statusBar);
   }
 
@@ -266,7 +291,7 @@ export class QuickMarks {
 
         const url = document.createElement("div");
         url.className = "tabi-tab-search-item-url";
-        url.textContent = mark.url;
+        url.textContent = summarizeUrl(mark.url);
 
         textWrap.appendChild(title);
         textWrap.appendChild(url);
