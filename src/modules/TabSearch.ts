@@ -291,6 +291,31 @@ export class TabSearch {
     document.body.appendChild(this.overlayEl);
 
     this.inputEl.addEventListener("input", this.onInputBound);
+
+    this.overlayEl.addEventListener("click", (e) => {
+      if (e.target === this.overlayEl) this.deactivate();
+    });
+
+    this.resultsEl.addEventListener("click", (e) => {
+      const item = (e.target as HTMLElement).closest(".tabi-tab-search-item");
+      if (!item) return;
+      const items = Array.from(this.resultsEl!.children);
+      const index = items.indexOf(item);
+      if (index < 0) return;
+      this.selectedIndex = index;
+      this.switchToSelected();
+    });
+
+    this.resultsEl.addEventListener("mousemove", (e) => {
+      const item = (e.target as HTMLElement).closest(".tabi-tab-search-item");
+      if (!item) return;
+      const items = Array.from(this.resultsEl!.children);
+      const index = items.indexOf(item);
+      if (index < 0 || index === this.selectedIndex) return;
+      const old = this.selectedIndex;
+      this.selectedIndex = index;
+      this.updateSelection(old);
+    });
   }
 
   /** Build a text node / <mark> sequence for highlighted text. */

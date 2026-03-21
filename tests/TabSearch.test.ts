@@ -496,6 +496,80 @@ describe("TabSearch", () => {
         });
     });
 
+    describe("click interactions", () => {
+        // Clicking a result item switches to that tab and dismisses the overlay
+        it("clicking a result item switches to that tab", async () => {
+            await tabSearch.activate();
+            const items = env.document.querySelectorAll(".tabi-tab-search-item");
+            assert.ok(items.length >= 3, "should have at least 3 items");
+            const expectedTabId = (tabSearch as any).scored[2].tab.id;
+
+            // Click the third item (index 2)
+            const clickEvent = new (env.window as any).MouseEvent("click", { bubbles: true });
+            items[2].dispatchEvent(clickEvent);
+
+            const switchMsg = sentMessages.find((m: any) => m.command === "switchTab");
+            assert.ok(switchMsg, "switchTab message should be sent on click");
+            assert.equal(switchMsg.tabId, expectedTabId);
+            assert.equal(tabSearch.isActive(), false, "overlay should dismiss after click");
+        });
+
+        // Clicking the overlay background (not a result) dismisses the search
+        it("clicking overlay background dismisses the search", async () => {
+            await tabSearch.activate();
+            assert.equal(tabSearch.isActive(), true);
+
+            const overlay = env.document.querySelector(".tabi-overlay") as HTMLElement;
+            const clickEvent = new (env.window as any).MouseEvent("click", { bubbles: true });
+            // Dispatch directly on overlay (simulates clicking the background)
+            overlay.dispatchEvent(clickEvent);
+
+            assert.equal(tabSearch.isActive(), false, "should dismiss on background click");
+        });
+
+        // Clicking inside the modal (not on an item) does NOT dismiss
+        it("clicking inside modal does not dismiss", async () => {
+            await tabSearch.activate();
+            const modal = env.document.querySelector(".tabi-tab-search-modal") as HTMLElement;
+            const clickEvent = new (env.window as any).MouseEvent("click", { bubbles: true });
+            modal.dispatchEvent(clickEvent);
+
+            assert.equal(tabSearch.isActive(), true, "should not dismiss when clicking modal");
+        });
+    });
+
+    describe("mouse hover selection", () => {
+        // Mousemove over a result item updates the visual selection
+        it("mousemove updates selected item", async () => {
+            await tabSearch.activate();
+            const items = env.document.querySelectorAll(".tabi-tab-search-item");
+
+            // Base: first item is selected
+            assert.ok(items[0].classList.contains("selected"), "first item should start selected");
+            assert.ok(!items[2].classList.contains("selected"), "third item should not be selected");
+
+            // Delta: mousemove over third item changes selection
+            const moveEvent = new (env.window as any).MouseEvent("mousemove", { bubbles: true });
+            items[2].dispatchEvent(moveEvent);
+
+            assert.ok(!items[0].classList.contains("selected"), "first item should lose selection");
+            assert.ok(items[2].classList.contains("selected"), "third item should gain selection");
+        });
+
+        // Mousemove over already-selected item is a no-op
+        it("mousemove over already-selected item does nothing", async () => {
+            await tabSearch.activate();
+            const items = env.document.querySelectorAll(".tabi-tab-search-item");
+
+            // Move over first item (already selected) — should not throw or change state
+            const moveEvent = new (env.window as any).MouseEvent("mousemove", { bubbles: true });
+            items[0].dispatchEvent(moveEvent);
+
+            assert.ok(items[0].classList.contains("selected"), "first item still selected");
+            assert.equal((tabSearch as any).selectedIndex, 0);
+        });
+    });
+
     describe("command wiring", () => {
         it("openTabSearch command activates", async () => {
             let activated = false;
