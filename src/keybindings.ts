@@ -150,6 +150,10 @@ export const PRESETS: Record<KeyLayout, PresetMeta> = {
       bind("KeyG KeyR", "focusInput", "gr"),
       bind("KeyG KeyC", "goUpUrl", "gc"),
 
+      // Marks
+      bind("KeyZ", "setMark", "Z"),
+      bind("Shift-KeyZ", "jumpMark", "Shift+Z"),
+
       // Help
       bind("KeyB", "showHelp", "B"),
     ],
@@ -182,7 +186,7 @@ export const PRESETS: Record<KeyLayout, PresetMeta> = {
       // Hints
       bind("Semicolon", "activateHints", ";"),
       bind("Shift-Semicolon", "multiOpen", ":"),
-      bind("KeyM", "yankLink", "M"),
+      bind("KeyY", "yankLink", "Y"),
 
       // Tabs
       bind("KeyP", "openTabSearch", "P"),
@@ -192,6 +196,10 @@ export const PRESETS: Record<KeyLayout, PresetMeta> = {
       // Navigation
       bind("KeyI", "focusInput", "I"),
       bind("KeyU KeyU", "goUpUrl", "uu"),
+
+      // Marks
+      bind("KeyM", "setMark", "M"),
+      bind("Quote", "jumpMark", "'"),
 
       // Help
       bind("Slash", "showHelp", "/"),
