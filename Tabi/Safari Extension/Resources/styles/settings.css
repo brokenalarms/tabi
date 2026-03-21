@@ -978,6 +978,13 @@ body {
   background: rgb(var(--cat));
 }
 
+.kb-note {
+  margin: 12px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--tabi-color-secondary);
+}
+
 /* Full binding reference table */
 
 .binding-table {

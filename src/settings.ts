@@ -790,6 +790,17 @@ function buildKeyLayoutsPage(): HTMLElement {
   page.appendChild(buildFullKeyboard(PRESETS[currentLayout]));
   page.appendChild(buildLegend());
 
+  if (!isPosition) {
+    page.appendChild(
+      text(
+        "p",
+        "kb-note",
+        "These are the characters each command produces — but we can't tell which physical key they're on for your layout. " +
+          "If a character doesn't match where you'd expect, check your OS keyboard settings."
+      )
+    );
+  }
+
   page.appendChild(el("hr", { class: "separator" }));
 
   // Full binding reference
