@@ -1,11 +1,11 @@
-// QuickMarks unit tests — verifies mark storage helpers and that the
-// QuickMarks class correctly wires set/jump commands, persists marks to
-// browser.storage.local, and shows toast feedback.
+// QuickMarks unit tests — verifies mark storage helpers, modal mark mode
+// with status bar feedback, discovery panel, and key capture that prevents
+// conflicts with normal-mode commands.
 
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { createDOM, type DOMEnvironment } from "./helpers/dom";
-import { loadMarks, saveMark, getMark, type Mark, type MarkMap } from "../src/modules/QuickMarks";
+import { loadMarks, saveMark, getMark, summarizeUrl, type Mark, type MarkMap } from "../src/modules/QuickMarks";
 
 // --- Pure storage helper tests (no DOM needed) ---
 
@@ -55,6 +55,51 @@ describe("QuickMarks storage helpers", () => {
   });
 });
 
+// --- URL summary tests ---
+
+describe("summarizeUrl", () => {
+  // Verifies that a URL with no path shows only the host.
+  it("returns host only for root URL", () => {
+    assert.equal(summarizeUrl("https://github.com/"), "github.com");
+    assert.equal(summarizeUrl("https://github.com"), "github.com");
+  });
+
+  // Verifies that www prefix is stripped.
+  it("strips www prefix", () => {
+    assert.equal(summarizeUrl("https://www.example.com/page"), "example.com/page");
+  });
+
+  // Verifies single path segment shows host/segment without ellipsis.
+  it("shows host/segment for single path segment", () => {
+    assert.equal(summarizeUrl("https://github.com/ralph"), "github.com/ralph");
+  });
+
+  // Verifies deep paths get ellipsis between host and last segment.
+  it("shows host/…/last for deep paths", () => {
+    assert.equal(
+      summarizeUrl("https://github.com/user/repo/pulls"),
+      "github.com/\u2026/pulls",
+    );
+    assert.equal(
+      summarizeUrl("https://amazon.com/dp/B08N5WRWNW/checkout"),
+      "amazon.com/\u2026/checkout",
+    );
+  });
+
+  // Verifies trailing slashes are ignored.
+  it("ignores trailing slash", () => {
+    assert.equal(
+      summarizeUrl("https://github.com/user/repo/"),
+      "github.com/\u2026/repo",
+    );
+  });
+
+  // Verifies invalid URLs are returned as-is.
+  it("returns raw string for invalid URL", () => {
+    assert.equal(summarizeUrl("not-a-url"), "not-a-url");
+  });
+});
+
 // --- Integration tests with browser shim ---
 
 describe("QuickMarks class", () => {
@@ -62,10 +107,18 @@ describe("QuickMarks class", () => {
   let storedData: Record<string, unknown>;
   let sentMessages: Array<Record<string, unknown>>;
   let commands: Map<string, () => void>;
+  let currentMode: string;
+  let modeKeyDelegate: ((event: KeyboardEvent) => boolean) | null;
+  let activeInstance: { deactivate(): void; destroy(): void } | null;
 
   const fakeKeyHandler = {
     on(cmd: string, cb: () => void) { commands.set(cmd, cb); },
     off(cmd: string) { commands.delete(cmd); },
+    setMode(mode: string) { currentMode = mode; },
+    setModeKeyDelegate(handler: (event: KeyboardEvent) => boolean) {
+      modeKeyDelegate = handler;
+    },
+    clearModeKeyDelegate() { modeKeyDelegate = null; },
   };
 
   beforeEach(() => {
@@ -73,6 +126,9 @@ describe("QuickMarks class", () => {
     commands = new Map();
     storedData = {};
     sentMessages = [];
+    currentMode = "NORMAL";
+    modeKeyDelegate = null;
+    activeInstance = null;
 
     (globalThis as any).browser = {
       runtime: {
@@ -93,90 +149,271 @@ describe("QuickMarks class", () => {
   });
 
   afterEach(() => {
+    if (activeInstance) {
+      activeInstance.destroy();
+      activeInstance = null;
+    }
     env.cleanup();
     delete (globalThis as any).browser;
   });
 
-  // Verifies that QuickMarks registers set and jump commands for all 26 letters.
-  it("registers setMark_a-z and jumpMark_a-z commands", async () => {
+  // Verifies that QuickMarks registers setMark and jumpMark commands.
+  it("registers setMark and jumpMark commands", async () => {
     const { QuickMarks } = await import("../src/modules/QuickMarks");
-    new QuickMarks(fakeKeyHandler);
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
 
-    assert.equal(commands.has("setMark_a"), true);
-    assert.equal(commands.has("setMark_z"), true);
-    assert.equal(commands.has("jumpMark_a"), true);
-    assert.equal(commands.has("jumpMark_z"), true);
-    assert.equal(commands.has("setMark_0"), false); // Only a-z
+    assert.equal(commands.has("setMark"), true);
+    assert.equal(commands.has("jumpMark"), true);
   });
 
-  // Verifies that setMark saves the current page's URL, scroll position, and title.
-  it("setMark persists mark to storage", async () => {
+  // Verifies that activating set mark mode enters MARK mode and shows status bar.
+  it("setMark enters MARK mode and shows status bar", async () => {
     const { QuickMarks } = await import("../src/modules/QuickMarks");
-    const qm = new QuickMarks(fakeKeyHandler);
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
 
-    await qm.setMark("a");
+    // Trigger setMark command
+    await commands.get("setMark")!();
 
+    assert.equal(currentMode, "MARK");
+    assert.notEqual(modeKeyDelegate, null);
+
+    const bar = document.querySelector(".tabi-mark-mode-bar");
+    assert.ok(bar, "status bar should appear");
+    assert.equal(bar!.textContent, "m");
+  });
+
+  // Verifies that typing a letter in set mark mode saves the mark and exits.
+  it("typing a letter in set mark mode saves mark and exits", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    await commands.get("setMark")!();
+
+    // Simulate typing 'a'
+    const event = new KeyboardEvent("keydown", {
+      code: "KeyA", key: "a", bubbles: true, cancelable: true,
+    });
+    const handled = modeKeyDelegate!(event);
+
+    assert.equal(handled, true);
+
+    // Allow async setMark to complete
+    await new Promise(r => setTimeout(r, 10));
+
+    // Mark should be persisted
     const marks = storedData.quickMarks as Record<string, unknown>;
     assert.ok(marks);
-    const mark = marks.a as { url: string; scrollY: number; title: string };
+    const mark = marks.a as Mark;
     assert.equal(mark.url, "https://localhost/");
-    assert.equal(typeof mark.scrollY, "number");
-    assert.equal(typeof mark.title, "string");
+
+    // Mode should return to NORMAL
+    assert.equal(currentMode, "NORMAL");
   });
 
-  // Verifies that jumpToMark sends a jumpToMark message to the background.
-  it("jumpToMark sends message to background with mark URL", async () => {
+  // Verifies that setMark confirmation shows prefix + letter + URL summary.
+  it("setMark confirmation shows key sequence and URL summary", async () => {
     const { QuickMarks } = await import("../src/modules/QuickMarks");
-    const qm = new QuickMarks(fakeKeyHandler);
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
 
-    // Pre-populate a mark
+    await commands.get("setMark")!();
+    modeKeyDelegate!(new KeyboardEvent("keydown", {
+      code: "KeyA", key: "a", bubbles: true, cancelable: true,
+    }));
+
+    await new Promise(r => setTimeout(r, 10));
+
+    // Status bar shows "ma → localhost" (happy-dom URL is https://localhost/)
+    const bars = document.querySelectorAll(".tabi-mark-mode-bar");
+    const lastBar = bars[bars.length - 1];
+    assert.ok(lastBar);
+    assert.equal(lastBar!.textContent, "ma \u2192 localhost");
+  });
+
+  // Verifies that jumpMark confirmation shows prefix + letter + URL summary.
+  it("jumpMark confirmation shows key sequence and URL summary", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    storedData.quickMarks = {
+      b: { url: "https://github.com/user/repo/pulls", scrollY: 0, title: "PRs" },
+    };
+
+    await commands.get("jumpMark")!();
+    modeKeyDelegate!(new KeyboardEvent("keydown", {
+      code: "KeyB", key: "b", bubbles: true, cancelable: true,
+    }));
+
+    await new Promise(r => setTimeout(r, 10));
+
+    const bars = document.querySelectorAll(".tabi-mark-mode-bar");
+    const lastBar = bars[bars.length - 1];
+    assert.ok(lastBar);
+    assert.equal(lastBar!.textContent, "\'b \u2192 github.com/\u2026/pulls");
+  });
+
+  // Verifies that mark mode captures non-letter keys without leaking them.
+  it("non-letter keys are consumed but do not set a mark", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    await commands.get("setMark")!();
+
+    // Simulate pressing 't' as a key code (which is a letter — this should work)
+    const tEvent = new KeyboardEvent("keydown", {
+      code: "KeyT", key: "t", bubbles: true, cancelable: true,
+    });
+    // But first, simulate pressing a number key (should be consumed but not act)
+    const numEvent = new KeyboardEvent("keydown", {
+      code: "Digit1", key: "1", bubbles: true, cancelable: true,
+    });
+    const handled = modeKeyDelegate!(numEvent);
+    assert.equal(handled, true, "non-letter keys should be consumed");
+
+    // Mode should still be MARK — no mark was set
+    assert.equal(currentMode, "MARK");
+  });
+
+  // Verifies that Escape is not consumed (falls through to KeyHandler for exitToNormal).
+  it("Escape falls through to KeyHandler for mode exit", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    await commands.get("setMark")!();
+
+    const escEvent = new KeyboardEvent("keydown", {
+      code: "Escape", key: "Escape", bubbles: true, cancelable: true,
+    });
+    const handled = modeKeyDelegate!(escEvent);
+    assert.equal(handled, false, "Escape should not be consumed by mark mode");
+  });
+
+  // Verifies that jumpMark enters MARK mode with jump status.
+  it("jumpMark enters MARK mode and shows jump status", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    await commands.get("jumpMark")!();
+
+    assert.equal(currentMode, "MARK");
+    const bar = document.querySelector(".tabi-mark-mode-bar");
+    assert.ok(bar);
+    assert.equal(bar!.textContent, "'");
+  });
+
+  // Verifies that typing a letter in jump mode sends jumpToMark message.
+  it("typing a letter in jump mode jumps to mark", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
     storedData.quickMarks = {
       b: { url: "https://target.com/page", scrollY: 300, title: "Target" },
     };
 
-    await qm.jumpToMark("b");
+    await commands.get("jumpMark")!();
+    modeKeyDelegate!(new KeyboardEvent("keydown", {
+      code: "KeyB", key: "b", bubbles: true, cancelable: true,
+    }));
+
+    await new Promise(r => setTimeout(r, 10));
 
     assert.equal(sentMessages.length, 1);
     assert.equal(sentMessages[0].command, "jumpToMark");
     assert.equal(sentMessages[0].url, "https://target.com/page");
     assert.equal(sentMessages[0].scrollY, 300);
+    assert.equal(currentMode, "NORMAL");
   });
 
-  // Verifies that jumping to an unset mark shows a "not set" toast without messaging background.
-  it("jumpToMark for unset mark shows toast without sending message", async () => {
+  // Verifies that jumping to an unset mark shows feedback without sending message.
+  it("jumping to unset mark shows feedback without sending message", async () => {
     const { QuickMarks } = await import("../src/modules/QuickMarks");
-    const qm = new QuickMarks(fakeKeyHandler);
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
 
-    await qm.jumpToMark("z");
+    await commands.get("jumpMark")!();
+    modeKeyDelegate!(new KeyboardEvent("keydown", {
+      code: "KeyZ", key: "z", bubbles: true, cancelable: true,
+    }));
 
-    // No message sent to background
+    await new Promise(r => setTimeout(r, 10));
+
     assert.equal(sentMessages.length, 0);
-    // Toast is visible
-    const toast = document.querySelector("[data-tabi-toast]");
-    assert.ok(toast);
-    assert.match(toast!.textContent || "", /not set/);
+
+    // Status bar should show "'z — not set" feedback
+    const bars = document.querySelectorAll(".tabi-mark-mode-bar");
+    const lastBar = bars[bars.length - 1];
+    assert.ok(lastBar);
+    assert.equal(lastBar!.textContent, "'z \u2014 not set");
   });
 
-  // Verifies that setMark shows a confirmation toast.
-  it("setMark shows a toast", async () => {
+  // Verifies that deactivate cleans up all DOM elements and resets mode.
+  it("deactivate removes status bar and returns to NORMAL", async () => {
     const { QuickMarks } = await import("../src/modules/QuickMarks");
-    const qm = new QuickMarks(fakeKeyHandler);
+    const qm = activeInstance = new QuickMarks(fakeKeyHandler as any);
 
-    await qm.setMark("d");
+    await commands.get("setMark")!();
+    assert.equal(currentMode, "MARK");
 
-    const toast = document.querySelector("[data-tabi-toast]");
-    assert.ok(toast);
-    assert.match(toast!.textContent || "", /Mark 'd' set/);
+    qm.deactivate();
+
+    assert.equal(currentMode, "NORMAL");
+    assert.equal(modeKeyDelegate, null);
+    assert.equal(document.querySelector(".tabi-mark-mode-bar"), null);
   });
 
-  // Verifies that destroy unregisters all commands.
-  it("destroy unregisters all commands", async () => {
+  // Verifies that destroy unregisters commands.
+  it("destroy unregisters commands", async () => {
     const { QuickMarks } = await import("../src/modules/QuickMarks");
-    const qm = new QuickMarks(fakeKeyHandler);
+    const qm = activeInstance = new QuickMarks(fakeKeyHandler as any);
 
-    assert.equal(commands.has("setMark_a"), true);
+    assert.equal(commands.has("setMark"), true);
     qm.destroy();
-    assert.equal(commands.has("setMark_a"), false);
-    assert.equal(commands.has("jumpMark_a"), false);
+    assert.equal(commands.has("setMark"), false);
+    assert.equal(commands.has("jumpMark"), false);
+  });
+
+  // Verifies that the discovery panel appears after the delay timer.
+  it("discovery panel shows saved marks after delay", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    storedData.quickMarks = {
+      a: { url: "https://example.com", scrollY: 0, title: "Example" },
+      c: { url: "https://test.com", scrollY: 100, title: "Test Page" },
+    };
+
+    await commands.get("jumpMark")!();
+
+    // Panel should not be visible yet
+    assert.equal(document.querySelector(".tabi-mark-panel"), null);
+
+    // Wait for panel delay (MARK_PANEL_DELAY_MS = 400)
+    await new Promise(r => setTimeout(r, 450));
+
+    const panel = document.querySelector(".tabi-mark-panel");
+    assert.ok(panel, "discovery panel should appear after delay");
+
+    const items = panel!.querySelectorAll(".tabi-tab-search-item");
+    assert.equal(items.length, 2, "panel should show 2 saved marks");
+
+    const labels = panel!.querySelectorAll(".tabi-mark-label");
+    assert.equal(labels[0]!.textContent, "a");
+    assert.equal(labels[1]!.textContent, "c");
+  });
+
+  // Verifies that fast typing (before panel delay) does not show the panel.
+  it("fast path: typing before delay skips panel", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    await commands.get("setMark")!();
+
+    // Type immediately
+    modeKeyDelegate!(new KeyboardEvent("keydown", {
+      code: "KeyA", key: "a", bubbles: true, cancelable: true,
+    }));
+
+    await new Promise(r => setTimeout(r, 10));
+
+    // Panel should never appear
+    assert.equal(document.querySelector(".tabi-mark-panel"), null);
   });
 });

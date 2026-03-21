@@ -200,6 +200,10 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
       tabSearch.deactivate();
       return;
     }
+    if (keyHandler.getMode() === Mode.MARK && quickMarks && quickMarks.isActive()) {
+      quickMarks.deactivate();
+      return;
+    }
     keyHandler.setMode(Mode.NORMAL);
     const active = document.activeElement;
     if (active && active !== document.body) (active as HTMLElement).blur();
@@ -277,6 +281,7 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   function cleanupModes(): void {
     if (hintMode.isActive()) hintMode.deactivate();
     if (tabSearch.isActive()) tabSearch.deactivate();
+    if (quickMarks && quickMarks.isActive()) quickMarks.deactivate();
   }
   window.addEventListener("beforeunload", cleanupModes);
   window.addEventListener("pagehide", cleanupModes);

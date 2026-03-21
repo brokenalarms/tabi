@@ -2,9 +2,33 @@
 // Each mark stores {url, scrollY, title}. Setting a mark saves the current
 // page state; jumping to a mark finds an existing tab or opens a new one
 // and restores the scroll position.
+//
+// Mark mode enters a proper modal state (MARK mode) that captures all input,
+// preventing conflicts with normal-mode commands. A bottom-right status bar
+// shows the building key sequence. After a short delay with no input, a
+// discovery panel appears listing saved marks.
 
 import type { ModeValue } from "../types";
-import { QUICKMARK_TOAST_DURATION_MS } from "./constants";
+import { Mode } from "../commands";
+import { MARK_PANEL_DELAY_MS } from "./constants";
+import { removeOverlay } from "./overlayUtils";
+
+export function summarizeUrl(raw: string): string {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return raw;
+  }
+  const host = url.hostname.replace(/^www\./, "");
+  const path = url.pathname.replace(/\/$/, "");
+  if (!path || path === "/") return host;
+
+  const segments = path.split("/").filter(Boolean);
+  const last = segments[segments.length - 1];
+  if (segments.length <= 1) return `${host}/${last}`;
+  return `${host}/\u2026/${last}`;
+}
 
 declare const browser: {
   runtime: {
@@ -27,29 +51,122 @@ export interface Mark {
 export type MarkMap = Partial<Record<string, Mark>>;
 
 const STORAGE_KEY = "quickMarks";
-const LETTERS = "abcdefghijklmnopqrstuvwxyz";
+
+type MarkSubMode = "set" | "jump";
 
 interface KeyHandlerLike {
+  setMode(mode: ModeValue): void;
+  setModeKeyDelegate(handler: (event: KeyboardEvent) => boolean): void;
+  clearModeKeyDelegate(): void;
   on(command: string, callback: () => void): void;
   off(command: string): void;
 }
 
 export class QuickMarks {
   private keyHandler: KeyHandlerLike;
-  private toastEl: HTMLDivElement | null = null;
-  private toastTimer: ReturnType<typeof setTimeout> | null = null;
+  private active: boolean;
+  private subMode: MarkSubMode;
+  private prefixKey: string;
+  private statusBar: HTMLDivElement | null;
+  private panelOverlay: HTMLDivElement | null;
+  private panelTimer: ReturnType<typeof setTimeout> | null;
+  private marks: MarkMap;
 
-  constructor(keyHandler: KeyHandlerLike) {
+  constructor(keyHandler: KeyHandlerLike, prefixKey: { set: string; jump: string } = { set: "m", jump: "'" }) {
     this.keyHandler = keyHandler;
+    this.active = false;
+    this.subMode = "set";
+    this.prefixKey = prefixKey.set;
+    this.statusBar = null;
+    this.panelOverlay = null;
+    this.panelTimer = null;
+    this.marks = {};
+    this.prefixKeys = prefixKey;
     this.wireCommands();
   }
 
-  private wireCommands(): void {
-    for (const letter of LETTERS) {
-      this.keyHandler.on("setMark_" + letter, () => this.setMark(letter));
-      this.keyHandler.on("jumpMark_" + letter, () => this.jumpToMark(letter));
+  private prefixKeys: { set: string; jump: string };
+
+  // --- Public API ---
+
+  isActive(): boolean {
+    return this.active;
+  }
+
+  deactivate(): void {
+    if (!this.active) return;
+    this.active = false;
+    this.clearPanelTimer();
+    this.keyHandler.clearModeKeyDelegate();
+    if (this.statusBar) {
+      this.statusBar.remove();
+      this.statusBar = null;
+    }
+    if (this.panelOverlay) {
+      removeOverlay(this.panelOverlay);
+      this.panelOverlay = null;
+    }
+    this.keyHandler.setMode(Mode.NORMAL);
+  }
+
+  destroy(): void {
+    this.deactivate();
+    this.keyHandler.off("setMark");
+    this.keyHandler.off("jumpMark");
+  }
+
+  // --- Activation ---
+
+  private async activate(subMode: MarkSubMode): Promise<void> {
+    if (this.active) {
+      this.deactivate();
+      return;
+    }
+    this.active = true;
+    this.subMode = subMode;
+    this.prefixKey = subMode === "set" ? this.prefixKeys.set : this.prefixKeys.jump;
+    this.keyHandler.setMode(Mode.MARK);
+
+    this.marks = await this.loadMarksFromStorage();
+
+    this.createStatusBar();
+    this.keyHandler.setModeKeyDelegate(this.handleKey.bind(this));
+    this.startPanelTimer();
+  }
+
+  // --- Key handling ---
+
+  private handleKey(event: KeyboardEvent): boolean {
+    if (!this.active) return false;
+
+    // Let Escape fall through to KeyHandler's exitToNormal
+    if (event.code === "Escape") return false;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    // Accept a-z letters only
+    const key = event.key;
+    if (key.length === 1 && key >= "a" && key <= "z") {
+      this.executeMark(key);
+      return true;
+    }
+
+    // Reject non-letter input but stay in mode
+    return true;
+  }
+
+  private async executeMark(letter: string): Promise<void> {
+    this.clearPanelTimer();
+
+    if (this.subMode === "set") {
+      await this.setMark(letter);
+    } else {
+      await this.jumpToMark(letter);
     }
   }
+
+  // --- Mark operations ---
 
   async setMark(letter: string): Promise<void> {
     const mark: Mark = {
@@ -57,91 +174,167 @@ export class QuickMarks {
       scrollY: window.scrollY,
       title: document.title,
     };
-    const stored = await browser.storage.local.get([STORAGE_KEY]);
-    const marks: MarkMap = (stored[STORAGE_KEY] as MarkMap) || {};
-    marks[letter] = mark;
+    const marks = { ...this.marks, [letter]: mark };
     await browser.storage.local.set({ [STORAGE_KEY]: marks });
-    this.showToast(`Mark '${letter}' set`);
+    const summary = summarizeUrl(mark.url);
+    this.updateStatusBar(`${this.prefixKey}${letter} → ${summary}`);
+    this.deactivateAfterConfirmation();
   }
 
   async jumpToMark(letter: string): Promise<void> {
-    const stored = await browser.storage.local.get([STORAGE_KEY]);
-    const marks: MarkMap = (stored[STORAGE_KEY] as MarkMap) || {};
-    const mark = marks[letter];
+    const mark = this.marks[letter];
     if (!mark) {
-      this.showToast(`Mark '${letter}' not set`);
+      this.updateStatusBar(`${this.prefixKey}${letter} — not set`);
+      this.deactivateAfterConfirmation();
       return;
     }
 
-    // Ask background to find an existing tab with this URL or open a new one
+    const summary = summarizeUrl(mark.url);
+    this.updateStatusBar(`${this.prefixKey}${letter} → ${summary}`);
+
     const response = await browser.runtime.sendMessage({
       command: "jumpToMark",
       url: mark.url,
       scrollY: mark.scrollY,
     });
 
-    // If we stayed on the same tab (URL matches), restore scroll directly
     const resp = response as { status: string; sameTab?: boolean };
     if (resp.sameTab) {
       window.scrollTo(0, mark.scrollY);
     }
-    // If switched to another tab or opened a new one, the content script
-    // on that tab will handle scroll restoration via a storage message.
 
-    this.showToast(`Jumped to '${letter}'`);
+    this.deactivateAfterConfirmation();
   }
 
-  private showToast(message: string): void {
-    this.dismissToast();
+  // --- Storage ---
 
-    const el = document.createElement("div");
-    el.textContent = message;
-    el.setAttribute("data-tabi-toast", "");
-    Object.assign(el.style, {
-      position: "fixed",
-      bottom: "20px",
-      left: "50%",
-      transform: "translateX(-50%)",
-      padding: "8px 16px",
-      borderRadius: "6px",
-      background: "rgba(0, 0, 0, 0.8)",
-      color: "#fff",
-      fontSize: "14px",
-      fontFamily: "-apple-system, BlinkMacSystemFont, sans-serif",
-      zIndex: "2147483647",
-      pointerEvents: "none",
-      transition: "opacity 0.2s",
-      opacity: "1",
-    });
-
-    document.body.appendChild(el);
-    this.toastEl = el;
-
-    this.toastTimer = setTimeout(() => {
-      el.style.opacity = "0";
-      this.toastTimer = setTimeout(() => {
-        this.dismissToast();
-      }, 200);
-    }, QUICKMARK_TOAST_DURATION_MS);
+  private async loadMarksFromStorage(): Promise<MarkMap> {
+    const stored = await browser.storage.local.get([STORAGE_KEY]);
+    return (stored[STORAGE_KEY] as MarkMap) || {};
   }
 
-  private dismissToast(): void {
-    if (this.toastTimer) {
-      clearTimeout(this.toastTimer);
-      this.toastTimer = null;
-    }
-    if (this.toastEl && this.toastEl.parentNode) {
-      this.toastEl.parentNode.removeChild(this.toastEl);
-      this.toastEl = null;
+  // --- Status bar ---
+
+  private createStatusBar(): void {
+    this.statusBar = document.createElement("div");
+    this.statusBar.className = "tabi-panel tabi-mode-bar tabi-mark-mode-bar";
+    this.updateStatusBar(this.prefixKey);
+    document.documentElement.appendChild(this.statusBar);
+  }
+
+  private updateStatusBar(text: string): void {
+    if (!this.statusBar) return;
+    this.statusBar.textContent = text;
+  }
+
+  // --- Discovery panel ---
+
+  private startPanelTimer(): void {
+    this.clearPanelTimer();
+    this.panelTimer = setTimeout(() => {
+      this.panelTimer = null;
+      this.showPanel();
+    }, MARK_PANEL_DELAY_MS);
+  }
+
+  private clearPanelTimer(): void {
+    if (this.panelTimer !== null) {
+      clearTimeout(this.panelTimer);
+      this.panelTimer = null;
     }
   }
 
-  destroy(): void {
-    this.dismissToast();
-    for (const letter of LETTERS) {
-      this.keyHandler.off("setMark_" + letter);
-      this.keyHandler.off("jumpMark_" + letter);
+  private showPanel(): void {
+    if (!this.active) return;
+
+    const entries = Object.entries(this.marks)
+      .filter((pair): pair is [string, Mark] => pair[1] !== undefined)
+      .sort(([a], [b]) => a.localeCompare(b));
+
+    this.panelOverlay = document.createElement("div");
+    this.panelOverlay.className = "tabi-overlay";
+
+    const modal = document.createElement("div");
+    modal.className = "tabi-panel tabi-tab-search-modal tabi-mark-panel";
+
+    const header = document.createElement("div");
+    header.className = "tabi-mark-panel-header";
+    header.textContent = this.subMode === "set"
+      ? "Set mark (a-z)"
+      : "Jump to mark (a-z)";
+    modal.appendChild(header);
+
+    const list = document.createElement("div");
+    list.className = "tabi-tab-search-results";
+
+    if (entries.length === 0) {
+      const empty = document.createElement("div");
+      empty.className = "tabi-tab-search-empty";
+      empty.textContent = "No marks saved";
+      list.appendChild(empty);
+    } else {
+      for (const [letter, mark] of entries) {
+        const item = document.createElement("div");
+        item.className = "tabi-tab-search-item";
+
+        const label = document.createElement("span");
+        label.className = "tabi-mark-label";
+        label.textContent = letter;
+        item.appendChild(label);
+
+        const textWrap = document.createElement("div");
+        textWrap.className = "tabi-tab-search-text";
+
+        const title = document.createElement("div");
+        title.className = "tabi-tab-search-item-title";
+        title.textContent = mark.title || "(Untitled)";
+
+        const url = document.createElement("div");
+        url.className = "tabi-tab-search-item-url";
+        url.textContent = summarizeUrl(mark.url);
+
+        textWrap.appendChild(title);
+        textWrap.appendChild(url);
+        item.appendChild(textWrap);
+        list.appendChild(item);
+      }
     }
+
+    modal.appendChild(list);
+    this.panelOverlay.appendChild(modal);
+    document.body.appendChild(this.panelOverlay);
+  }
+
+  // --- Deactivation with brief confirmation display ---
+
+  private deactivateAfterConfirmation(): void {
+    // Remove panel immediately but keep status bar briefly for confirmation
+    if (this.panelOverlay) {
+      removeOverlay(this.panelOverlay);
+      this.panelOverlay = null;
+    }
+    // Mark as inactive so key delegate stops processing
+    this.active = false;
+    this.clearPanelTimer();
+    this.keyHandler.clearModeKeyDelegate();
+    this.keyHandler.setMode(Mode.NORMAL);
+
+    // Fade out the status bar after a brief display
+    const bar = this.statusBar;
+    if (bar) {
+      this.statusBar = null;
+      bar.addEventListener("transitionend", () => bar.remove(), { once: true });
+      // Trigger reflow before adding the fade class
+      void bar.offsetHeight;
+      bar.classList.add("tabi-mode-bar-fade");
+    }
+  }
+
+  // --- Command wiring ---
+
+  private wireCommands(): void {
+    this.keyHandler.on("setMark", () => this.activate("set"));
+    this.keyHandler.on("jumpMark", () => this.activate("jump"));
   }
 }
 

@@ -216,16 +216,8 @@ export class KeyHandler {
     this.bind(n, "KeyG Digit0", "goToTabFirst");          // g0
     this.bind(n, "KeyG Shift-Digit4", "goToTabLast");     // g$
 
-    // Quick marks (m + a-z to set, ' + a-z to jump) — layout-independent
-    for (let c = 65; c <= 90; c++) {
-      const letter = String.fromCharCode(c + 32); // a-z
-      const code = "Key" + String.fromCharCode(c);  // KeyA-KeyZ
-      this.bind(n, "KeyM " + code, "setMark_" + letter);
-      this.bind(n, "Quote " + code, "jumpMark_" + letter);
-    }
-
     // Mode escape — works in all non-NORMAL modes
-    for (const mode of [Mode.INSERT, Mode.HINTS, Mode.TAB_SEARCH]) {
+    for (const mode of [Mode.INSERT, Mode.HINTS, Mode.TAB_SEARCH, Mode.MARK]) {
       this.bind(mode, "Escape", "exitToNormal");
     }
   }

@@ -5,6 +5,7 @@ export const Mode = {
   INSERT: "INSERT",
   HINTS: "HINTS",
   TAB_SEARCH: "TAB_SEARCH",
+  MARK: "MARK",
 } as const;
 
 export const PREMIUM_COMMANDS = new Set([

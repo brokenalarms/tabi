@@ -141,9 +141,21 @@
     --tabi-help-row-hover: rgba(255, 255, 255, 0.06);
 }
 
+/* ── Mark label theme ────────────────────────────────────────────────── */
+
+.tabi-mark-label {
+    --tabi-mark-label-bg: rgba(168, 120, 255, 0.2);
+    --tabi-mark-label-color: #c4a0ff;
+}
+
 /* ── Light mode ───────────────────────────────────────────────────────── */
 
 @media (prefers-color-scheme: light) {
+    .tabi-mark-label {
+        --tabi-mark-label-bg: rgba(120, 70, 220, 0.12);
+        --tabi-mark-label-color: #6b3fa0;
+    }
+
     .tabi-panel {
         --tabi-panel-bg: rgba(255, 255, 255, 0.82);
         --tabi-panel-shadow: 0 8px 40px rgba(0, 0, 0, 0.15), 0 0 0 0.5px rgba(0, 0, 0, 0.1);

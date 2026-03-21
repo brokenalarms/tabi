@@ -71,6 +71,9 @@ export const BONUS_WORD_BOUNDARY = 8;
 export const BONUS_CONTIGUOUS = 4;
 export const BASE_CHAR_SCORE = 1;
 
+// ── Mark mode ──────────────────────────────────────────────
+export const MARK_PANEL_DELAY_MS = 400;
+
 // ── Toast / notification timing ─────────────────────────────
 export const PREMIUM_TOAST_DURATION_MS = 5000;
 export const QUICKMARK_TOAST_DURATION_MS = 1500;
