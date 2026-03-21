@@ -343,7 +343,7 @@ export class TabSearch {
     if (this.selectedIndex >= 0 && this.selectedIndex < items.length) {
       const next = items[this.selectedIndex] as HTMLElement;
       next.classList.add("selected");
-      next.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      next.scrollIntoView({ block: "nearest" });
     }
   }
 

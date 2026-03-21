@@ -1,11 +1,12 @@
 // ScrollController — scroll target detection and scroll commands for Tabi
 // Finds the correct scrollable element and performs directional/absolute scrolling.
-// Uses requestAnimationFrame for smooth scrolling, since Safari does not reliably
-// support CSS `behavior: "smooth"` on all elements.
 //
 // Step keys (j/k/h/l) use velocity-based scrolling: keydown starts a continuous
 // RAF loop at a fixed speed, keyup decelerates to a stop via exponential smoothing.
 // This avoids dependence on OS key repeat and produces smooth scrolling from frame 1.
+//
+// Jump commands (d/u, gg/G) delegate to native scrollTo/scrollBy with
+// behavior: "smooth", letting the compositor handle the animation off main thread.
 
 import { ScrollConfig } from "./constants";
 
@@ -17,30 +18,12 @@ interface KeyHandlerLike {
   off(command: string): void;
 }
 
-// --- Target-chase animation ---
-// Two modes:
-//   Exponential smoothing (deceleration after j/k release): converges on target
-//     using a time constant.  Fast for small deltas.
-//   Duration-based ease-in-out (d/u, gg/G): fixed-duration animation with a
-//     cubic ease curve.  Matches native scroll feel for larger jumps.
-
-function easeInOutCubic(t: number): number {
-  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
-}
-
 interface ChaseAnimation {
   targetX: number;
   targetY: number;
   rafId: number;
   lastTime: number;
-  // Duration mode fields (unset → exponential smoothing)
-  startX?: number;
-  startY?: number;
-  startTime?: number;
-  durationMs?: number;
 }
-
-// --- Velocity-based continuous scroll (held keys) ---
 
 interface VelocityScroll {
   target: Element;
@@ -77,7 +60,6 @@ export class ScrollController {
     const el = target as HTMLElement;
     if (!el.style) return;
     if (!ScrollController.overriddenElements.has(el)) return;
-    // Only restore if no velocity or chase is still active on this target
     const v = ScrollController.velocity;
     if (v && v.target === target) return;
     if (ScrollController.chaseAnimations.has(target)) return;
@@ -117,13 +99,12 @@ export class ScrollController {
     return el.scrollHeight > el.clientHeight;
   }
 
-  // --- Chase animation (smooth scroll to target) ---
+  // --- Chase animation (exponential deceleration after j/k release) ---
 
   private static smoothScroll(
     target: Element,
     deltaX: number,
     deltaY: number,
-    durationMs?: number,
   ): void {
     const existing = ScrollController.chaseAnimations.get(target);
     if (existing) {
@@ -131,13 +112,6 @@ export class ScrollController {
       const maxY = target.scrollHeight - target.clientHeight;
       existing.targetX = Math.max(0, Math.min(maxX, existing.targetX + deltaX));
       existing.targetY = Math.max(0, Math.min(maxY, existing.targetY + deltaY));
-      // If switching to duration mode, reset start position for the new target
-      if (durationMs !== undefined) {
-        existing.startX = target.scrollLeft;
-        existing.startY = target.scrollTop;
-        existing.startTime = undefined; // re-record on next frame
-        existing.durationMs = durationMs;
-      }
       return;
     }
 
@@ -149,12 +123,6 @@ export class ScrollController {
       rafId: 0,
       lastTime: 0,
     };
-
-    if (durationMs !== undefined) {
-      anim.startX = target.scrollLeft;
-      anim.startY = target.scrollTop;
-      anim.durationMs = durationMs;
-    }
 
     function finish() {
       target.scrollLeft = anim.targetX;
@@ -170,24 +138,6 @@ export class ScrollController {
         return;
       }
 
-      // --- Duration mode: ease-in-out over fixed time ---
-      if (anim.durationMs !== undefined) {
-        if (anim.startTime === undefined) {
-          anim.startTime = now;
-        }
-        const elapsed = now - anim.startTime;
-        const progress = Math.min(1, elapsed / anim.durationMs);
-        const eased = easeInOutCubic(progress);
-
-        target.scrollLeft = anim.startX! + (anim.targetX - anim.startX!) * eased;
-        target.scrollTop = anim.startY! + (anim.targetY - anim.startY!) * eased;
-
-        if (progress >= 1) { finish(); return; }
-        anim.rafId = requestAnimationFrame(step);
-        return;
-      }
-
-      // --- Exponential mode: deceleration ---
       if (anim.lastTime === 0) {
         anim.lastTime = now;
         anim.rafId = requestAnimationFrame(step);
@@ -229,16 +179,12 @@ export class ScrollController {
 
   private static startVelocity(axis: Axis, direction: number): void {
     const v = ScrollController.velocity;
-    // Already scrolling in same direction — ignore key repeat
     if (v && v.axis === axis && v.direction === direction) return;
 
-    // Stop any existing velocity or chase on this target
     ScrollController.stopVelocityImmediate();
     const target = ScrollController.findScrollTarget(axis);
     const chase = ScrollController.chaseAnimations.get(target);
     if (chase) {
-      // Don't snap — just stop the previous motion where it is and
-      // start the new direction from the current position.
       cancelAnimationFrame(chase.rafId);
       ScrollController.chaseAnimations.delete(target);
     }
@@ -252,7 +198,6 @@ export class ScrollController {
     };
 
     function step(now: number) {
-      // First frame: record timestamp, no movement yet
       if (vel.lastTime === 0) {
         vel.lastTime = now;
         vel.rafId = requestAnimationFrame(step);
@@ -290,7 +235,6 @@ export class ScrollController {
     cancelAnimationFrame(v.rafId);
     ScrollController.velocity = null;
 
-    // Hand off momentum for smooth deceleration
     const remaining = ScrollConfig.scrollStep * v.direction;
     const dx = v.axis === "x" ? remaining : 0;
     const dy = v.axis === "y" ? remaining : 0;
@@ -301,48 +245,9 @@ export class ScrollController {
     const v = ScrollController.velocity;
     if (!v) return;
     cancelAnimationFrame(v.rafId);
+    const target = v.target;
     ScrollController.velocity = null;
-    // Don't restore smooth scroll — callers (scrollToTop, scrollHalfPageDown,
-    // etc.) start a new animation right after, so the override must stay.
-    // destroy() handles final cleanup.
-  }
-
-  // --- Scroll operations ---
-
-  static scrollBy(axis: Axis, delta: number, durationMs?: number): void {
-    const target = ScrollController.findScrollTarget(axis);
-    const dx = axis === "x" ? delta : 0;
-    const dy = axis === "y" ? delta : 0;
-    ScrollController.smoothScroll(target, dx, dy, durationMs);
-  }
-
-  static scrollToTop(): void {
-    ScrollController.stopVelocityImmediate();
-    const target = ScrollController.findScrollTarget("y");
-    ScrollController.cancelChase(target);
-    const dy = -target.scrollTop;
-    ScrollController.smoothScroll(target, 0, dy, ScrollConfig.scrollDurationMs);
-  }
-
-  static scrollToBottom(): void {
-    ScrollController.stopVelocityImmediate();
-    const target = ScrollController.findScrollTarget("y");
-    ScrollController.cancelChase(target);
-    const dy = target.scrollHeight - target.clientHeight - target.scrollTop;
-    ScrollController.smoothScroll(target, 0, dy, ScrollConfig.scrollDurationMs);
-  }
-
-  private static cancelChase(target: Element): void {
-    const existing = ScrollController.chaseAnimations.get(target);
-    if (existing) {
-      cancelAnimationFrame(existing.rafId);
-      ScrollController.chaseAnimations.delete(target);
-      // Don't restore smooth scroll here — callers always start a new
-      // animation immediately, which keeps the override active.  The
-      // restore→disable flip between cancelChase and the next smoothScroll
-      // caused Safari to briefly re-enable CSS smooth scrolling, producing
-      // visible jumps on half-page and absolute scroll commands.
-    }
+    ScrollController.restoreSmoothScroll(target);
   }
 
   // --- Command wiring ---
@@ -350,7 +255,6 @@ export class ScrollController {
   private wireCommands(): void {
     const kh = this.keyHandler;
 
-    // Step scrolls: keydown starts velocity, keyup decelerates
     const scrollCmds: [string, Axis, number][] = [
       ["scrollDown", "y", 1],
       ["scrollUp", "y", -1],
@@ -365,20 +269,28 @@ export class ScrollController {
     kh.on("scrollHalfPageDown", () => {
       ScrollController.stopVelocityImmediate();
       const target = ScrollController.findScrollTarget("y");
-      ScrollController.cancelChase(target);
-      ScrollController.scrollBy("y", Math.round(target.clientHeight / 2), ScrollConfig.scrollDurationMs);
+      target.scrollBy({ top: Math.round(target.clientHeight / 2), behavior: "smooth" });
       this.onAction?.();
     });
     kh.on("scrollHalfPageUp", () => {
       ScrollController.stopVelocityImmediate();
       const target = ScrollController.findScrollTarget("y");
-      ScrollController.cancelChase(target);
-      ScrollController.scrollBy("y", -Math.round(target.clientHeight / 2), ScrollConfig.scrollDurationMs);
+      target.scrollBy({ top: -Math.round(target.clientHeight / 2), behavior: "smooth" });
       this.onAction?.();
     });
 
-    kh.on("scrollToTop", () => { ScrollController.scrollToTop(); this.onAction?.(); });
-    kh.on("scrollToBottom", () => { ScrollController.scrollToBottom(); this.onAction?.(); });
+    kh.on("scrollToTop", () => {
+      ScrollController.stopVelocityImmediate();
+      const target = ScrollController.findScrollTarget("y");
+      target.scrollTo({ top: 0, behavior: "smooth" });
+      this.onAction?.();
+    });
+    kh.on("scrollToBottom", () => {
+      ScrollController.stopVelocityImmediate();
+      const target = ScrollController.findScrollTarget("y");
+      target.scrollTo({ top: target.scrollHeight - target.clientHeight, behavior: "smooth" });
+      this.onAction?.();
+    });
 
     kh.on("goBack", () => history.back());
     kh.on("goForward", () => history.forward());
@@ -387,12 +299,10 @@ export class ScrollController {
 
   destroy(): void {
     ScrollController.stopVelocityImmediate();
-    // Cancel any running chase animations
     for (const [, chase] of ScrollController.chaseAnimations) {
       cancelAnimationFrame(chase.rafId);
     }
     ScrollController.chaseAnimations.clear();
-    // Restore smooth scroll on all overridden elements
     for (const el of ScrollController.overriddenElements) {
       el.style.scrollBehavior = "";
     }
