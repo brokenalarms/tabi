@@ -658,8 +658,9 @@ function buildBindingTable(layout: KeyLayout): HTMLElement {
   return table;
 }
 
-function buildModeColorPreviews(): HTMLElement {
+function buildModeColorPreviews(theme: Theme): HTMLElement {
   const row = el("div", { class: "mode-colors" });
+  row.dataset.tagTheme = theme;
   const modes: { cls: string; label: string }[] = [
     { cls: "click", label: "Click" },
     { cls: "yank", label: "Yank" },
@@ -667,7 +668,9 @@ function buildModeColorPreviews(): HTMLElement {
   ];
   for (const { cls, label } of modes) {
     const preview = el("div", { class: "mode-color-preview" });
-    preview.appendChild(el("span", { class: `mode-hint-tag ${cls}`, text: "ab" }));
+    const tag = el("span", { class: `mode-hint-tag ${cls}`, text: "ab" });
+    tag.dataset.label = "ab";
+    preview.appendChild(tag);
     preview.appendChild(el("span", { class: "mode-color-label", text: label }));
     row.appendChild(preview);
   }
@@ -696,7 +699,7 @@ function buildKeyLayoutsPage(): HTMLElement {
       }
     )
   );
-  tagSection.appendChild(buildModeColorPreviews());
+  tagSection.appendChild(buildModeColorPreviews(currentTheme));
   page.appendChild(tagSection);
 
   // Animations

@@ -127,6 +127,28 @@ test("key layouts page shows mode color previews with Click, Yank, Multi tags", 
   await expect(tags.nth(2)).toHaveClass(/multi/);
 });
 
+test("mode color previews reflect active theme and update on theme change", async ({ page }) => {
+  // Preview tags should match the selected theme via data-tag-theme
+  await setupSettingsPage(page);
+
+  const modeColors = page.locator(".mode-colors");
+
+  // Default theme is "auto"
+  await expect(modeColors).toHaveAttribute("data-tag-theme", "auto");
+
+  // Change theme to "dark" via the segmented control
+  await page.locator(".segmented button", { hasText: "Dark" }).click();
+  await expect(modeColors).toHaveAttribute("data-tag-theme", "dark");
+
+  // Change theme to "light"
+  await page.locator(".segmented button", { hasText: "Light" }).click();
+  await expect(modeColors).toHaveAttribute("data-tag-theme", "light");
+
+  // Change theme to "classic"
+  await page.locator(".segmented button", { hasText: "Classic" }).click();
+  await expect(modeColors).toHaveAttribute("data-tag-theme", "classic");
+});
+
 // ── Premium gate overlay ───────────────────────────────────────────
 
 test("clicking disabled premium layout card shows premium prompt", async ({ page }) => {
