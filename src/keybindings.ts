@@ -44,10 +44,6 @@ const SHARED: KeyBinding[] = [
   bind("KeyG KeyI", "focusInput", "gi"),
   bind("KeyG KeyU", "goUpUrl", "gu"),
 
-  // Marks
-  bind("KeyM", "setMark", "m"),
-  bind("Quote", "jumpMark", "'"),
-
   // Help
   bind("Shift-Slash", "showHelp", "?"),
 ];
@@ -61,26 +57,32 @@ export const PRESETS: Record<KeyLayout, PresetMeta> = {
     bindings: [
       ...SHARED,
 
-      // Scrolling
+      // Scrolling (right hand home row)
       bind("KeyJ", "scrollDown", "J"),
       bind("KeyK", "scrollUp", "K"),
       bind("KeyH", "scrollLeft", "H"),
       bind("KeyL", "scrollRight", "L"),
+
+      // Page scrolling (left hand: E above D = spatial up/down)
       bind("KeyD", "scrollHalfPageDown", "D"),
-      bind("KeyU", "scrollHalfPageUp", "U"),
-      bind("Shift-KeyG", "scrollToBottom", "Shift+G"),
-      bind("KeyG KeyG", "scrollToTop", "gg"),
+      bind("KeyE", "scrollHalfPageUp", "E"),
+      bind("Shift-KeyJ", "scrollToBottom", "Shift+J"),
+      bind("Shift-KeyK", "scrollToTop", "Shift+K"),
 
       // History
       bind("Shift-KeyH", "goBack", "Shift+H"),
       bind("Shift-KeyL", "goForward", "Shift+L"),
       bind("KeyR", "pageRefresh", "R"),
 
-      // Tab movement
-      bind("Shift-KeyJ", "tabLeft", "Shift+J"),
-      bind("Shift-KeyK", "tabRight", "Shift+K"),
-      bind("KeyG KeyT", "tabNext", "gt"),
-      bind("KeyG Shift-KeyT", "tabPrev", "gT"),
+      // Tab switching
+      bind("KeyN", "tabNext", "N"),
+      bind("KeyP", "tabPrev", "P"),
+      bind("Shift-Comma", "tabLeft", "<"),
+      bind("Shift-Period", "tabRight", ">"),
+
+      // Marks (semicolon = home row, better than quote)
+      bind("KeyM", "setMark", "M"),
+      bind("Semicolon", "jumpMark", ";"),
     ],
   },
 
@@ -90,7 +92,7 @@ export const PRESETS: Record<KeyLayout, PresetMeta> = {
     bindings: [
       ...SHARED,
 
-      // Scrolling — same keys, vim heritage
+      // Scrolling
       bind("KeyJ", "scrollDown", "j"),
       bind("KeyK", "scrollUp", "k"),
       bind("KeyH", "scrollLeft", "h"),
@@ -110,6 +112,10 @@ export const PRESETS: Record<KeyLayout, PresetMeta> = {
       bind("Shift-KeyK", "tabRight", "K"),
       bind("KeyG KeyT", "tabNext", "gt"),
       bind("KeyG Shift-KeyT", "tabPrev", "gT"),
+
+      // Marks
+      bind("KeyM", "setMark", "m"),
+      bind("Quote", "jumpMark", "'"),
     ],
   },
 

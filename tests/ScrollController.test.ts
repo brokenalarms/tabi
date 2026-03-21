@@ -202,7 +202,7 @@ describe("ScrollController", () => {
         });
     });
 
-    describe("Half-page scroll (d/u)", () => {
+    describe("Half-page scroll (d/e)", () => {
         it("d scrolls half page down", () => {
             fireKeyDown(makeKeyEvent("KeyD"));
             flushRAF(5000);
@@ -212,9 +212,9 @@ describe("ScrollController", () => {
             );
         });
 
-        it("u scrolls half page up", () => {
+        it("e scrolls half page up", () => {
             documentScrollingElement.scrollTop = 1000;
-            fireKeyDown(makeKeyEvent("KeyU"));
+            fireKeyDown(makeKeyEvent("KeyE"));
             flushRAF(5000);
             assert.equal(
                 documentScrollingElement.scrollTop,
@@ -223,18 +223,17 @@ describe("ScrollController", () => {
         });
     });
 
-    describe("Absolute scroll (gg/G)", () => {
-        it("gg scrolls to top", () => {
+    describe("Absolute scroll (Shift+K / Shift+J)", () => {
+        it("Shift+K scrolls to top", () => {
             documentScrollingElement.scrollTop = 500;
-            fireKeyDown(makeKeyEvent("KeyG"));
-            fireKeyDown(makeKeyEvent("KeyG"));
+            fireKeyDown(makeKeyEvent("KeyK", { shift: true }));
             flushRAF(5000);
             assert.equal(documentScrollingElement.scrollTop, 0);
         });
 
-        it("G scrolls to bottom", () => {
+        it("Shift+J scrolls to bottom", () => {
             documentScrollingElement.scrollTop = 0;
-            fireKeyDown(makeKeyEvent("KeyG", { shift: true }));
+            fireKeyDown(makeKeyEvent("KeyJ", { shift: true }));
             flushRAF(5000);
             assert.equal(
                 documentScrollingElement.scrollTop,
