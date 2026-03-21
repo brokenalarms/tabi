@@ -1003,3 +1003,27 @@ body {
   color: var(--tabi-color);
   cursor: default;
 }
+
+/* ── Debug page ──────────────────────────────────────────── */
+
+.debug-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #dc2626;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+@media (prefers-color-scheme: dark) {
+  .debug-badge {
+    color: #f87171;
+    background: rgba(239, 68, 68, 0.12);
+  }
+}

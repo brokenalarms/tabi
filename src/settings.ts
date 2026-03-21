@@ -16,7 +16,7 @@ import { loadMarks } from "./modules/QuickMarks";
 import type { MarkMap } from "./modules/QuickMarks";
 import { COMMANDS, COMMAND_CATEGORIES, CATEGORY_LABELS } from "./commands";
 import type { CommandCategory } from "./commands";
-import { DEFAULTS, FORCE_PREMIUM } from "./types";
+import { DEFAULTS, DEBUG, resolvePremiumStatus } from "./types";
 import type { KeyLayout, Theme, KeyBindingMode } from "./types";
 import { PremiumPrompt, PREMIUM_FEATURES } from "./modules/PremiumPrompt";
 
@@ -67,7 +67,7 @@ function text(tag: keyof HTMLElementTagNameMap, className: string, content: stri
 
 // ── Navigation ────────────────────────────────────────────────
 
-type PageId = "statistics" | "quickmarks" | "keylayouts" | "premium";
+type PageId = "statistics" | "quickmarks" | "keylayouts" | "premium" | "debug";
 
 interface NavEntry {
   id: PageId;
@@ -80,6 +80,7 @@ const NAV_ITEMS: NavEntry[] = [
   { id: "quickmarks", label: "Quick Marks", icon: "\ud83d\udccc" },
   { id: "keylayouts", label: "Key Layouts", icon: "\u2328" },
   { id: "premium", label: "Premium", icon: "\u2726" },
+  ...(DEBUG ? [{ id: "debug" as const, label: "Debug", icon: "\ud83d\udee0" }] : []),
 ];
 
 // ── State ─────────────────────────────────────────────────────
@@ -762,6 +763,32 @@ function buildPremiumPage(): HTMLElement {
   return page;
 }
 
+// ── Debug page ────────────────────────────────────────────────
+
+function buildDebugPage(): HTMLElement {
+  const page = el("div", { class: "page", id: "page-debug" });
+
+  const titleRow = el("h2", { class: "page-title" });
+  titleRow.textContent = "Debug";
+  const badge = el("span", { class: "debug-badge", text: "Dev" });
+  titleRow.appendChild(badge);
+  page.appendChild(titleRow);
+
+  page.appendChild(
+    text("p", "section-hint", "Runtime overrides for development. Changes take effect immediately.")
+  );
+
+  page.appendChild(
+    buildToggle("Premium Mode", "Simulate premium entitlement without rebuilding", isPremium, (v) => {
+      isPremium = v;
+      browser.storage.local.set({ isPremium: v, debugPremium: v });
+      refreshPage();
+    })
+  );
+
+  return page;
+}
+
 // ── Sidebar ───────────────────────────────────────────────────
 
 function buildSidebar(): HTMLElement {
@@ -792,6 +819,7 @@ const PAGE_BUILDERS: Record<PageId, () => HTMLElement> = {
   quickmarks: buildQuickMarksPage,
   keylayouts: buildKeyLayoutsPage,
   premium: buildPremiumPage,
+  ...(DEBUG ? { debug: buildDebugPage } : {}),
 };
 
 function render(): void {
@@ -834,9 +862,10 @@ async function init(): Promise<void> {
     "autoNotifications",
     "statistics",
     "quickMarks",
+    ...(DEBUG ? ["debugPremium"] : []),
   ]);
 
-  isPremium = FORCE_PREMIUM || stored.isPremium === true;
+  isPremium = resolvePremiumStatus(stored, DEBUG);
   currentLayout = (stored.keyLayout as KeyLayout) || DEFAULTS.keyLayout;
   currentBindingMode = (stored.keyBindingMode as KeyBindingMode) || DEFAULTS.keyBindingMode;
   currentTheme = (stored.theme as Theme) || DEFAULTS.theme;
@@ -852,7 +881,10 @@ async function init(): Promise<void> {
     if (areaName !== "local") return;
     let needsRefresh = false;
 
-    if (changes.isPremium?.newValue !== undefined) {
+    if (DEBUG && changes.debugPremium?.newValue !== undefined) {
+      isPremium = changes.debugPremium.newValue === true;
+      needsRefresh = true;
+    } else if (!DEBUG && changes.isPremium?.newValue !== undefined) {
       isPremium = changes.isPremium.newValue === true;
       needsRefresh = true;
     }

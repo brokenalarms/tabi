@@ -30,6 +30,13 @@ export const DEBUG: boolean = typeof __TABI_DEBUG__ !== "undefined" ? __TABI_DEB
 declare const __TABI_PREMIUM__: boolean;
 export const FORCE_PREMIUM: boolean = typeof __TABI_PREMIUM__ !== "undefined" ? __TABI_PREMIUM__ : false;
 
+export function resolvePremiumStatus(storage: Record<string, unknown>, debug: boolean): boolean {
+  if (debug) {
+    return storage.debugPremium !== undefined ? (storage.debugPremium as boolean) : true;
+  }
+  return FORCE_PREMIUM || storage.isPremium === true;
+}
+
 export function resolveSettings(storage: Record<string, unknown>): TabiSettings {
   return {
     ...DEFAULTS,
