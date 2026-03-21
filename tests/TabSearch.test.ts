@@ -268,6 +268,34 @@ describe("TabSearch", () => {
             assert.equal((tabSearch as any).scored.length, 4);
             assert.ok((tabSearch as any).scored.every((e: any) => !e.tab.active));
         });
+
+        // Non-premium tab search must render results on first activation
+        it("renders tab results for non-premium users", async () => {
+            // Base: non-premium tabSearch (default in tests) — should show results
+            await tabSearch.activate();
+            const items = env.document.querySelectorAll(".tabi-tab-search-item");
+            assert.equal(items.length, 4, "non-premium should render 4 tab results");
+            const overlay = env.document.querySelector(".tabi-overlay");
+            assert.ok(overlay, "overlay should exist");
+        });
+
+        // Second activation after deactivate must render results again
+        it("renders tab results on second activation", async () => {
+            // First activation works
+            await tabSearch.activate();
+            assert.equal(env.document.querySelectorAll(".tabi-tab-search-item").length, 4);
+
+            // Deactivate
+            tabSearch.deactivate();
+            assert.equal(env.document.querySelector(".tabi-overlay"), null);
+
+            // Second activation must also show results
+            await tabSearch.activate();
+            const items = env.document.querySelectorAll(".tabi-tab-search-item");
+            assert.equal(items.length, 4, "second activation should render 4 tab results");
+            const overlay = env.document.querySelector(".tabi-overlay");
+            assert.ok(overlay, "overlay should exist on second activation");
+        });
     });
 
     describe("keyboard navigation", () => {

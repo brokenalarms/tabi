@@ -4,6 +4,7 @@
 
 import { test, expect } from "@playwright/test";
 import path from "path";
+import fs from "fs";
 
 const HARNESS_PATH = path.resolve(__dirname, "harness.js");
 
@@ -677,5 +678,69 @@ test("glow propagates to sibling <tr> without discovered elements", async ({ pag
   // Row 1 has 1 button, row 2 has none — glow propagates to row 2
   expect(result.hintCount).toBe(2);
   expect(result.glowCount).toBe(2);
+});
+
+// Tab search results container must have visible height in a real layout engine.
+// With flex-basis: 0 in an auto-height flex column, the results collapse to 0px.
+// flex-basis: auto sizes to content first, then shrinks via flex-shrink if needed.
+test("tab search results have visible height", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+
+  const cssDir = path.resolve(__dirname, "../../Tabi/Safari Extension/Resources/styles");
+  const panelCSS = fs.readFileSync(path.join(cssDir, "panel.css"), "utf-8");
+  const tabSearchCSS = fs.readFileSync(path.join(cssDir, "tab-search.css"), "utf-8");
+
+  await page.setContent(`<!DOCTYPE html>
+<html>
+<head><style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { width: 1024px; height: 768px; }
+  ${panelCSS}
+  ${tabSearchCSS}
+</style></head>
+<body></body>
+</html>`);
+
+  await page.evaluate(() => {
+    (window as any).browser = {
+      runtime: {
+        sendMessage(msg: any) {
+          if (msg.command === "queryTabs") {
+            return Promise.resolve([
+              { id: 1, title: "Active Tab", url: "https://example.com", active: true },
+              { id: 2, title: "Google Search", url: "https://google.com", active: false },
+              { id: 3, title: "Stack Overflow", url: "https://stackoverflow.com", active: false },
+              { id: 4, title: "MDN Web Docs", url: "https://developer.mozilla.org", active: false },
+            ]);
+          }
+          return Promise.resolve({ status: "ok" });
+        },
+      },
+    };
+  });
+
+  await page.addScriptTag({ path: HARNESS_PATH });
+
+  const result = await page.evaluate(async () => {
+    const { KeyHandler, TabSearch, Mode } = window.TestHarness;
+    const kh = new KeyHandler();
+    const ts = new TabSearch(kh, false);
+    kh.on("exitToNormal", () => {
+      if (ts.isActive()) ts.deactivate();
+      kh.setMode(Mode.NORMAL);
+    });
+
+    await ts.activate();
+
+    const results = document.querySelector(".tabi-tab-search-results") as HTMLElement;
+    const items = document.querySelectorAll(".tabi-tab-search-item");
+    const resultsHeight = results ? results.getBoundingClientRect().height : 0;
+
+    ts.destroy();
+    return { itemCount: items.length, resultsHeight };
+  });
+
+  expect(result.itemCount).toBe(3);
+  expect(result.resultsHeight).toBeGreaterThan(0);
 });
 
