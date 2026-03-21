@@ -69,7 +69,7 @@ test("settings page renders sidebar with all navigation items", async ({ page })
   await setupSettingsPage(page);
 
   const navItems = await page.locator(".nav-item").allTextContents();
-  for (const label of ["Statistics", "Quick Marks", "Key Layouts", "Premium"]) {
+  for (const label of ["Statistics", "Quick Marks", "Key Layouts", "License"]) {
     expect(navItems.some(item => item.includes(label))).toBe(true);
   }
   expect(navItems).toHaveLength(4);
@@ -92,11 +92,11 @@ test("sidebar shows Free pill when not premium", async ({ page }) => {
   await expect(pill).toHaveClass("premium-pill");
 });
 
-test("sidebar shows Premium pill when premium is active", async ({ page }) => {
+test("sidebar shows Licensed pill when premium is active", async ({ page }) => {
   await setupSettingsPage(page, { isPremium: true });
 
   const pill = page.locator(".premium-pill");
-  await expect(pill).toContainText("Premium");
+  await expect(pill).toContainText("Licensed");
   await expect(pill).toHaveClass(/premium/);
 });
 
@@ -139,7 +139,7 @@ test("clicking disabled premium layout card shows premium prompt", async ({ page
   const overlay = page.locator("[data-tabi-premium-prompt]");
   await expect(overlay).toBeVisible();
   await expect(overlay).toContainText("Left Hand Layout");
-  await expect(overlay).toContainText("Upgrade to Premium");
+  await expect(overlay).toContainText("Purchase License");
   await expect(overlay).toContainText("Maybe later");
 });
 
@@ -154,13 +154,13 @@ test("premium prompt dismiss button removes overlay", async ({ page }) => {
   await expect(overlay).toBeHidden({ timeout: 1000 });
 });
 
-test("premium prompt CTA navigates to Premium page", async ({ page }) => {
+test("premium prompt CTA navigates to license page", async ({ page }) => {
   await setupSettingsPage(page);
 
   await page.locator(".layout-card.disabled", { hasText: "Right Hand" }).click();
   await expect(page.locator("[data-tabi-premium-prompt]")).toBeVisible();
 
-  await page.locator("[data-tabi-premium-prompt] button", { hasText: "Upgrade to Premium" }).click();
+  await page.locator("[data-tabi-premium-prompt] button", { hasText: "Purchase License" }).click();
 
   const activePage = page.locator(".page.active");
   await expect(activePage).toHaveAttribute("id", "page-premium");
@@ -181,7 +181,7 @@ test("statistics page shows gated empty state for non-premium users", async ({ p
   await page.locator(".nav-item", { hasText: "Statistics" }).click();
 
   const activePage = page.locator(".page.active");
-  await expect(activePage).toContainText("Statistics tracking is a premium feature");
+  await expect(activePage).toContainText("Statistics tracking requires a license");
   await expect(activePage.locator(".empty-state-cta")).toBeVisible();
 });
 
@@ -262,7 +262,7 @@ test("quick marks page shows gated state for non-premium users", async ({ page }
   await page.locator(".nav-item", { hasText: "Quick Marks" }).click();
 
   const activePage = page.locator(".page.active");
-  await expect(activePage).toContainText("Quick Marks is a premium feature");
+  await expect(activePage).toContainText("Quick Marks requires a license");
 });
 
 test("quick marks page shows empty state for premium users with no marks", async ({ page }) => {
@@ -335,24 +335,24 @@ test("add-mark form disables save for invalid URL", async ({ page }) => {
 
 // ── Premium page ───────────────────────────────────────────────────
 
-test("premium page shows upgrade CTA for non-premium users", async ({ page }) => {
+test("license page shows purchase CTA for unlicensed users", async ({ page }) => {
   await setupSettingsPage(page);
 
-  await page.locator(".nav-item", { hasText: "Premium" }).click();
+  await page.locator(".nav-item", { hasText: "License" }).click();
 
   const activePage = page.locator(".page.active");
-  await expect(activePage.locator(".premium-status")).toHaveText("Upgrade to Premium");
+  await expect(activePage.locator(".premium-status")).toHaveText("Unlicensed");
   await expect(activePage.locator(".upgrade-btn")).toBeEnabled();
 });
 
-test("premium page shows active status for premium users", async ({ page }) => {
+test("license page shows licensed status without purchase button", async ({ page }) => {
   await setupSettingsPage(page, { isPremium: true });
 
-  await page.locator(".nav-item", { hasText: "Premium" }).click();
+  await page.locator(".nav-item", { hasText: "License" }).click();
 
   const activePage = page.locator(".page.active");
-  await expect(activePage.locator(".premium-status")).toHaveText("You're on Premium");
-  await expect(activePage.locator(".upgrade-btn")).toBeDisabled();
+  await expect(activePage.locator(".premium-status")).toHaveText("Licensed");
+  await expect(activePage.locator(".upgrade-btn")).toHaveCount(0);
 });
 
 // ── Storage reactivity ─────────────────────────────────────────────
@@ -371,8 +371,8 @@ test("settings page re-renders when storage changes externally", async ({ page }
     (window as any).browser.storage.local.set({ isPremium: true });
   });
 
-  // The page should reactively re-render with premium status
-  await expect(pill).toContainText("Premium");
+  // The page should reactively re-render with licensed status
+  await expect(pill).toContainText("Licensed");
 });
 
 // ── Screenshots for visual comparison ─────────────────────────────────

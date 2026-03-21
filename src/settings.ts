@@ -79,7 +79,7 @@ const NAV_ITEMS: NavEntry[] = [
   { id: "statistics", label: "Statistics", icon: "\ud83d\udcca" },
   { id: "quickmarks", label: "Quick Marks", icon: "\ud83d\udccc" },
   { id: "keylayouts", label: "Key Layouts", icon: "\u2328" },
-  { id: "premium", label: "Premium", icon: "\u2726" },
+  { id: "premium", label: "License", icon: "\u2726" },
   ...(DEBUG ? [{ id: "debug" as const, label: "Debug", icon: "\ud83d\udee0" }] : []),
 ];
 
@@ -109,7 +109,7 @@ function buildSegmented(
     if (opt.value === activeValue) btn.classList.add("active");
     if (opt.premium && !isPremium) {
       btn.disabled = true;
-      btn.title = "Premium feature";
+      btn.title = "Requires license";
     }
     container.appendChild(btn);
   }
@@ -273,9 +273,9 @@ function buildStatisticsPage(): HTMLElement {
     const empty = el("div", { class: "empty-state empty-state-gated" });
     empty.appendChild(text("div", "empty-state-icon", "\ud83d\udcca"));
     empty.appendChild(
-      text("div", "empty-state-text", "Statistics tracking is a premium feature. Upgrade to see your usage insights.")
+      text("div", "empty-state-text", "Statistics tracking requires a license. Purchase to see your usage insights.")
     );
-    const emptyBtn = el("button", { class: "upgrade-btn empty-state-cta", text: "Upgrade to Premium" });
+    const emptyBtn = el("button", { class: "upgrade-btn empty-state-cta", text: "Purchase License" });
     emptyBtn.addEventListener("click", () => navigate("premium"));
     empty.appendChild(emptyBtn);
     page.appendChild(empty);
@@ -482,10 +482,10 @@ function buildQuickMarksPage(): HTMLElement {
       text(
         "div",
         "empty-state-text",
-        "Quick Marks is a premium feature. Set marks with m+letter, jump with '+letter."
+        "Quick Marks requires a license. Set marks with m+letter, jump with '+letter."
       )
     );
-    const emptyBtn = el("button", { class: "upgrade-btn empty-state-cta", text: "Upgrade to Premium" });
+    const emptyBtn = el("button", { class: "upgrade-btn empty-state-cta", text: "Purchase License" });
     emptyBtn.addEventListener("click", () => navigate("premium"));
     empty.appendChild(emptyBtn);
     page.appendChild(empty);
@@ -797,12 +797,12 @@ function buildKeyLayoutsPage(): HTMLElement {
 
 function buildPremiumPage(): HTMLElement {
   const page = el("div", { class: "page", id: "page-premium" });
-  page.appendChild(text("h2", "page-title", "Premium"));
+  page.appendChild(text("h2", "page-title", "License"));
 
   const hero = el("div", { class: "premium-hero" });
   hero.appendChild(text("div", "premium-icon", isPremium ? "\u2726" : "\u2728"));
   hero.appendChild(
-    text("div", "premium-status", isPremium ? "You're on Premium" : "Upgrade to Premium")
+    text("div", "premium-status", isPremium ? "Licensed" : "Unlicensed")
   );
   hero.appendChild(
     text(
@@ -810,7 +810,7 @@ function buildPremiumPage(): HTMLElement {
       "premium-subtitle",
       isPremium
         ? "Thanks for supporting tabi! All features unlocked."
-        : "Unlock all layouts, statistics, and quick marks."
+        : "Purchase a license to unlock all features."
     )
   );
   page.appendChild(hero);
@@ -835,11 +835,24 @@ function buildPremiumPage(): HTMLElement {
   }
   page.appendChild(list);
 
-  // CTA button
-  const btn = el("button", { class: isPremium ? "upgrade-btn active-plan" : "upgrade-btn" });
-  btn.textContent = isPremium ? "Active Plan" : "Upgrade to Premium";
-  if (isPremium) btn.disabled = true;
-  page.appendChild(btn);
+  if (!isPremium) {
+    const btn = el("button", { class: "upgrade-btn" });
+    btn.textContent = "Purchase License";
+    page.appendChild(btn);
+    page.appendChild(text("p", "license-hint", "One-time purchase via the App Store"));
+  }
+
+  // Support link
+  const support = el("div", { class: "license-support" });
+  const link = el("a", {
+    href: "https://github.com/anthropics/tabi/issues",
+    class: "license-support-link",
+  });
+  link.textContent = "Report a problem";
+  link.setAttribute("target", "_blank");
+  link.setAttribute("rel", "noopener");
+  support.appendChild(link);
+  page.appendChild(support);
 
   return page;
 }
@@ -878,7 +891,7 @@ function buildSidebar(): HTMLElement {
   const header = el("div", { class: "sidebar-header" });
   header.appendChild(el("h1", { text: "tabi" }));
   const pill = el("span", { class: isPremium ? "premium-pill premium" : "premium-pill" });
-  pill.textContent = isPremium ? "\u2726 Premium" : "Free";
+  pill.textContent = isPremium ? "\u2726 Licensed" : "Free";
   header.appendChild(pill);
   sidebar.appendChild(header);
 

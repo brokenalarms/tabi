@@ -40,7 +40,7 @@ describe("PremiumPrompt", () => {
     prompt.show("quickmarks");
 
     const overlay = document.querySelector("[data-tabi-premium-prompt]");
-    assert.ok(overlay!.textContent!.includes("Upgrade to Premium"));
+    assert.ok(overlay!.textContent!.includes("Purchase License"));
   });
 
   // Verifies that the dismiss link is present.
@@ -96,7 +96,7 @@ describe("PremiumPrompt", () => {
     // Find and click the CTA button
     const overlay = document.querySelector("[data-tabi-premium-prompt]");
     const buttons = overlay!.querySelectorAll("button");
-    const cta = Array.from(buttons).find(b => b.textContent === "Upgrade to Premium");
+    const cta = Array.from(buttons).find(b => b.textContent === "Purchase License");
     assert.ok(cta !== undefined, "CTA button should exist");
 
     cta!.click();

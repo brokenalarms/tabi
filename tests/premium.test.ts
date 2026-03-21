@@ -69,7 +69,7 @@ describe("premium", () => {
       const toast = win.document.querySelector(".tabi-premium-toast");
       assert.notEqual(toast, null);
       assert.ok(toast!.textContent!.includes("Yank mode"));
-      assert.ok(toast!.textContent!.includes("Upgrade"));
+      assert.ok(toast!.textContent!.includes("Purchase"));
     });
   });
 
@@ -81,9 +81,9 @@ describe("premium", () => {
       const toast = win.document.querySelector(".tabi-premium-toast");
       assert.notEqual(toast, null);
       const strong = toast!.querySelector("strong");
-      assert.equal(strong!.textContent, "Tab search is a premium feature");
+      assert.equal(strong!.textContent, "Tab search requires a license");
       const cta = toast!.querySelector(".tabi-premium-cta");
-      assert.equal(cta!.textContent, "Upgrade in the Tabi app");
+      assert.equal(cta!.textContent, "Purchase in the Tabi app");
     });
 
     // Showing a second toast replaces the first (no stacking)
