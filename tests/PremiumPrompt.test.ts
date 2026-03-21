@@ -57,7 +57,7 @@ describe("PremiumPrompt", () => {
     assert.equal(prompt.isVisible(), false);
 
     // Delta: show makes it visible
-    prompt.show("fuzzySearch");
+    prompt.show("tabSearch");
     assert.equal(prompt.isVisible(), true);
 
     // Delta: dismiss makes it not visible

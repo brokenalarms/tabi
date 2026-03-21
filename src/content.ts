@@ -11,6 +11,7 @@ import { HintMode } from "./modules/HintMode";
 import { TabSearch } from "./modules/TabSearch";
 import { HelpOverlay } from "./modules/HelpOverlay";
 import { setPremiumStatus } from "./premium";
+import { PremiumPrompt } from "./modules/PremiumPrompt";
 import { QuickMarks } from "./modules/QuickMarks";
 import { Statistics } from "./modules/Statistics";
 import { StatsNotification } from "./modules/StatsNotification";
@@ -106,8 +107,14 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   const hintMode = new HintMode(keyHandler);
   hintMode.wireCommands();
 
-  // Tab search overlay (fuzzy matching is premium)
-  const tabSearch = new TabSearch(keyHandler, resolved.isPremium);
+  // Tab search overlay (premium feature)
+  const premiumPrompt = new PremiumPrompt();
+  let tabSearch: TabSearch | null = null;
+  if (resolved.isPremium) {
+    tabSearch = new TabSearch(keyHandler);
+  } else {
+    keyHandler.on("openTabSearch", () => premiumPrompt.show("tabSearch"));
+  }
 
   // Help overlay
   const helpOverlay = new HelpOverlay(keyHandler, resolved.keyLayout);
@@ -133,7 +140,7 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
       if (type === "yank") statistics!.record("linksYanked");
       else statistics!.record("hintsClicked");
     };
-    tabSearch.onAction = () => statistics!.record("tabsSearched");
+    if (tabSearch) tabSearch.onAction = () => statistics!.record("tabsSearched");
     scrollController.onAction = () => statistics!.record("scrollActions");
   }
 
@@ -157,7 +164,14 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
     if (changes.isPremium?.newValue !== undefined) {
       setPremiumStatus(changes.isPremium.newValue as boolean);
       resolved.isPremium = changes.isPremium.newValue as boolean;
-      tabSearch.setPremium(resolved.isPremium);
+      if (resolved.isPremium && !tabSearch) {
+        keyHandler.off("openTabSearch");
+        tabSearch = new TabSearch(keyHandler);
+      } else if (!resolved.isPremium && tabSearch) {
+        tabSearch.destroy();
+        tabSearch = null;
+        keyHandler.on("openTabSearch", () => premiumPrompt.show("tabSearch"));
+      }
       if (resolved.isPremium && !quickMarks) {
         quickMarks = new QuickMarks(keyHandler);
       } else if (!resolved.isPremium && quickMarks) {
@@ -176,11 +190,11 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
           if (type === "yank") statistics!.record("linksYanked");
           else statistics!.record("hintsClicked");
         };
-        tabSearch.onAction = () => statistics!.record("tabsSearched");
+        if (tabSearch) tabSearch.onAction = () => statistics!.record("tabsSearched");
         scrollController.onAction = () => statistics!.record("scrollActions");
       } else if (!resolved.isPremium && statistics) {
         hintMode.onAction = null;
-        tabSearch.onAction = null;
+        if (tabSearch) tabSearch.onAction = null;
         scrollController.onAction = null;
         statistics = null;
         if (statsNotification) {
@@ -197,7 +211,7 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
       hintMode.deactivate();
       return;
     }
-    if (keyHandler.getMode() === Mode.TAB_SEARCH && tabSearch.isActive()) {
+    if (keyHandler.getMode() === Mode.TAB_SEARCH && tabSearch && tabSearch.isActive()) {
       tabSearch.deactivate();
       return;
     }
@@ -282,7 +296,7 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   // Clean up all mode overlays on navigation (page unload)
   function cleanupModes(): void {
     if (hintMode.isActive()) hintMode.deactivate();
-    if (tabSearch.isActive()) tabSearch.deactivate();
+    if (tabSearch && tabSearch.isActive()) tabSearch.deactivate();
     if (quickMarks && quickMarks.isActive()) quickMarks.deactivate();
   }
   window.addEventListener("beforeunload", cleanupModes);

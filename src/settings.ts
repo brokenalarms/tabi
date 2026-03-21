@@ -818,7 +818,7 @@ function buildPremiumPage(): HTMLElement {
   // Feature list — sourced from the shared feature catalog
   const features = [
     { icon: PREMIUM_FEATURES.leftHand.icon, name: "One-handed Layouts", desc: PREMIUM_FEATURES.leftHand.description },
-    { icon: PREMIUM_FEATURES.fuzzySearch.icon, name: PREMIUM_FEATURES.fuzzySearch.name, desc: PREMIUM_FEATURES.fuzzySearch.description },
+    { icon: PREMIUM_FEATURES.tabSearch.icon, name: PREMIUM_FEATURES.tabSearch.name, desc: PREMIUM_FEATURES.tabSearch.description },
     { icon: PREMIUM_FEATURES.statistics.icon, name: PREMIUM_FEATURES.statistics.name, desc: PREMIUM_FEATURES.statistics.description },
     { icon: PREMIUM_FEATURES.quickmarks.icon, name: PREMIUM_FEATURES.quickmarks.name, desc: PREMIUM_FEATURES.quickmarks.description },
   ];
