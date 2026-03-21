@@ -918,6 +918,7 @@ body {
   flex-direction: column;
   gap: 5px;
   margin-top: 12px;
+  align-items: center;
 }
 
 .full-kb-row {

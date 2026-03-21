@@ -538,9 +538,22 @@ function buildQuickMarksPage(): HTMLElement {
 // QWERTY keyboard rows for visualization
 const KB_ROWS = [
   ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
-  ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
-  ["z", "x", "c", "v", "b", "n", "m"],
+  ["a", "s", "d", "f", "g", "h", "j", "k", "l", ";"],
+  ["z", "x", "c", "v", "b", "n", "m", ",", ".", "/"],
 ];
+
+const CODE_TO_DISPLAY: Record<string, string> = {
+  Semicolon: ";",
+  Period: ".",
+  Comma: ",",
+  Slash: "/",
+  Quote: "'",
+};
+
+function codeToKey(code: string): string | null {
+  if (code.startsWith("Key")) return code.slice(3).toLowerCase();
+  return CODE_TO_DISPLAY[code] ?? null;
+}
 
 function getKeyCategories(preset: PresetMeta): Map<string, CommandCategory> {
   const keys = new Map<string, CommandCategory>();
@@ -549,12 +562,9 @@ function getKeyCategories(preset: PresetMeta): Map<string, CommandCategory> {
   for (const binding of preset.bindings) {
     if (binding.sequence.includes(" ")) continue;
     if (binding.sequence.startsWith("Shift-")) continue;
-    const code = binding.sequence;
-    if (code.startsWith("Key")) {
-      const key = code.slice(3).toLowerCase();
-      const cat = COMMAND_CATEGORIES[binding.command];
-      if (cat) keys.set(key, cat);
-    }
+    const key = codeToKey(binding.sequence);
+    const cat = COMMAND_CATEGORIES[binding.command];
+    if (key && cat) keys.set(key, cat);
   }
 
   // Shift bindings (fill gaps)
@@ -562,11 +572,9 @@ function getKeyCategories(preset: PresetMeta): Map<string, CommandCategory> {
     if (binding.sequence.includes(" ")) continue;
     if (!binding.sequence.startsWith("Shift-")) continue;
     const code = binding.sequence.replace(/^Shift-/, "");
-    if (code.startsWith("Key")) {
-      const key = code.slice(3).toLowerCase();
-      const cat = COMMAND_CATEGORIES[binding.command];
-      if (cat && !keys.has(key)) keys.set(key, cat);
-    }
+    const key = codeToKey(code);
+    const cat = COMMAND_CATEGORIES[binding.command];
+    if (key && cat && !keys.has(key)) keys.set(key, cat);
   }
 
   // Sequence keys (fill remaining gaps)
@@ -574,11 +582,9 @@ function getKeyCategories(preset: PresetMeta): Map<string, CommandCategory> {
     if (!binding.sequence.includes(" ")) continue;
     for (const part of binding.sequence.split(" ")) {
       const code = part.replace(/^Shift-/, "");
-      if (code.startsWith("Key")) {
-        const key = code.slice(3).toLowerCase();
-        const cat = COMMAND_CATEGORIES[binding.command];
-        if (cat && !keys.has(key)) keys.set(key, cat);
-      }
+      const key = codeToKey(code);
+      const cat = COMMAND_CATEGORIES[binding.command];
+      if (key && cat && !keys.has(key)) keys.set(key, cat);
     }
   }
 
