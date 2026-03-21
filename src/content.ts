@@ -110,7 +110,7 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
   const tabSearch = new TabSearch(keyHandler, resolved.isPremium);
 
   // Help overlay
-  const helpOverlay = new HelpOverlay(keyHandler);
+  const helpOverlay = new HelpOverlay(keyHandler, resolved.keyLayout);
 
   // Quick marks (premium feature)
   let quickMarks: QuickMarks | null = null;
@@ -148,6 +148,7 @@ function initialize(resolved: ReturnType<typeof resolveSettings>): void {
       const layout = changes.keyLayout.newValue as KeyLayout;
       if (!isLayoutPremium(layout) || resolved.isPremium) {
         keyHandler.setLayout(layout);
+        helpOverlay.setLayout(layout);
       }
     }
     if (changes.theme?.newValue) {

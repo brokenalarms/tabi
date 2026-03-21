@@ -14,6 +14,47 @@ export const PREMIUM_COMMANDS = new Set([
   "jumpMark",
 ]);
 
+export type CommandCategory = "hints" | "scroll" | "page" | "tabs" | "actions" | "marks";
+
+export const COMMAND_CATEGORIES: Record<string, CommandCategory> = {
+  activateHints: "hints",
+  multiOpen: "hints",
+  yankLink: "hints",
+  scrollDown: "scroll",
+  scrollUp: "scroll",
+  scrollLeft: "scroll",
+  scrollRight: "scroll",
+  scrollHalfPageDown: "page",
+  scrollHalfPageUp: "page",
+  scrollToBottom: "page",
+  scrollToTop: "page",
+  createTab: "tabs",
+  openTabSearch: "tabs",
+  closeTab: "tabs",
+  restoreTab: "tabs",
+  tabLeft: "tabs",
+  tabRight: "tabs",
+  tabNext: "tabs",
+  tabPrev: "tabs",
+  goBack: "actions",
+  goForward: "actions",
+  pageRefresh: "actions",
+  showHelp: "actions",
+  focusInput: "actions",
+  goUpUrl: "actions",
+  setMark: "marks",
+  jumpMark: "marks",
+};
+
+export const CATEGORY_LABELS: { cat: CommandCategory; label: string }[] = [
+  { cat: "hints", label: "Hints" },
+  { cat: "scroll", label: "Scroll" },
+  { cat: "page", label: "Page" },
+  { cat: "tabs", label: "Tabs" },
+  { cat: "actions", label: "Actions" },
+  { cat: "marks", label: "Marks" },
+];
+
 export const COMMANDS: Record<string, string> = {
   scrollDown: "Scroll down",
   scrollUp: "Scroll up",

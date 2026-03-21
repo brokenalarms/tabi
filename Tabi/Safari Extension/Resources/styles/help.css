@@ -4,6 +4,7 @@
     right: 16px;
     width: fit-content;
     max-width: 90vw;
+    max-height: calc(100vh - 32px);
     display: flex;
     flex-direction: column;
 }
@@ -16,43 +17,58 @@
     border-bottom: 1px solid var(--tabi-panel-border);
 }
 
+.tabi-help-body {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 20px;
+    padding: 8px 14px;
+    overflow-y: auto;
+}
+
+.tabi-help-section {
+    flex: 0 0 auto;
+    min-width: 140px;
+}
+
+.tabi-help-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 4px 0 2px;
+    color: rgb(var(--cat));
+}
+
 .tabi-help-grid {
     display: grid;
     grid-template-columns: auto 1fr;
     gap: 0;
-    padding: 4px 0;
 }
 
 .tabi-help-row {
     display: contents;
 }
 
-.tabi-help-row > * {
-    transition: background 0.1s;
-}
-
-.tabi-help-row:hover > * {
-    background: var(--tabi-help-row-hover);
-}
-
 .tabi-help-key {
     font-family: "SF Mono", Menlo, monospace;
     font-size: 11px;
+    font-weight: 600;
     line-height: 1.4;
     white-space: nowrap;
-    color: var(--tabi-help-key-color);
-    background: var(--tabi-help-key-bg);
-    border: 1px solid var(--tabi-help-key-border);
-    border-radius: 5px;
-    padding: 3px 8px;
-    margin: 3px 10px 3px 14px;
-    min-width: 24px;
+    display: inline-block;
+    padding: 1px 6px;
+    margin: 2px 8px 2px 0;
+    min-width: 18px;
     text-align: center;
+    border-radius: 4px;
+    background: rgb(var(--cat) / 0.1);
+    border: 1px solid rgb(var(--cat) / 0.2);
+    color: rgb(var(--cat));
 }
 
 .tabi-help-desc {
-    font-size: 13px;
-    padding: 4px 14px 4px 8px;
+    font-size: 12px;
+    padding: 2px 0;
     display: flex;
     align-items: center;
 }
@@ -71,4 +87,21 @@
     padding: 6px 14px;
     border-top: 1px solid var(--tabi-panel-border);
     margin: 0;
+}
+
+/* Category colors — shared with settings page */
+.tabi-help-modal .cat-hints { --cat: 245 158 11; }
+.tabi-help-modal .cat-scroll { --cat: 16 185 129; }
+.tabi-help-modal .cat-page { --cat: 56 189 248; }
+.tabi-help-modal .cat-tabs { --cat: 10 132 255; }
+.tabi-help-modal .cat-actions { --cat: 168 85 247; }
+.tabi-help-modal .cat-marks { --cat: 236 72 153; }
+
+@media (prefers-color-scheme: light) {
+    .tabi-help-modal .cat-hints { --cat: 217 119 6; }
+    .tabi-help-modal .cat-scroll { --cat: 5 150 105; }
+    .tabi-help-modal .cat-page { --cat: 8 145 178; }
+    .tabi-help-modal .cat-tabs { --cat: 37 99 235; }
+    .tabi-help-modal .cat-actions { --cat: 124 58 237; }
+    .tabi-help-modal .cat-marks { --cat: 219 39 119; }
 }

@@ -14,7 +14,8 @@ import { SECONDS_PER_ACTION } from "./modules/constants";
 import type { StatCounters } from "./modules/Statistics";
 import { loadMarks } from "./modules/QuickMarks";
 import type { MarkMap } from "./modules/QuickMarks";
-import { COMMANDS } from "./commands";
+import { COMMANDS, COMMAND_CATEGORIES, CATEGORY_LABELS } from "./commands";
+import type { CommandCategory } from "./commands";
 import { DEFAULTS, FORCE_PREMIUM } from "./types";
 import type { KeyLayout, Theme, KeyBindingMode } from "./types";
 import { PremiumPrompt, PREMIUM_FEATURES } from "./modules/PremiumPrompt";
@@ -451,47 +452,6 @@ function buildQuickMarksPage(): HTMLElement {
 }
 
 // ── Key Layouts page ──────────────────────────────────────────
-
-type CommandCategory = "hints" | "scroll" | "page" | "tabs" | "actions" | "marks";
-
-const COMMAND_CATEGORIES: Record<string, CommandCategory> = {
-  activateHints: "hints",
-  multiOpen: "hints",
-  yankLink: "hints",
-  scrollDown: "scroll",
-  scrollUp: "scroll",
-  scrollLeft: "scroll",
-  scrollRight: "scroll",
-  scrollHalfPageDown: "page",
-  scrollHalfPageUp: "page",
-  scrollToBottom: "page",
-  scrollToTop: "page",
-  createTab: "tabs",
-  openTabSearch: "tabs",
-  closeTab: "tabs",
-  restoreTab: "tabs",
-  tabLeft: "tabs",
-  tabRight: "tabs",
-  tabNext: "tabs",
-  tabPrev: "tabs",
-  goBack: "actions",
-  goForward: "actions",
-  pageRefresh: "actions",
-  showHelp: "actions",
-  focusInput: "actions",
-  goUpUrl: "actions",
-  setMark: "marks",
-  jumpMark: "marks",
-};
-
-const CATEGORY_LABELS: { cat: CommandCategory; label: string }[] = [
-  { cat: "hints", label: "Hints" },
-  { cat: "scroll", label: "Scroll" },
-  { cat: "page", label: "Page" },
-  { cat: "tabs", label: "Tabs" },
-  { cat: "actions", label: "Actions" },
-  { cat: "marks", label: "Marks" },
-];
 
 // QWERTY keyboard rows for visualization
 const KB_ROWS = [
