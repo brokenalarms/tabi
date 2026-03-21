@@ -8,6 +8,7 @@
     max-height: 60vh;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
 }
 
 .tabi-tab-search-input-wrap {
@@ -45,7 +46,8 @@
 
 .tabi-tab-search-results {
     overflow-y: auto;
-    flex: 1 1 auto;
+    flex: 1 1 0;
+    min-height: 0;
 }
 
 .tabi-tab-search-item {

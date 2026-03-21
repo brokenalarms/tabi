@@ -15,7 +15,7 @@ function makeElement(opts: Record<string, any> = {}) {
         overflowX: opts.overflowX || "visible",
         overflowY: opts.overflowY || "visible",
     };
-    return {
+    const el = {
         tagName: opts.tag || "DIV",
         scrollWidth: opts.scrollWidth || 100,
         scrollHeight: opts.scrollHeight || 5000,
@@ -25,7 +25,16 @@ function makeElement(opts: Record<string, any> = {}) {
         scrollTop: opts.scrollTop || 0,
         parentElement: opts.parent || null,
         _style: style,
+        scrollTo(options: { top?: number; left?: number }) {
+            if (options.top !== undefined) el.scrollTop = options.top;
+            if (options.left !== undefined) el.scrollLeft = options.left;
+        },
+        scrollBy(options: { top?: number; left?: number }) {
+            if (options.top !== undefined) el.scrollTop += options.top;
+            if (options.left !== undefined) el.scrollLeft += options.left;
+        },
     };
+    return el;
 }
 
 let capturedListeners: Record<string, Function[]>,

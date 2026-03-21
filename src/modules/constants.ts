@@ -58,8 +58,6 @@ export const ScrollConfig = {
   scrollStep: 36,
   /** Smoothing time constant (ms) for deceleration after key release */
   smoothTimeMs: 120,
-  /** Duration (ms) for commanded scrolls (d/u, gg/G) — ease-in-out curve */
-  scrollDurationMs: 250,
   /** Snap threshold (px) — stop animating when this close to target */
   snapThreshold: 0.5,
 };
