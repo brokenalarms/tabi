@@ -103,6 +103,8 @@ export class TabSearch {
   private scored: ScoredEntry[];
   private selectedIndex: number;
   private readonly onInputBound: () => void;
+  private savedScrollX: number;
+  private savedScrollY: number;
   /** Optional callback fired when a tab switch is executed. */
   onAction: (() => void) | null;
 
@@ -116,6 +118,8 @@ export class TabSearch {
     this.scored = [];
     this.selectedIndex = 0;
     this.onInputBound = this.handleInput.bind(this);
+    this.savedScrollX = 0;
+    this.savedScrollY = 0;
     this.onAction = null;
     this.wireCommands();
   }
@@ -125,6 +129,8 @@ export class TabSearch {
   async activate(): Promise<void> {
     if (this.active) return;
     this.active = true;
+    this.savedScrollX = window.scrollX;
+    this.savedScrollY = window.scrollY;
     this.keyHandler.setMode(Mode.TAB_SEARCH);
     this.tabs = await this.fetchTabs();
     const nonActive = this.tabs.filter(t => !t.active);
@@ -150,6 +156,7 @@ export class TabSearch {
     this.tabs = [];
     this.scored = [];
     this.selectedIndex = 0;
+    window.scrollTo(this.savedScrollX, this.savedScrollY);
     this.keyHandler.setMode(Mode.NORMAL);
   }
 

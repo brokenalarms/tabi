@@ -35,7 +35,7 @@ export const PREMIUM_FEATURES: Record<string, PremiumFeature> = {
   tabSearch: {
     name: "Tab Search",
     icon: "\ud83d\udd0d",
-    description: "Fuzzy tab search to find and switch tabs instantly.",
+    description: "Get fuzzy tab search by signing up for premium.",
   },
   notifications: {
     name: "Weekly Stats Notification",

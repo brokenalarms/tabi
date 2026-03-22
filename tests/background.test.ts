@@ -453,6 +453,50 @@ describe("background.ts tab management", () => {
             assert.equal(activatedTabId, null);
             assert.equal(createdTabs.length, 0);
         });
+
+        // Verifies that URL matching ignores query params when reuse is enabled
+        it("matches tab ignoring query params", async () => {
+            // Tab 3 has url https://example.com/3, mark url has query params
+            const sender = makeSender(1);
+            const result = await handleCommand("jumpToMark", sender, {
+                command: "jumpToMark",
+                url: "https://example.com/3?q=search",
+                scrollY: 0,
+                reuseTab: true,
+            });
+            assert.equal((result as any).status, "ok");
+            assert.equal((result as any).sameTab, false);
+            assert.equal(activatedTabId, 3);
+            assert.equal(createdTabs.length, 0);
+        });
+
+        // Verifies that reuseTab=false always opens a new tab
+        it("opens new tab when reuseTab is false even if URL matches", async () => {
+            const sender = makeSender(1);
+            const result = await handleCommand("jumpToMark", sender, {
+                command: "jumpToMark",
+                url: "https://example.com/3",
+                scrollY: 0,
+                reuseTab: false,
+            });
+            assert.equal((result as any).status, "ok");
+            assert.equal((result as any).sameTab, false);
+            assert.equal(activatedTabId, null);
+            assert.equal(createdTabs.length, 1);
+        });
+
+        // Verifies that sameTab matches the current sender tab ignoring query params
+        it("returns sameTab when sender matches via origin+pathname", async () => {
+            const sender = { tab: { id: 2, url: "https://example.com/2?foo=bar" } };
+            const result = await handleCommand("jumpToMark", sender, {
+                command: "jumpToMark",
+                url: "https://example.com/2",
+                scrollY: 0,
+                reuseTab: true,
+            });
+            assert.equal((result as any).status, "ok");
+            assert.equal((result as any).sameTab, true);
+        });
     });
 
     describe("tab history navigation", () => {

@@ -77,7 +77,7 @@
     --tabi-hint-bar-glow: rgba(110, 192, 201, 0.15);
 }
 
-/* ── Multi-select mode hint theme (green) ────────────────────────────── */
+/* ── Batch mode hint theme (green) ───────────────────────────────────── */
 
 .tabi-hint-overlay[data-hint-mode="multi"] .tabi-hint {
     --tabi-hint-bg: linear-gradient(to bottom, #85ff9a, #42d65a);
@@ -112,6 +112,7 @@
     --tabi-panel-color: #f0f0f0;
     --tabi-panel-border: rgba(255, 255, 255, 0.08);
     --tabi-panel-muted: rgba(255, 255, 255, 0.4);
+    color-scheme: dark;
 }
 
 /* ── Mode bar overrides ───────────────────────────────────────────────── */
@@ -162,6 +163,7 @@
         --tabi-panel-color: #1a1a1a;
         --tabi-panel-border: rgba(0, 0, 0, 0.08);
         --tabi-panel-muted: rgba(0, 0, 0, 0.4);
+        color-scheme: light;
     }
 
     .tabi-mode-bar {

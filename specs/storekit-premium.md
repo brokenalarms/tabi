@@ -93,7 +93,6 @@ Each premium feature calls `guardPremium()` at its entry point:
 - StoreKit purchase flow works in sandbox environment
 - Premium status persists across app/extension restarts
 - Free users see upgrade toast when triggering premium features (not on every keystroke — only on mode entry)
-- Free tab search still works with basic prefix/substring scoring
 - Free hint mode works normally (no yank, no multi)
 - Premium users see no toasts, all features unlocked
 - Graceful degradation: if native messaging fails, default to free (never lock out incorrectly)

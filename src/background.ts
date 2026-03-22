@@ -13,6 +13,15 @@ type Command =
 
 const APP_BUNDLE_ID = "com.brokenalarms.tabi";
 
+function urlOriginPath(raw: string): string {
+  try {
+    const u = new URL(raw);
+    return u.origin + u.pathname;
+  } catch {
+    return raw;
+  }
+}
+
 interface TabInfo {
   id: number;
   title: string;
@@ -279,28 +288,30 @@ export async function handleCommand(command: Command, sender: MessageSender, mes
     case "jumpToMark": {
       const url = message && typeof message.url === "string" ? message.url : undefined;
       const scrollY = message && typeof message.scrollY === "number" ? message.scrollY : 0;
+      const reuseTab = message && typeof message.reuseTab === "boolean" ? message.reuseTab : true;
       if (!url) break;
 
-      // Check if the current tab already has this URL
-      if (sender.tab && sender.tab.url === url) {
-        return { status: "ok", sameTab: true } as CommandResponse;
-      }
+      if (reuseTab) {
+        // Strip query params for relaxed URL matching
+        const markBase = urlOriginPath(url);
 
-      // Find an existing tab with this URL
-      const tabs = await browser.tabs.query({ currentWindow: true });
-      const existing = tabs.find(t => t.url === url);
-      if (existing) {
-        await browser.tabs.update(existing.id, { active: true });
-        // Send scroll restoration to the target tab
-        try {
-          await browser.tabs.sendMessage(existing.id, { command: "restoreScroll", scrollY });
-        } catch (_) {
-          // Content script may not be loaded yet
+        if (sender.tab && sender.tab.url && urlOriginPath(sender.tab.url).startsWith(markBase)) {
+          return { status: "ok", sameTab: true } as CommandResponse;
         }
-        return { status: "ok", sameTab: false } as CommandResponse;
+
+        const tabs = await browser.tabs.query({ currentWindow: true });
+        const existing = tabs.find(t => t.url !== undefined && urlOriginPath(t.url).startsWith(markBase));
+        if (existing) {
+          await browser.tabs.update(existing.id, { active: true });
+          try {
+            await browser.tabs.sendMessage(existing.id, { command: "restoreScroll", scrollY });
+          } catch (_) {
+            // Content script may not be loaded yet
+          }
+          return { status: "ok", sameTab: false } as CommandResponse;
+        }
       }
 
-      // No existing tab — open a new one
       await browser.tabs.create({ url });
       return { status: "ok", sameTab: false } as CommandResponse;
     }

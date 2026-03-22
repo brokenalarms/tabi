@@ -126,8 +126,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 22px;
+    min-width: 22px;
     height: 22px;
+    padding: 0 4px;
     border-radius: 4px;
     background: var(--tabi-mark-label-bg, rgba(168, 120, 255, 0.2));
     color: var(--tabi-mark-label-color, #c4a0ff);

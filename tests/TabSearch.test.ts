@@ -155,6 +155,29 @@ describe("TabSearch", () => {
             assert.equal(overlay, null, "overlay should be removed from DOM");
         });
 
+        // Deactivating tab search must restore the page scroll position
+        // to exactly where it was before the overlay was opened.
+        it("preserves scroll position on deactivate", async () => {
+            let mockScrollX = 0;
+            let mockScrollY = 500;
+            Object.defineProperty(env.window, "scrollX", { get: () => mockScrollX, configurable: true });
+            Object.defineProperty(env.window, "scrollY", { get: () => mockScrollY, configurable: true });
+            const scrollCalls: [number, number][] = [];
+            (env.window as any).scrollTo = (x: number, y: number) => {
+                scrollCalls.push([x, y]);
+                mockScrollX = x;
+                mockScrollY = y;
+            };
+
+            await tabSearch.activate();
+            // Simulate browser scroll jump (focus change moves scroll to top)
+            mockScrollY = 0;
+
+            tabSearch.deactivate();
+            const lastCall = scrollCalls[scrollCalls.length - 1];
+            assert.deepEqual(lastCall, [0, 500], "scroll should be restored to pre-activation position");
+        });
+
         it("ignores double activate", async () => {
             await tabSearch.activate();
             await tabSearch.activate();

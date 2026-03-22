@@ -73,6 +73,8 @@ export const BASE_CHAR_SCORE = 1;
 
 // ── Mark mode ──────────────────────────────────────────────
 export const MARK_PANEL_DELAY_MS = 400;
+export const MARK_CONFIRM_DURATION_MS = 2000;
+export const MARK_JUMP_DEBOUNCE_MS = 300;
 
 // ── Toast / notification timing ─────────────────────────────
 export const PREMIUM_TOAST_DURATION_MS = 5000;

@@ -12,8 +12,8 @@ import {
 } from "./modules/Statistics";
 import { SECONDS_PER_ACTION } from "./modules/constants";
 import type { StatCounters } from "./modules/Statistics";
-import { loadMarks } from "./modules/QuickMarks";
-import type { MarkMap } from "./modules/QuickMarks";
+import { loadMarks, loadSettings } from "./modules/QuickMarks";
+import type { MarkMap, QuickMarkSettings } from "./modules/QuickMarks";
 import { COMMANDS, COMMAND_CATEGORIES, CATEGORY_LABELS } from "./commands";
 import type { CommandCategory } from "./commands";
 import { DEFAULTS, DEBUG, resolvePremiumStatus } from "./types";
@@ -67,7 +67,8 @@ function text(tag: keyof HTMLElementTagNameMap, className: string, content: stri
 
 // ── Navigation ────────────────────────────────────────────────
 
-type PageId = "statistics" | "quickmarks" | "keylayouts" | "premium" | "debug";
+type CorePageId = "statistics" | "quickmarks" | "keylayouts" | "premium";
+type PageId = CorePageId | "debug";
 
 interface NavEntry {
   id: PageId;
@@ -94,6 +95,7 @@ let animate = DEFAULTS.animate;
 let autoNotifications = DEFAULTS.autoNotifications;
 let counters: StatCounters = { hintsClicked: 0, linksYanked: 0, tabsSearched: 0, scrollActions: 0 };
 let marks: MarkMap = {};
+let markSettings: QuickMarkSettings = { reuseTab: true };
 const premiumPrompt = new PremiumPrompt();
 
 // ── Page builders ─────────────────────────────────────────────
@@ -389,7 +391,7 @@ function buildStatisticsPage(): HTMLElement {
 
 // ── Quick Marks page ──────────────────────────────────────────
 
-function usedMarkLetters(): Set<string> {
+function usedMarkLabels(): Set<string> {
   return new Set(Object.keys(marks));
 }
 
@@ -399,7 +401,7 @@ function buildAddMarkForm(): HTMLElement {
   const letterInput = el("input", {
     class: "add-mark-letter",
     type: "text",
-    maxlength: "1",
+    maxlength: "2",
     placeholder: "a",
   });
 
@@ -421,9 +423,9 @@ function buildAddMarkForm(): HTMLElement {
   const errorEl = el("div", { class: "add-mark-error" });
 
   function validate(): string | null {
-    const letter = letterInput.value.toLowerCase();
-    if (!letter || letter < "a" || letter > "z") return "Letter must be a\u2013z";
-    if (usedMarkLetters().has(letter)) return `Mark "${letter}" already exists`;
+    const label = letterInput.value.toLowerCase();
+    if (!label || !/^[a-z]{1,2}$/.test(label)) return "Label must be 1\u20132 letters (a\u2013z)";
+    if (usedMarkLabels().has(label)) return `Mark "${label}" already exists`;
     const url = urlInput.value.trim();
     if (!url) return "URL is required";
     try { new URL(url); } catch { return "Invalid URL"; }
@@ -437,7 +439,7 @@ function buildAddMarkForm(): HTMLElement {
   }
 
   letterInput.addEventListener("input", () => {
-    letterInput.value = letterInput.value.toLowerCase().replace(/[^a-z]/g, "");
+    letterInput.value = letterInput.value.toLowerCase().replace(/[^a-z]/g, "").slice(0, 2);
     updateState();
   });
   urlInput.addEventListener("input", updateState);
@@ -449,10 +451,10 @@ function buildAddMarkForm(): HTMLElement {
       errorEl.textContent = err;
       return;
     }
-    const letter = letterInput.value.toLowerCase();
+    const label = letterInput.value.toLowerCase();
     const url = urlInput.value.trim();
     const title = titleInput.value.trim() || url;
-    marks[letter] = { url, scrollY: 0, title };
+    marks[label] = { url, scrollY: 0, title };
     await browser.storage.local.set({ quickMarks: marks });
     refreshPage();
   });
@@ -496,8 +498,22 @@ function buildQuickMarksPage(): HTMLElement {
   }
 
   page.appendChild(
-    text("p", "section-hint", "Set marks with m + letter, jump with ' + letter. Marks persist across sessions.")
+    text("p", "section-hint", "Set marks with m + label + Enter, jump with ' + label. Labels are 1\u20132 characters. Marks persist across sessions.")
   );
+
+  // Reuse-tab toggle
+  const reuseSection = el("div", { class: "setting-row" });
+  const reuseLabel = el("label", { class: "setting-label" });
+  reuseLabel.textContent = "Reuse existing tab when jumping to mark";
+  const reuseCheck = el("input", { type: "checkbox" }) as HTMLInputElement;
+  reuseCheck.checked = markSettings.reuseTab;
+  reuseCheck.addEventListener("change", async () => {
+    markSettings = { ...markSettings, reuseTab: reuseCheck.checked };
+    await browser.storage.local.set({ quickMarkSettings: markSettings });
+  });
+  reuseLabel.prepend(reuseCheck);
+  reuseSection.appendChild(reuseLabel);
+  page.appendChild(reuseSection);
 
   const entries = Object.entries(marks).sort(([a], [b]) => a.localeCompare(b));
 
@@ -508,10 +524,20 @@ function buildQuickMarksPage(): HTMLElement {
     page.appendChild(empty);
   } else {
     const grid = el("div", { class: "marks-grid" });
-    for (const [letter, mark] of entries) {
+    for (const [label, mark] of entries) {
       if (!mark) continue;
       const card = el("div", { class: "mark-card" });
-      card.appendChild(text("span", "mark-letter", letter));
+
+      if (mark.favicon) {
+        const img = el("img", { class: "mark-favicon" }) as HTMLImageElement;
+        img.src = mark.favicon;
+        img.width = 16;
+        img.height = 16;
+        img.alt = "";
+        card.appendChild(img);
+      }
+
+      card.appendChild(text("span", "mark-letter", label));
 
       const info = el("div", { class: "mark-info" });
       info.appendChild(text("div", "mark-title", mark.title || "Untitled"));
@@ -520,7 +546,7 @@ function buildQuickMarksPage(): HTMLElement {
 
       const deleteBtn = el("button", { class: "mark-delete", title: "Delete mark", text: "\u00d7" });
       deleteBtn.addEventListener("click", async () => {
-        delete marks[letter];
+        delete marks[label];
         await browser.storage.local.set({ quickMarks: marks });
         refreshPage();
       });
@@ -820,52 +846,68 @@ function buildKeyLayoutsPage(): HTMLElement {
 
 function buildPremiumPage(): HTMLElement {
   const page = el("div", { class: "page", id: "page-premium" });
-  page.appendChild(text("h2", "page-title", "License"));
+  page.appendChild(text("h1", "page-title", "License"));
 
-  const hero = el("div", { class: "premium-hero" });
-  hero.appendChild(text("div", "premium-icon", isPremium ? "\u2726" : "\u2728"));
-  hero.appendChild(
-    text("div", "premium-status", isPremium ? "Licensed" : "Unlicensed")
+  const header = el("div", { class: "premium-header" });
+  header.appendChild(
+    text("div", isPremium ? "premium-status licensed" : "premium-status free",
+      isPremium ? "Licensed" : "Unlicensed")
   );
-  hero.appendChild(
-    text(
-      "div",
-      "premium-subtitle",
+  header.appendChild(
+    text("p", "premium-tagline",
       isPremium
         ? "Thanks for supporting tabi! All features unlocked."
-        : "Purchase a license to unlock all features."
-    )
+        : "Purchase a license to unlock all features.")
   );
-  page.appendChild(hero);
+  page.appendChild(header);
 
-  // Feature list — sourced from the shared feature catalog
-  const features = [
-    { icon: PREMIUM_FEATURES.leftHand.icon, name: "One-handed Layouts", desc: PREMIUM_FEATURES.leftHand.description },
-    { icon: PREMIUM_FEATURES.tabSearch.icon, name: PREMIUM_FEATURES.tabSearch.name, desc: PREMIUM_FEATURES.tabSearch.description },
-    { icon: PREMIUM_FEATURES.statistics.icon, name: PREMIUM_FEATURES.statistics.name, desc: PREMIUM_FEATURES.statistics.description },
-    { icon: PREMIUM_FEATURES.quickmarks.icon, name: PREMIUM_FEATURES.quickmarks.name, desc: PREMIUM_FEATURES.quickmarks.description },
+  const card = el("div", { class: "card" });
+  card.appendChild(text("div", "card-label", "What\u2019s Included"));
+
+  const features: { icon: string; name: string; desc: string; tier: "free" | "premium" }[] = [
+    { icon: "\ud83c\udfaf", name: "Hint Mode", desc: "Click any link or button with keyboard hints", tier: "free" },
+    { icon: "\ud83d\udcdc", name: "Scroll Navigation", desc: "Smooth scrolling with hjkl / arrow keys", tier: "free" },
+    { icon: "\ud83d\udd04", name: "Tab Switching", desc: "Next/previous tab with keyboard shortcuts", tier: "free" },
+    { icon: "\u2753", name: "Help Overlay", desc: "Quick reference for all keybindings", tier: "free" },
+    { icon: PREMIUM_FEATURES.tabSearch.icon, name: "Fuzzy Tab Search", desc: "Find and switch tabs instantly with fuzzy matching", tier: "premium" },
+    { icon: "\ud83d\udccb", name: "Yank Mode", desc: "Copy any link URL to clipboard with one keystroke", tier: "premium" },
+    { icon: PREMIUM_FEATURES.quickmarks.icon, name: PREMIUM_FEATURES.quickmarks.name, desc: PREMIUM_FEATURES.quickmarks.description, tier: "premium" },
+    { icon: "\u2328", name: "Optimized Layout", desc: "Home row, both hands \u2014 the recommended default", tier: "free" },
+    { icon: "\ud83e\udd1a", name: "One-handed Layouts", desc: "Left-hand or right-hand layouts for mouse users", tier: "premium" },
+    { icon: PREMIUM_FEATURES.statistics.icon, name: "Statistics Dashboard", desc: PREMIUM_FEATURES.statistics.description, tier: "premium" },
+    { icon: "\ud83d\ude80", name: "Multi-Open", desc: "Open multiple links at once with batch mode", tier: "premium" },
   ];
 
-  const list = el("ul", { class: "feature-list" });
+  const list = el("div", { class: "feature-list" });
+  let premiumSectionStarted = false;
   for (const feat of features) {
-    const item = el("li", { class: "feature-item" });
-    item.appendChild(text("span", "feature-icon", feat.icon));
-    const info = el("div");
+    const item = el("div", { class: "feature-item" });
+    if (feat.tier === "premium" && !premiumSectionStarted) {
+      premiumSectionStarted = true;
+      item.style.marginTop = "8px";
+      item.style.paddingTop = "12px";
+      item.style.borderTop = "1px solid var(--tabi-border)";
+    }
+    item.appendChild(text("div", "feature-icon", feat.icon));
+    const info = el("div", { class: "feature-info" });
     info.appendChild(text("div", "feature-name", feat.name));
     info.appendChild(text("div", "feature-desc", feat.desc));
     item.appendChild(info);
+    const badgeClass = feat.tier === "free" ? "feature-badge free" : "feature-badge premium";
+    const badgeText = feat.tier === "free" ? "Free" : "\u2726 Premium";
+    item.appendChild(text("span", badgeClass, badgeText));
     list.appendChild(item);
   }
-  page.appendChild(list);
+  card.appendChild(list);
+  page.appendChild(card);
 
   if (!isPremium) {
-    const btn = el("button", { class: "upgrade-btn" });
+    const btn = el("button", { class: "upgrade-cta" });
     btn.textContent = "Purchase License";
     page.appendChild(btn);
     page.appendChild(text("p", "license-hint", "One-time purchase via the App Store"));
   }
 
-  // Support link
   const support = el("div", { class: "license-support" });
   const link = el("a", {
     href: "https://github.com/anthropics/tabi/issues",
@@ -931,7 +973,7 @@ function buildSidebar(): HTMLElement {
 
 // ── Render ────────────────────────────────────────────────────
 
-const PAGE_BUILDERS: Record<PageId, () => HTMLElement> = {
+const PAGE_BUILDERS: Record<CorePageId, () => HTMLElement> & Partial<Record<"debug", () => HTMLElement>> = {
   statistics: buildStatisticsPage,
   quickmarks: buildQuickMarksPage,
   keylayouts: buildKeyLayoutsPage,
@@ -979,6 +1021,7 @@ async function init(): Promise<void> {
     "autoNotifications",
     "statistics",
     "quickMarks",
+    "quickMarkSettings",
     ...(DEBUG ? ["debugPremium"] : []),
   ]);
 
@@ -990,6 +1033,7 @@ async function init(): Promise<void> {
   autoNotifications = stored.autoNotifications !== undefined ? (stored.autoNotifications as boolean) : DEFAULTS.autoNotifications;
   counters = loadCounters(stored);
   marks = loadMarks(stored);
+  markSettings = loadSettings(stored);
 
   render();
 
@@ -1011,6 +1055,10 @@ async function init(): Promise<void> {
     }
     if (changes.quickMarks?.newValue !== undefined) {
       marks = loadMarks({ quickMarks: changes.quickMarks.newValue });
+      needsRefresh = true;
+    }
+    if (changes.quickMarkSettings?.newValue !== undefined) {
+      markSettings = loadSettings({ quickMarkSettings: changes.quickMarkSettings.newValue });
       needsRefresh = true;
     }
     if (changes.keyLayout?.newValue !== undefined) {

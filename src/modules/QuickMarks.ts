@@ -1,17 +1,27 @@
-// QuickMarks — Vim-style marks (a-z) that save and restore page positions.
-// Each mark stores {url, scrollY, title}. Setting a mark saves the current
-// page state; jumping to a mark finds an existing tab or opens a new one
-// and restores the scroll position.
+// QuickMarks — Vim-style marks that save and restore page positions.
+// Each mark stores {url, scrollY, title, favicon}. Labels are one or two
+// characters (a-z). Setting a mark prompts for Enter confirmation so
+// two-character labels are possible. Jumping debounces briefly to allow
+// a second character before dispatching.
 //
 // Mark mode enters a proper modal state (MARK mode) that captures all input,
 // preventing conflicts with normal-mode commands. A bottom-right status bar
 // shows the building key sequence. After a short delay with no input, a
-// discovery panel appears listing saved marks.
+// discovery panel appears listing saved marks with favicons.
 
 import type { ModeValue } from "../types";
 import { Mode } from "../commands";
-import { MARK_PANEL_DELAY_MS } from "./constants";
+import { MARK_PANEL_DELAY_MS, MARK_CONFIRM_DURATION_MS, MARK_JUMP_DEBOUNCE_MS } from "./constants";
 import { removeOverlay } from "./overlayUtils";
+
+export function urlOriginPath(raw: string): string {
+  try {
+    const u = new URL(raw);
+    return u.origin + u.pathname;
+  } catch {
+    return raw;
+  }
+}
 
 export function summarizeUrl(raw: string): string {
   let url: URL;
@@ -46,13 +56,26 @@ export interface Mark {
   url: string;
   scrollY: number;
   title: string;
+  favicon?: string;
 }
 
 export type MarkMap = Partial<Record<string, Mark>>;
 
 const STORAGE_KEY = "quickMarks";
+const SETTINGS_KEY = "quickMarkSettings";
+
+export interface QuickMarkSettings {
+  reuseTab: boolean;
+}
+
+const DEFAULT_SETTINGS: QuickMarkSettings = { reuseTab: true };
 
 type MarkSubMode = "set" | "jump";
+
+const MODE_LABELS: Record<MarkSubMode, string> = {
+  set: "Set Mark:",
+  jump: "Jump to Mark:",
+};
 
 interface KeyHandlerLike {
   setMode(mode: ModeValue): void;
@@ -71,6 +94,9 @@ export class QuickMarks {
   private panelOverlay: HTMLDivElement | null;
   private panelTimer: ReturnType<typeof setTimeout> | null;
   private marks: MarkMap;
+  private labelBuffer: string;
+  private jumpDebounceTimer: ReturnType<typeof setTimeout> | null;
+  private settings: QuickMarkSettings;
 
   constructor(keyHandler: KeyHandlerLike, prefixKey: { set: string; jump: string } = { set: "m", jump: "'" }) {
     this.keyHandler = keyHandler;
@@ -82,6 +108,9 @@ export class QuickMarks {
     this.panelTimer = null;
     this.marks = {};
     this.prefixKeys = prefixKey;
+    this.labelBuffer = "";
+    this.jumpDebounceTimer = null;
+    this.settings = DEFAULT_SETTINGS;
     this.wireCommands();
   }
 
@@ -96,7 +125,9 @@ export class QuickMarks {
   deactivate(): void {
     if (!this.active) return;
     this.active = false;
+    this.labelBuffer = "";
     this.clearPanelTimer();
+    this.clearJumpDebounce();
     this.keyHandler.clearModeKeyDelegate();
     if (this.statusBar) {
       this.statusBar.remove();
@@ -124,13 +155,16 @@ export class QuickMarks {
     }
     this.active = true;
     this.subMode = subMode;
+    this.labelBuffer = "";
     this.prefixKey = subMode === "set" ? this.prefixKeys.set : this.prefixKeys.jump;
     this.keyHandler.setMode(Mode.MARK);
-
-    this.marks = await this.loadMarksFromStorage();
-
-    this.createStatusBar();
     this.keyHandler.setModeKeyDelegate(this.handleKey.bind(this));
+    this.createStatusBar();
+
+    const stored = await browser.storage.local.get([STORAGE_KEY, SETTINGS_KEY]);
+    this.marks = (stored[STORAGE_KEY] as MarkMap) || {};
+    this.settings = { ...DEFAULT_SETTINGS, ...(stored[SETTINGS_KEY] as Partial<QuickMarkSettings>) };
+
     this.startPanelTimer();
   }
 
@@ -139,78 +173,179 @@ export class QuickMarks {
   private handleKey(event: KeyboardEvent): boolean {
     if (!this.active) return false;
 
-    // Let Escape fall through to KeyHandler's exitToNormal
     if (event.code === "Escape") return false;
 
     event.preventDefault();
     event.stopPropagation();
 
-    // Accept a-z letters only
     const key = event.key;
-    if (key.length === 1 && key >= "a" && key <= "z") {
-      this.executeMark(key);
+
+    if (key === "Enter") {
+      if (this.subMode === "set" && this.labelBuffer.length > 0) {
+        this.executeSetMark(this.labelBuffer);
+      }
       return true;
     }
 
-    // Reject non-letter input but stay in mode
+    if (key === "Backspace") {
+      if (this.labelBuffer.length > 0) {
+        this.labelBuffer = this.labelBuffer.slice(0, -1);
+        this.updateStatusBarForInput();
+      }
+      return true;
+    }
+
+    if (key.length === 1 && key >= "a" && key <= "z") {
+      this.labelBuffer += key;
+
+      if (this.subMode === "set") {
+        this.updateStatusBarForInput();
+        if (this.labelBuffer.length >= 2) {
+          // At max length — show prompt and wait for Enter
+          this.updateStatusBarForInput();
+        }
+      } else {
+        this.handleJumpInput();
+      }
+      return true;
+    }
+
     return true;
   }
 
-  private async executeMark(letter: string): Promise<void> {
-    this.clearPanelTimer();
-
-    if (this.subMode === "set") {
-      await this.setMark(letter);
+  private updateStatusBarForInput(): void {
+    const modeLabel = MODE_LABELS[this.subMode];
+    if (this.labelBuffer.length === 0) {
+      this.updateStatusBar(modeLabel);
     } else {
-      await this.jumpToMark(letter);
+      const label = this.labelBuffer;
+      const prompt = this.subMode === "set" ? " ⏎ save" : "";
+      this.updateStatusBar(`${modeLabel} ${label}${prompt}`);
     }
+  }
+
+  private handleJumpInput(): void {
+    this.clearJumpDebounce();
+    this.updateStatusBarForInput();
+
+    if (this.labelBuffer.length >= 2) {
+      this.executeJumpToMark(this.labelBuffer);
+      return;
+    }
+
+    // Check for exact match — if this single char has a mark, debounce
+    // so a second keystroke can override
+    this.jumpDebounceTimer = setTimeout(() => {
+      this.jumpDebounceTimer = null;
+      if (this.active && this.labelBuffer.length > 0) {
+        this.executeJumpToMark(this.labelBuffer);
+      }
+    }, MARK_JUMP_DEBOUNCE_MS);
+  }
+
+  private clearJumpDebounce(): void {
+    if (this.jumpDebounceTimer !== null) {
+      clearTimeout(this.jumpDebounceTimer);
+      this.jumpDebounceTimer = null;
+    }
+  }
+
+  private async executeSetMark(label: string): Promise<void> {
+    this.clearPanelTimer();
+    await this.setMark(label);
+  }
+
+  private async executeJumpToMark(label: string): Promise<void> {
+    this.clearPanelTimer();
+    this.clearJumpDebounce();
+    await this.jumpToMark(label);
   }
 
   // --- Mark operations ---
 
-  async setMark(letter: string): Promise<void> {
+  async setMark(label: string): Promise<void> {
+    const favicon = this.getCurrentFavicon();
     const mark: Mark = {
       url: window.location.href,
       scrollY: window.scrollY,
       title: document.title,
+      ...(favicon ? { favicon } : {}),
     };
-    const marks = { ...this.marks, [letter]: mark };
+    const marks = { ...this.marks, [label]: mark };
     await browser.storage.local.set({ [STORAGE_KEY]: marks });
-    const summary = summarizeUrl(mark.url);
-    this.updateStatusBar(`${this.prefixKey}${letter} → ${summary}`);
-    this.deactivateAfterConfirmation();
+    this.showConfirmation(label, mark.url, "set");
   }
 
-  async jumpToMark(letter: string): Promise<void> {
-    const mark = this.marks[letter];
+  async jumpToMark(label: string): Promise<void> {
+    const mark = this.marks[label];
     if (!mark) {
-      this.updateStatusBar(`${this.prefixKey}${letter} — not set`);
-      this.deactivateAfterConfirmation();
+      this.showConfirmation(label, null, "notset");
       return;
     }
 
-    const summary = summarizeUrl(mark.url);
-    this.updateStatusBar(`${this.prefixKey}${letter} → ${summary}`);
+    this.showConfirmation(label, mark.url, "jump");
 
     const response = await browser.runtime.sendMessage({
       command: "jumpToMark",
       url: mark.url,
       scrollY: mark.scrollY,
+      reuseTab: this.settings.reuseTab,
     });
 
     const resp = response as { status: string; sameTab?: boolean };
     if (resp.sameTab) {
       window.scrollTo(0, mark.scrollY);
     }
-
-    this.deactivateAfterConfirmation();
   }
 
-  // --- Storage ---
+  private getCurrentFavicon(): string | undefined {
+    const link = document.querySelector<HTMLLinkElement>(
+      'link[rel="icon"], link[rel="shortcut icon"], link[rel~="icon"]'
+    );
+    return link?.href ?? undefined;
+  }
 
-  private async loadMarksFromStorage(): Promise<MarkMap> {
-    const stored = await browser.storage.local.get([STORAGE_KEY]);
-    return (stored[STORAGE_KEY] as MarkMap) || {};
+  // --- Confirmation display ---
+
+  private showConfirmation(label: string, url: string | null, type: "set" | "jump" | "notset"): void {
+    if (this.panelOverlay) {
+      removeOverlay(this.panelOverlay);
+      this.panelOverlay = null;
+    }
+    this.active = false;
+    this.labelBuffer = "";
+    this.clearPanelTimer();
+    this.clearJumpDebounce();
+    this.keyHandler.clearModeKeyDelegate();
+    this.keyHandler.setMode(Mode.NORMAL);
+
+    const bar = this.statusBar;
+    if (!bar) return;
+    this.statusBar = null;
+
+    bar.textContent = "";
+    bar.classList.add("tabi-mode-bar-confirm");
+
+    const keyLine = document.createElement("div");
+    keyLine.className = "tabi-confirm-key";
+    const modeLabel = MODE_LABELS[this.subMode];
+    const suffix = type === "set" ? "saved" : type === "jump" ? "jump" : "not set";
+    keyLine.textContent = `${modeLabel} ${label} — ${suffix}`;
+    bar.appendChild(keyLine);
+
+    if (url) {
+      const urlLine = document.createElement("div");
+      urlLine.className = "tabi-confirm-url";
+      urlLine.textContent = url;
+      bar.appendChild(urlLine);
+    }
+
+    bar.addEventListener("transitionend", () => bar.remove(), { once: true });
+    // Hold the confirmation visible, then fade
+    setTimeout(() => {
+      void bar.offsetHeight;
+      bar.classList.add("tabi-mode-bar-fade");
+    }, MARK_CONFIRM_DURATION_MS);
   }
 
   // --- Status bar ---
@@ -218,7 +353,7 @@ export class QuickMarks {
   private createStatusBar(): void {
     this.statusBar = document.createElement("div");
     this.statusBar.className = "tabi-panel tabi-mode-bar tabi-mark-mode-bar";
-    this.updateStatusBar(this.prefixKey);
+    this.updateStatusBar(MODE_LABELS[this.subMode]);
     document.documentElement.appendChild(this.statusBar);
   }
 
@@ -260,8 +395,8 @@ export class QuickMarks {
     const header = document.createElement("div");
     header.className = "tabi-mark-panel-header";
     header.textContent = this.subMode === "set"
-      ? "Set mark (a-z)"
-      : "Jump to mark (a-z)";
+      ? "Set mark — type label, Enter to save"
+      : "Jump to mark — type label";
     modal.appendChild(header);
 
     const list = document.createElement("div");
@@ -273,14 +408,24 @@ export class QuickMarks {
       empty.textContent = "No marks saved";
       list.appendChild(empty);
     } else {
-      for (const [letter, mark] of entries) {
+      for (const [label, mark] of entries) {
         const item = document.createElement("div");
         item.className = "tabi-tab-search-item";
 
-        const label = document.createElement("span");
-        label.className = "tabi-mark-label";
-        label.textContent = letter;
-        item.appendChild(label);
+        if (mark.favicon) {
+          const favicon = document.createElement("img");
+          favicon.className = "tabi-tab-search-favicon";
+          favicon.src = mark.favicon;
+          favicon.width = 16;
+          favicon.height = 16;
+          favicon.alt = "";
+          item.appendChild(favicon);
+        }
+
+        const labelEl = document.createElement("span");
+        labelEl.className = "tabi-mark-label";
+        labelEl.textContent = label;
+        item.appendChild(labelEl);
 
         const textWrap = document.createElement("div");
         textWrap.className = "tabi-tab-search-text";
@@ -305,31 +450,6 @@ export class QuickMarks {
     document.body.appendChild(this.panelOverlay);
   }
 
-  // --- Deactivation with brief confirmation display ---
-
-  private deactivateAfterConfirmation(): void {
-    // Remove panel immediately but keep status bar briefly for confirmation
-    if (this.panelOverlay) {
-      removeOverlay(this.panelOverlay);
-      this.panelOverlay = null;
-    }
-    // Mark as inactive so key delegate stops processing
-    this.active = false;
-    this.clearPanelTimer();
-    this.keyHandler.clearModeKeyDelegate();
-    this.keyHandler.setMode(Mode.NORMAL);
-
-    // Fade out the status bar after a brief display
-    const bar = this.statusBar;
-    if (bar) {
-      this.statusBar = null;
-      bar.addEventListener("transitionend", () => bar.remove(), { once: true });
-      // Trigger reflow before adding the fade class
-      void bar.offsetHeight;
-      bar.classList.add("tabi-mode-bar-fade");
-    }
-  }
-
   // --- Command wiring ---
 
   private wireCommands(): void {
@@ -344,10 +464,14 @@ export function loadMarks(stored: Record<string, unknown>): MarkMap {
   return (stored[STORAGE_KEY] as MarkMap) || {};
 }
 
-export function saveMark(marks: MarkMap, letter: string, mark: Mark): MarkMap {
-  return { ...marks, [letter]: mark };
+export function saveMark(marks: MarkMap, label: string, mark: Mark): MarkMap {
+  return { ...marks, [label]: mark };
 }
 
-export function getMark(marks: MarkMap, letter: string): Mark | undefined {
-  return marks[letter];
+export function getMark(marks: MarkMap, label: string): Mark | undefined {
+  return marks[label];
+}
+
+export function loadSettings(stored: Record<string, unknown>): QuickMarkSettings {
+  return { ...DEFAULT_SETTINGS, ...(stored[SETTINGS_KEY] as Partial<QuickMarkSettings>) };
 }
