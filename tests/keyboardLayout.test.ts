@@ -13,22 +13,20 @@ describe("Keyboard layout visualization", () => {
 
   // Shorter keyboard rows use null spacers to pad to the rectangle width
   it("pads shorter rows with null spacers at the end", () => {
-    // The bottom row (z-/) has fewer real keys than the top row (q-])
-    const topRealKeys = KB_ROWS[0].filter((k) => k !== null).length;
-    const bottomRealKeys = KB_ROWS[2].filter((k) => k !== null).length;
-    assert.ok(
-      bottomRealKeys < topRealKeys,
-      "bottom row should have fewer real keys than top row"
-    );
+    // Top row defines the natural width — no padding needed
+    const topNulls = KB_ROWS[0].filter((k) => k === null).length;
+    assert.equal(topNulls, 0, "top row should have no spacers (defines width)");
 
-    // The null spacers that pad the bottom row should be at the end
-    const bottomRow = KB_ROWS[2];
-    const lastRealIndex = bottomRow.findLastIndex((k) => k !== null);
-    const trailingNulls = bottomRow.slice(lastRealIndex + 1);
-    assert.ok(
-      trailingNulls.length > 0 && trailingNulls.every((k) => k === null),
-      "trailing cells should be null spacers"
-    );
+    // Each subsequent row has progressively more trailing spacers
+    for (let i = 1; i < KB_ROWS.length; i++) {
+      const row = KB_ROWS[i];
+      const lastRealIndex = row.findLastIndex((k) => k !== null);
+      const trailingNulls = row.slice(lastRealIndex + 1);
+      assert.ok(
+        trailingNulls.length > 0 && trailingNulls.every((k) => k === null),
+        `row ${i} should have trailing null spacers`
+      );
+    }
   });
 
   // Every real key should be a single printable character
