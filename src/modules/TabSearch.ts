@@ -1,10 +1,9 @@
 // TabSearch — modal overlay for fuzzy-searching and switching browser tabs
-// Requests tab list from background. Premium users get fzf-style character-
-// skipping fuzzy matching with contiguous bonuses; free users get the original
-// prefix > word-boundary > substring scorer. Matched characters are highlighted
-// with <mark> spans. Favicons are displayed when available.
-// Keyboard: Up/Down or Ctrl-j/k to navigate, Enter to switch, Escape or
-// Ctrl-x to dismiss.
+// Premium-only feature: non-premium users see an upgrade prompt instead.
+// Uses fzf-style character-skipping fuzzy matching with contiguous bonuses.
+// Matched characters are highlighted with <mark> spans. Favicons displayed
+// when available. Keyboard: Up/Down or Ctrl-j/k to navigate, Enter to
+// switch, Escape or Ctrl-x to dismiss.
 
 import type { ModeValue, TabInfo } from "../types";
 import { Mode } from "../commands";
@@ -94,26 +93,6 @@ export function fuzzyMatch(query: string, text: string): FuzzyResult {
   return { score, indices };
 }
 
-/**
- * Original prefix/substring scorer for free-tier users.
- * Returns score (3 prefix, 2 word-boundary, 1 substring, -1 no match)
- * and the contiguous range of matched indices.
- */
-export function substringMatch(query: string, text: string): FuzzyResult {
-  if (!query || !text) return { score: SCORE_NO_MATCH, indices: [] };
-  const lq = query.toLowerCase();
-  const lt = text.toLowerCase();
-  const idx = lt.indexOf(lq);
-  if (idx < 0) return { score: SCORE_NO_MATCH, indices: [] };
-
-  const indices: number[] = [];
-  for (let i = idx; i < idx + lq.length; i++) indices.push(i);
-
-  if (idx === 0) return { score: 3, indices };
-  if (WORD_SEPARATORS.has(lt[idx - 1])) return { score: 2, indices };
-  return { score: 1, indices };
-}
-
 export class TabSearch {
   private keyHandler: KeyHandlerLike;
   private active: boolean;
@@ -124,11 +103,10 @@ export class TabSearch {
   private scored: ScoredEntry[];
   private selectedIndex: number;
   private readonly onInputBound: () => void;
-  private premium: boolean;
   /** Optional callback fired when a tab switch is executed. */
   onAction: (() => void) | null;
 
-  constructor(keyHandler: KeyHandlerLike, premium = false) {
+  constructor(keyHandler: KeyHandlerLike) {
     this.keyHandler = keyHandler;
     this.active = false;
     this.overlayEl = null;
@@ -138,13 +116,8 @@ export class TabSearch {
     this.scored = [];
     this.selectedIndex = 0;
     this.onInputBound = this.handleInput.bind(this);
-    this.premium = premium;
     this.onAction = null;
     this.wireCommands();
-  }
-
-  setPremium(value: boolean): void {
-    this.premium = value;
   }
 
   // --- Public API ---
@@ -184,35 +157,6 @@ export class TabSearch {
     return this.active;
   }
 
-  // --- Backward-compatible static methods ---
-
-  static scoreMatch(query: string, text: string): number {
-    return substringMatch(query, text).score;
-  }
-
-  static scoreTabs(query: string, tabs: TabInfo[]): TabInfo[] {
-    if (!query) return tabs.slice();
-    const entries: ScoredEntry[] = [];
-    for (let i = 0; i < tabs.length; i++) {
-      const tab = tabs[i];
-      const titleResult = substringMatch(query, tab.title);
-      const urlResult = substringMatch(query, tab.url);
-      const bestScore = Math.max(titleResult.score, urlResult.score);
-      if (bestScore > 0) {
-        entries.push({
-          tab, score: bestScore, index: i,
-          titleIndices: titleResult.score >= urlResult.score ? titleResult.indices : [],
-          urlIndices: urlResult.score > titleResult.score ? urlResult.indices : [],
-        });
-      }
-    }
-    entries.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return a.index - b.index;
-    });
-    return entries.map(s => s.tab);
-  }
-
   // --- Internal scoring ---
 
   private scoreTabsInternal(query: string, tabs: TabInfo[]): ScoredEntry[] {
@@ -222,12 +166,11 @@ export class TabSearch {
       }));
     }
 
-    const matchFn = this.premium ? fuzzyMatch : substringMatch;
     const entries: ScoredEntry[] = [];
     for (let i = 0; i < tabs.length; i++) {
       const tab = tabs[i];
-      const titleResult = matchFn(query, tab.title);
-      const urlResult = matchFn(query, tab.url);
+      const titleResult = fuzzyMatch(query, tab.title);
+      const urlResult = fuzzyMatch(query, tab.url);
       const bestScore = Math.max(titleResult.score, urlResult.score);
       if (bestScore > 0) {
         entries.push({
@@ -275,13 +218,6 @@ export class TabSearch {
     this.inputEl.setAttribute("spellcheck", "false");
     inputWrap.appendChild(this.inputEl);
 
-    if (this.premium) {
-      const star = document.createElement("span");
-      star.className = "tabi-tab-search-premium";
-      star.textContent = "\u2726";
-      inputWrap.appendChild(star);
-    }
-
     this.resultsEl = document.createElement("div");
     this.resultsEl.className = "tabi-tab-search-results";
 
@@ -291,6 +227,31 @@ export class TabSearch {
     document.body.appendChild(this.overlayEl);
 
     this.inputEl.addEventListener("input", this.onInputBound);
+
+    this.overlayEl.addEventListener("click", (e) => {
+      if (e.target === this.overlayEl) this.deactivate();
+    });
+
+    this.resultsEl.addEventListener("click", (e) => {
+      const item = (e.target as HTMLElement).closest(".tabi-tab-search-item");
+      if (!item) return;
+      const items = Array.from(this.resultsEl!.children);
+      const index = items.indexOf(item);
+      if (index < 0) return;
+      this.selectedIndex = index;
+      this.switchToSelected();
+    });
+
+    this.resultsEl.addEventListener("mousemove", (e) => {
+      const item = (e.target as HTMLElement).closest(".tabi-tab-search-item");
+      if (!item) return;
+      const items = Array.from(this.resultsEl!.children);
+      const index = items.indexOf(item);
+      if (index < 0 || index === this.selectedIndex) return;
+      const old = this.selectedIndex;
+      this.selectedIndex = index;
+      this.updateSelection(old);
+    });
   }
 
   /** Build a text node / <mark> sequence for highlighted text. */

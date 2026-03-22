@@ -1,13 +1,12 @@
 // TabSearch unit tests — using Node.js built-in test runner + happy-dom
-// Tests fuzzy matching/scoring, substring matching, overlay lifecycle,
-// keyboard navigation, tab switching, favicon rendering, match highlighting,
-// premium gating, and command wiring.
+// Tests fuzzy matching/scoring, overlay lifecycle, keyboard navigation,
+// tab switching, favicon rendering, match highlighting, and command wiring.
 
 import { describe, it, beforeEach, afterEach, mock } from "node:test";
 import assert from "node:assert/strict";
 import { createDOM, type DOMEnvironment } from "./helpers/dom";
 import { KeyHandler } from "../src/modules/KeyHandler";
-import { TabSearch, fuzzyMatch, substringMatch } from "../src/modules/TabSearch";
+import { TabSearch, fuzzyMatch } from "../src/modules/TabSearch";
 import { Mode } from "../src/commands";
 
 let env: DOMEnvironment;
@@ -54,10 +53,6 @@ function fireKeyDown(code: string, opts: { key?: string; shiftKey?: boolean; ctr
 describe("fuzzyMatch", () => {
     // Proves that fuzzy matching finds characters in order across gaps
     it("matches characters scattered across text", () => {
-        // Base: substring match fails for non-contiguous query
-        assert.equal(substringMatch("ghb", "GitHub").score, -1);
-
-        // Delta: fuzzy match succeeds with character skipping
         const result = fuzzyMatch("ghb", "GitHub");
         assert.ok(result.score > 0);
         assert.deepEqual(result.indices, [0, 3, 5]);
@@ -123,34 +118,6 @@ describe("fuzzyMatch", () => {
     });
 });
 
-describe("substringMatch", () => {
-    // Verifies backward compatibility: prefix match gets score 3
-    it("returns score 3 for prefix match with correct indices", () => {
-        const result = substringMatch("git", "GitHub - Home");
-        assert.equal(result.score, 3);
-        assert.deepEqual(result.indices, [0, 1, 2]);
-    });
-
-    // Verifies word-boundary match gets score 2
-    it("returns score 2 for word-boundary match", () => {
-        const result = substringMatch("home", "GitHub - Home");
-        assert.equal(result.score, 2);
-        assert.deepEqual(result.indices, [9, 10, 11, 12]);
-    });
-
-    // Verifies plain substring gets score 1
-    it("returns score 1 for substring match", () => {
-        const result = substringMatch("ithu", "GitHub - Home");
-        assert.equal(result.score, 1);
-        assert.deepEqual(result.indices, [1, 2, 3, 4]);
-    });
-
-    // Verifies no match returns -1
-    it("returns -1 for no match", () => {
-        assert.equal(substringMatch("xyz", "GitHub - Home").score, -1);
-    });
-});
-
 describe("TabSearch", () => {
     beforeEach(() => {
         env = createDOM();
@@ -168,73 +135,6 @@ describe("TabSearch", () => {
         if (keyHandler) keyHandler.destroy();
         delete (globalThis as any).browser;
         env.cleanup();
-    });
-
-    describe("scoreMatch (backward compat)", () => {
-        // Verifies static scoreMatch still works for existing callers
-        it("returns 3 for prefix match", () => {
-            assert.equal(TabSearch.scoreMatch("git", "GitHub - Home"), 3);
-        });
-
-        it("returns 2 for word-boundary match", () => {
-            assert.equal(TabSearch.scoreMatch("home", "GitHub - Home"), 2);
-        });
-
-        it("returns 1 for substring match", () => {
-            assert.equal(TabSearch.scoreMatch("ithu", "GitHub - Home"), 1);
-        });
-
-        it("returns -1 for no match", () => {
-            assert.equal(TabSearch.scoreMatch("xyz", "GitHub - Home"), -1);
-        });
-
-        it("matches case-insensitively", () => {
-            assert.equal(TabSearch.scoreMatch("GITHUB", "GitHub - Home"), 3);
-        });
-
-        it("returns -1 for empty query", () => {
-            assert.equal(TabSearch.scoreMatch("", "GitHub"), -1);
-        });
-
-        it("detects word boundary after slash", () => {
-            assert.equal(TabSearch.scoreMatch("search", "google.com/search"), 2);
-        });
-
-        it("detects word boundary after dot", () => {
-            assert.equal(TabSearch.scoreMatch("com", "google.com"), 2);
-        });
-    });
-
-    describe("scoreTabs", () => {
-        const tabs = [
-            { id: 1, title: "GitHub", url: "https://github.com" },
-            { id: 2, title: "Google Search", url: "https://google.com" },
-            { id: 3, title: "GitLab CI", url: "https://gitlab.com" },
-        ];
-
-        it("returns all tabs for empty query", () => {
-            const result = TabSearch.scoreTabs("", tabs as any);
-            assert.equal(result.length, 3);
-            assert.equal(result[0].id, 1);
-        });
-
-        it("ranks prefix matches above substring matches", () => {
-            const result = TabSearch.scoreTabs("git", tabs as any);
-            assert.equal(result.length, 2);
-            assert.equal(result[0].id, 1);
-            assert.equal(result[1].id, 3);
-        });
-
-        it("excludes non-matching tabs", () => {
-            const result = TabSearch.scoreTabs("xyz", tabs as any);
-            assert.equal(result.length, 0);
-        });
-
-        it("matches against URL as well as title", () => {
-            const result = TabSearch.scoreTabs("gitlab.com", tabs as any);
-            assert.equal(result.length, 1);
-            assert.equal(result[0].id, 3);
-        });
     });
 
     describe("activation and deactivation", () => {
@@ -269,12 +169,11 @@ describe("TabSearch", () => {
             assert.ok((tabSearch as any).scored.every((e: any) => !e.tab.active));
         });
 
-        // Non-premium tab search must render results on first activation
-        it("renders tab results for non-premium users", async () => {
-            // Base: non-premium tabSearch (default in tests) — should show results
+        // Tab search renders results on activation
+        it("renders tab results on activation", async () => {
             await tabSearch.activate();
             const items = env.document.querySelectorAll(".tabi-tab-search-item");
-            assert.equal(items.length, 4, "non-premium should render 4 tab results");
+            assert.equal(items.length, 4, "should render 4 tab results");
             const overlay = env.document.querySelector(".tabi-overlay");
             assert.ok(overlay, "overlay should exist");
         });
@@ -464,35 +363,89 @@ describe("TabSearch", () => {
         });
     });
 
-    describe("premium fuzzy matching", () => {
-        // Proves premium mode uses fuzzy matching (character skipping)
-        it("finds tabs with scattered character matches when premium", async () => {
-            tabSearch.setPremium(true);
+    describe("fuzzy matching", () => {
+        // Proves tab search uses fuzzy matching (character skipping)
+        it("finds tabs with scattered character matches", async () => {
             await tabSearch.activate();
-            // "ggl" won't match via substring but will match "Google" via fuzzy
+            // "ggl" matches "Google" via fuzzy character skipping
             (tabSearch as any).inputEl.value = "ggl";
             (tabSearch as any).onInputBound();
             assert.ok((tabSearch as any).scored.length > 0, "fuzzy should find matches");
             assert.equal((tabSearch as any).scored[0].tab.title, "Google Search");
         });
+    });
 
-        // Proves free mode rejects non-contiguous queries
-        it("rejects scattered queries when not premium", async () => {
-            // Base: premium finds it
-            tabSearch.setPremium(true);
+    describe("click interactions", () => {
+        // Clicking a result item switches to that tab and dismisses the overlay
+        it("clicking a result item switches to that tab", async () => {
             await tabSearch.activate();
-            (tabSearch as any).inputEl.value = "ggl";
-            (tabSearch as any).onInputBound();
-            const premiumCount = (tabSearch as any).scored.length;
-            assert.ok(premiumCount > 0);
-            tabSearch.deactivate();
+            const items = env.document.querySelectorAll(".tabi-tab-search-item");
+            assert.ok(items.length >= 3, "should have at least 3 items");
+            const expectedTabId = (tabSearch as any).scored[2].tab.id;
 
-            // Delta: free mode rejects it
-            tabSearch.setPremium(false);
+            // Click the third item (index 2)
+            const clickEvent = new (env.window as any).MouseEvent("click", { bubbles: true });
+            items[2].dispatchEvent(clickEvent);
+
+            const switchMsg = sentMessages.find((m: any) => m.command === "switchTab");
+            assert.ok(switchMsg, "switchTab message should be sent on click");
+            assert.equal(switchMsg.tabId, expectedTabId);
+            assert.equal(tabSearch.isActive(), false, "overlay should dismiss after click");
+        });
+
+        // Clicking the overlay background (not a result) dismisses the search
+        it("clicking overlay background dismisses the search", async () => {
             await tabSearch.activate();
-            (tabSearch as any).inputEl.value = "ggl";
-            (tabSearch as any).onInputBound();
-            assert.equal((tabSearch as any).scored.length, 0, "substring should reject scattered query");
+            assert.equal(tabSearch.isActive(), true);
+
+            const overlay = env.document.querySelector(".tabi-overlay") as HTMLElement;
+            const clickEvent = new (env.window as any).MouseEvent("click", { bubbles: true });
+            // Dispatch directly on overlay (simulates clicking the background)
+            overlay.dispatchEvent(clickEvent);
+
+            assert.equal(tabSearch.isActive(), false, "should dismiss on background click");
+        });
+
+        // Clicking inside the modal (not on an item) does NOT dismiss
+        it("clicking inside modal does not dismiss", async () => {
+            await tabSearch.activate();
+            const modal = env.document.querySelector(".tabi-tab-search-modal") as HTMLElement;
+            const clickEvent = new (env.window as any).MouseEvent("click", { bubbles: true });
+            modal.dispatchEvent(clickEvent);
+
+            assert.equal(tabSearch.isActive(), true, "should not dismiss when clicking modal");
+        });
+    });
+
+    describe("mouse hover selection", () => {
+        // Mousemove over a result item updates the visual selection
+        it("mousemove updates selected item", async () => {
+            await tabSearch.activate();
+            const items = env.document.querySelectorAll(".tabi-tab-search-item");
+
+            // Base: first item is selected
+            assert.ok(items[0].classList.contains("selected"), "first item should start selected");
+            assert.ok(!items[2].classList.contains("selected"), "third item should not be selected");
+
+            // Delta: mousemove over third item changes selection
+            const moveEvent = new (env.window as any).MouseEvent("mousemove", { bubbles: true });
+            items[2].dispatchEvent(moveEvent);
+
+            assert.ok(!items[0].classList.contains("selected"), "first item should lose selection");
+            assert.ok(items[2].classList.contains("selected"), "third item should gain selection");
+        });
+
+        // Mousemove over already-selected item is a no-op
+        it("mousemove over already-selected item does nothing", async () => {
+            await tabSearch.activate();
+            const items = env.document.querySelectorAll(".tabi-tab-search-item");
+
+            // Move over first item (already selected) — should not throw or change state
+            const moveEvent = new (env.window as any).MouseEvent("mousemove", { bubbles: true });
+            items[0].dispatchEvent(moveEvent);
+
+            assert.ok(items[0].classList.contains("selected"), "first item still selected");
+            assert.equal((tabSearch as any).selectedIndex, 0);
         });
     });
 

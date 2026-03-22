@@ -32,10 +32,10 @@ export const PREMIUM_FEATURES: Record<string, PremiumFeature> = {
     icon: "\ud83d\udccc",
     description: "Vim-style marks (a\u2013z) to save and jump to pages instantly.",
   },
-  fuzzySearch: {
-    name: "Fuzzy Tab Search",
+  tabSearch: {
+    name: "Tab Search",
     icon: "\ud83d\udd0d",
-    description: "fzf-style fuzzy matching for faster, smarter tab switching.",
+    description: "Fuzzy tab search to find and switch tabs instantly.",
   },
   notifications: {
     name: "Weekly Stats Notification",
@@ -136,7 +136,7 @@ export class PremiumPrompt {
       marginBottom: "12px",
       transition: "opacity 0.15s",
     });
-    cta.textContent = "Upgrade to Premium";
+    cta.textContent = "Purchase License";
     cta.addEventListener("mouseenter", () => { cta.style.opacity = "0.9"; });
     cta.addEventListener("mouseleave", () => { cta.style.opacity = "1"; });
     cta.addEventListener("click", () => {

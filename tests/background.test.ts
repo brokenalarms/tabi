@@ -16,6 +16,7 @@ let activatedTabId: number | null;
 let actionState: Record<number, Record<string, unknown>>;
 let tabRemovedListeners: Array<(tabId: number) => void>;
 let tabUpdatedListeners: Array<(tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string }) => void>;
+let tabActivatedListeners: Array<(activeInfo: { tabId: number }) => void>;
 let nativeMessagesSent: Array<{ appId: string; message: Record<string, unknown> }>;
 let nativeMessageResponse: Record<string, unknown>;
 let storageState: Record<string, unknown>;
@@ -32,6 +33,7 @@ function resetBrowserShim() {
     actionState = {};
     tabRemovedListeners = [];
     tabUpdatedListeners = [];
+    tabActivatedListeners = [];
     nativeMessagesSent = [];
     nativeMessageResponse = {};
     storageState = {};
@@ -65,7 +67,7 @@ function resetBrowserShim() {
                 addListener(fn: (tabId: number, changeInfo: { url?: string }, tab: { id: number; url: string }) => void) { tabUpdatedListeners.push(fn); },
             },
             onActivated: {
-                addListener() {},
+                addListener(fn: (activeInfo: { tabId: number }) => void) { tabActivatedListeners.push(fn); },
             },
         },
         action: {
@@ -126,6 +128,7 @@ import {
     tabUrlCache,
     tabOrder,
     activeHistory,
+    tabHistory,
     init,
 } from "../src/background";
 
@@ -138,6 +141,9 @@ describe("background.ts tab management", () => {
         tabOrder.length = 0;
         activeHistory.previous = null;
         activeHistory.current = null;
+        tabHistory.stack.length = 0;
+        tabHistory.index = -1;
+        tabHistory.navigating = false;
         init();
     });
 
@@ -446,6 +452,131 @@ describe("background.ts tab management", () => {
             assert.equal(result.status, "ok");
             assert.equal(activatedTabId, null);
             assert.equal(createdTabs.length, 0);
+        });
+    });
+
+    describe("tab history navigation", () => {
+        function activateTab(tabId: number) {
+            for (const fn of tabActivatedListeners) fn({ tabId });
+        }
+
+        // Verifies that activating tabs builds a history stack in order.
+        it("builds history stack from tab activations", () => {
+            activateTab(1);
+            activateTab(2);
+            activateTab(3);
+            assert.deepEqual(tabHistory.stack, [1, 2, 3]);
+            assert.equal(tabHistory.index, 2);
+        });
+
+        // Verifies that tabHistoryBack navigates to the previous tab in the stack.
+        it("tabHistoryBack activates the previous tab", async () => {
+            activateTab(1);
+            activateTab(2);
+            activateTab(3);
+
+            await handleCommand("tabHistoryBack", makeSender(3));
+            assert.equal(activatedTabId, 2);
+            assert.equal(tabHistory.index, 1);
+        });
+
+        // Verifies that tabHistoryForward navigates to the next tab after going back.
+        it("tabHistoryForward activates the next tab after back", async () => {
+            activateTab(1);
+            activateTab(2);
+            activateTab(3);
+
+            await handleCommand("tabHistoryBack", makeSender(3));
+            activatedTabId = null;
+            await handleCommand("tabHistoryForward", makeSender(2));
+            assert.equal(activatedTabId, 3);
+            assert.equal(tabHistory.index, 2);
+        });
+
+        // Verifies that going back at the start of history is a no-op.
+        it("tabHistoryBack is a no-op at the start of history", async () => {
+            activateTab(1);
+            assert.equal(tabHistory.index, 0);
+
+            await handleCommand("tabHistoryBack", makeSender(1));
+            assert.equal(activatedTabId, null);
+            assert.equal(tabHistory.index, 0);
+        });
+
+        // Verifies that going forward at the end of history is a no-op.
+        it("tabHistoryForward is a no-op at the end of history", async () => {
+            activateTab(1);
+            activateTab(2);
+            assert.equal(tabHistory.index, 1);
+
+            await handleCommand("tabHistoryForward", makeSender(2));
+            assert.equal(activatedTabId, null);
+            assert.equal(tabHistory.index, 1);
+        });
+
+        // Verifies browser-style behavior: visiting a new tab after going back
+        // wipes forward history.
+        it("new activation after back wipes forward history", async () => {
+            activateTab(1);
+            activateTab(2);
+            activateTab(3);
+
+            await handleCommand("tabHistoryBack", makeSender(3));
+            // Now at index 1 (tab 2), forward history = [3]
+            // Visit a new tab — forward history should be wiped
+            activateTab(1);
+            assert.deepEqual(tabHistory.stack, [1, 2, 1]);
+            assert.equal(tabHistory.index, 2);
+
+            // Forward should be a no-op now
+            activatedTabId = null;
+            await handleCommand("tabHistoryForward", makeSender(1));
+            assert.equal(activatedTabId, null);
+        });
+
+        // Verifies that consecutive visits to the same tab are deduplicated.
+        it("deduplicates consecutive activations of the same tab", () => {
+            activateTab(1);
+            activateTab(1);
+            activateTab(1);
+            assert.deepEqual(tabHistory.stack, [1]);
+            assert.equal(tabHistory.index, 0);
+        });
+
+        // Verifies that closing a tab removes it from the history stack
+        // and adjusts the index.
+        it("removes closed tabs from history stack", () => {
+            activateTab(1);
+            activateTab(2);
+            activateTab(3);
+            assert.deepEqual(tabHistory.stack, [1, 2, 3]);
+            assert.equal(tabHistory.index, 2);
+
+            // Close tab 2 (middle of history)
+            for (const fn of tabRemovedListeners) fn(2);
+            assert.deepEqual(tabHistory.stack, [1, 3]);
+            assert.equal(tabHistory.index, 1);
+        });
+
+        // Verifies that multiple back navigations walk through the full stack.
+        it("supports multiple back steps", async () => {
+            activateTab(1);
+            activateTab(2);
+            activateTab(3);
+
+            await handleCommand("tabHistoryBack", makeSender(3));
+            assert.equal(activatedTabId, 2);
+            assert.equal(tabHistory.index, 1);
+
+            activatedTabId = null;
+            await handleCommand("tabHistoryBack", makeSender(2));
+            assert.equal(activatedTabId, 1);
+            assert.equal(tabHistory.index, 0);
+
+            // Already at start, no-op
+            activatedTabId = null;
+            await handleCommand("tabHistoryBack", makeSender(1));
+            assert.equal(activatedTabId, null);
         });
     });
 });

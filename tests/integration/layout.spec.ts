@@ -744,3 +744,76 @@ test("tab search results have visible height", async ({ page }) => {
   expect(result.resultsHeight).toBeGreaterThan(0);
 });
 
+// GitHub PR merge box: "Expand checks" button inside a section with a
+// visibility:hidden sibling and a "Details" link sibling. The button must
+// get a hint — visibility:hidden siblings must not occlude, and disclosure
+// dedup must not remove standalone section header buttons.
+// SITE: github.com — PR merge box checks section
+// FIX: Disclosure dedup limited to repeating containers; visibility:hidden
+// covers exempt from occlusion.
+test("GitHub merge box expand-checks button gets a hint", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await setupPage(page, `
+    <div style="width:800px; padding:20px;">
+      <section aria-label="Checks" style="border:1px solid #ccc;">
+        <div style="display:flex; align-items:center; gap:8px; padding:8px;">
+          <button id="expand-btn"
+                  aria-label="Expand checks"
+                  aria-expanded="false"
+                  aria-controls="checks-panel"
+                  style="display:flex; align-items:center; gap:8px; flex:1; padding:8px; border:none; background:none; cursor:pointer;">
+            <svg width="20" height="20" viewBox="0 0 20 20">
+              <circle cx="10" cy="10" r="8" fill="green" stroke="#ccc" stroke-width="2"/>
+            </svg>
+            <span>5 / 5 checks OK</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" style="margin-left:auto;">
+              <path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>
+          <a href="/checks" id="details-link" style="padding:4px 8px;">Details</a>
+        </div>
+        <div id="checks-panel" style="visibility:hidden; height:0; overflow:hidden;">
+          <ul>
+            <li><a href="/check/1">Build (ubuntu)</a> — passed</li>
+            <li><a href="/check/2">Test (ubuntu)</a> — passed</li>
+          </ul>
+        </div>
+      </section>
+    </div>
+  `);
+
+  const result = await page.evaluate(() => {
+    const { KeyHandler, HintMode, Mode, walkerFilter } = window.TestHarness;
+    const kh = new KeyHandler();
+    const hm = new HintMode(kh);
+    hm.wireCommands();
+    kh.on("exitToNormal", () => {
+      if (hm.isActive()) hm.deactivate();
+      kh.setMode(Mode.NORMAL);
+    });
+    hm.activate();
+
+    const btn = document.getElementById("expand-btn")!;
+    const hints = document.querySelectorAll(".tabi-hint");
+    const hintTargets = Array.from(hints).map(h => {
+      const style = (h as HTMLElement).style;
+      return { left: parseFloat(style.left), top: parseFloat(style.top) };
+    });
+
+    const btnVerdict = walkerFilter(btn);
+
+    hm.destroy();
+    return {
+      hintCount: hints.length,
+      btnVerdict,
+      btnRect: btn.getBoundingClientRect().toJSON(),
+      hintTargets,
+    };
+  });
+
+  // The expand button must pass the walker filter (FILTER_ACCEPT = 1)
+  expect(result.btnVerdict).toBe(1);
+  // At least 2 hints: the expand button and the "Details" link
+  expect(result.hintCount).toBeGreaterThanOrEqual(2);
+});
+

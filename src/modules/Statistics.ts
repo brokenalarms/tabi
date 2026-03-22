@@ -43,15 +43,15 @@ export interface Milestone {
 }
 
 export const MILESTONES: Milestone[] = [
-  { threshold: 10, description: "Enough time saved to open a fridge" },
-  { threshold: 50, description: "You've saved a minute of mouse-reaching" },
-  { threshold: 100, description: "Your arm has been spared 100 feet of travel" },
-  { threshold: 250, description: "That's one football field of arm movement saved" },
-  { threshold: 500, description: "Half a trip to the Moon in saved mouse-miles (okay, not really)" },
-  { threshold: 1000, description: "1,000 actions — you're a keyboard astronaut" },
-  { threshold: 2500, description: "Your mouse is collecting dust at this point" },
-  { threshold: 5000, description: "5,000 actions — that's roughly a workday saved" },
-  { threshold: 10000, description: "10k club. Your trackpad doesn't even know you anymore" },
+  { threshold: 10, description: "Tires pumped, bags packed" },
+  { threshold: 50, description: "First gravel segment cleared" },
+  { threshold: 100, description: "You've found your cadence" },
+  { threshold: 250, description: "Past the first summit" },
+  { threshold: 500, description: "Your legs remember the way" },
+  { threshold: 1000, description: "1,000 miles on the odometer" },
+  { threshold: 2500, description: "Seasoned tourer — your mouse is collecting dust in a pannier" },
+  { threshold: 5000, description: "Bikepacking veteran" },
+  { threshold: 10000, description: "10k club — you could ride the Great Divide twice" },
 ];
 
 // --- Pure helpers (testable without browser APIs) ---

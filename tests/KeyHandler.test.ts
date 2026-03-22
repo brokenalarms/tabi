@@ -120,11 +120,11 @@ describe("KeyHandler", () => {
             assert.ok(ev.defaultPrevented);
         });
 
-        // Tests that shift+key dispatches a different command (G → scrollToBottom)
+        // Tests that shift+key dispatches a different command (Shift+J → scrollToBottom)
         it("dispatches shift-modified binding", () => {
             let called = false;
             keyHandler.on("scrollToBottom", () => { called = true; });
-            fireKeyDown(makeKeyEvent("KeyG", { shift: true }));
+            fireKeyDown(makeKeyEvent("KeyJ", { shift: true }));
             assert.ok(called);
         });
 
@@ -137,30 +137,21 @@ describe("KeyHandler", () => {
     });
 
     describe("Multi-key sequence with timeout", () => {
-        // Tests that 'g' followed by 'g' dispatches scrollToTop
-        it("dispatches gg sequence", () => {
+        // Tests that g+i dispatches focusInput
+        it("dispatches gi sequence", () => {
             let called = false;
-            keyHandler.on("scrollToTop", () => { called = true; });
+            keyHandler.on("focusInput", () => { called = true; });
             fireKeyDown(makeKeyEvent("KeyG"));
-            fireKeyDown(makeKeyEvent("KeyG"));
-            assert.ok(called, "scrollToTop should be called for gg");
+            fireKeyDown(makeKeyEvent("KeyI"));
+            assert.ok(called, "focusInput should be called for gi");
         });
 
-        // Tests that g+t dispatches tabNext
-        it("dispatches gt sequence", () => {
+        // Tests that g+u dispatches goUpUrl
+        it("dispatches gu sequence", () => {
             let called = false;
-            keyHandler.on("tabNext", () => { called = true; });
+            keyHandler.on("goUpUrl", () => { called = true; });
             fireKeyDown(makeKeyEvent("KeyG"));
-            fireKeyDown(makeKeyEvent("KeyT"));
-            assert.ok(called);
-        });
-
-        // Tests that g+Shift+T dispatches tabPrev
-        it("dispatches gT (g + Shift-T) sequence", () => {
-            let called = false;
-            keyHandler.on("tabPrev", () => { called = true; });
-            fireKeyDown(makeKeyEvent("KeyG"));
-            fireKeyDown(makeKeyEvent("KeyT", { shift: true }));
+            fireKeyDown(makeKeyEvent("KeyU"));
             assert.ok(called);
         });
 
@@ -469,15 +460,16 @@ describe("KeyHandler", () => {
             assert.ok(scrollDownCalled, "S dispatches scrollDown in leftHand layout");
         });
 
-        it("switches to rightHand layout — semicolon activates hints", () => {
-            // Base: optimized layout — Semicolon is not bound
+        it("switches to rightHand layout — semicolon changes from jumpMark to activateHints", () => {
+            // Base: optimized layout — Semicolon dispatches jumpMark
+            let jumpMarkCalled = false;
+            keyHandler.on("jumpMark", () => { jumpMarkCalled = true; });
+            fireKeyDown(makeKeyEvent("Semicolon"));
+            assert.ok(jumpMarkCalled, "Semicolon dispatches jumpMark in optimized layout");
+
+            // Delta: rightHand layout — Semicolon dispatches activateHints instead
             let hintsCalled = false;
             keyHandler.on("activateHints", () => { hintsCalled = true; });
-            const evSemi = makeKeyEvent("Semicolon");
-            fireKeyDown(evSemi);
-            assert.ok(!hintsCalled, "Semicolon should not dispatch activateHints in optimized layout");
-
-            // Delta: rightHand layout — Semicolon dispatches activateHints
             keyHandler.setLayout("rightHand");
             fireKeyDown(makeKeyEvent("Semicolon"));
             assert.ok(hintsCalled, "Semicolon dispatches activateHints in rightHand layout");

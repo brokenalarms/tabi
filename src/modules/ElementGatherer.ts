@@ -3,7 +3,7 @@
 // non-clickable nodes, and yield visible clickable elements, then deduplicates
 // via containment analysis.
 
-import { CLICKABLE_SELECTOR, LIST_BOUNDARY_TAGS } from "./constants";
+import { CLICKABLE_SELECTOR, LIST_BOUNDARY_TAGS, REPEATING_CONTAINER_SELECTOR } from "./constants";
 import {
   isExcludedByIntent, childrenCannotBeVisible, isOnScreen, isVisible,
   isClippedByOverflow, isOccluded, isZeroSizeAnchor, isRedirectableControl,
@@ -270,7 +270,10 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
     }
   }
 
-  // Disclosure trigger dedup
+  // Disclosure trigger dedup — only in repeating containers (nav menus).
+  // In a nav list (<li>), a toggle button next to a content link is secondary
+  // and gets deduped. In standalone sections (merge box headers, accordions),
+  // the toggle IS the primary target and must be kept.
   for (const el of result) {
     if (toRemove.has(el)) continue;
     if (el.getAttribute("aria-expanded") == null) continue;
@@ -278,6 +281,7 @@ export function discoverElements(getHintRect: (el: HTMLElement) => DOMRect): HTM
 
     const parent = el.parentElement;
     if (!parent) continue;
+    if (!parent.closest(REPEATING_CONTAINER_SELECTOR)) continue;
 
     for (const sibling of result) {
       if (sibling !== el && !toRemove.has(sibling) && sibling.parentElement === parent) {

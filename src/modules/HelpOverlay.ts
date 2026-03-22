@@ -1,28 +1,40 @@
 // HelpOverlay — keybinding reference modal for Tabi
-// Shows all NORMAL-mode bindings in a centered overlay.
+// Shows all NORMAL-mode bindings grouped by category in a centered overlay.
 // Dismissed on any keypress or mouse click.
 
-import { COMMANDS, PREMIUM_COMMANDS } from "../commands";
+import { COMMANDS, PREMIUM_COMMANDS, COMMAND_CATEGORIES, CATEGORY_LABELS } from "../commands";
+import type { CommandCategory } from "../commands";
+import { PRESETS } from "../keybindings";
+import type { KeyBinding } from "../keybindings";
+import type { KeyLayout } from "../types";
 import { removeOverlay } from "./overlayUtils";
 import { isPremiumActive } from "../premium";
 
 interface KeyHandlerLike {
   on(command: string, callback: () => void): void;
   off(command: string): void;
-  getBindings(): Map<string, Map<string, string>>;
+}
+
+interface HelpRow {
+  display: string;
+  label: string;
+  category: CommandCategory | undefined;
+  premium: boolean;
 }
 
 export class HelpOverlay {
   private keyHandler: KeyHandlerLike;
   private active: boolean;
   private overlay: HTMLDivElement | null;
+  private layout: KeyLayout;
   private readonly onMouseDown: () => void;
   private readonly onKeyDown: (event: KeyboardEvent) => void;
 
-  constructor(keyHandler: KeyHandlerLike) {
+  constructor(keyHandler: KeyHandlerLike, layout: KeyLayout = "optimized") {
     this.keyHandler = keyHandler;
     this.active = false;
     this.overlay = null;
+    this.layout = layout;
     this.onMouseDown = this.deactivate.bind(this);
     this.onKeyDown = (event: KeyboardEvent) => {
       event.preventDefault();
@@ -30,6 +42,10 @@ export class HelpOverlay {
       this.deactivate();
     };
     this.keyHandler.on("showHelp", () => this.activate());
+  }
+
+  setLayout(layout: KeyLayout): void {
+    this.layout = layout;
   }
 
   activate(): void {
@@ -41,6 +57,32 @@ export class HelpOverlay {
     this.createOverlay();
     document.addEventListener("keydown", this.onKeyDown, true);
     document.addEventListener("mousedown", this.onMouseDown, true);
+  }
+
+  private buildRows(): HelpRow[] {
+    const preset = PRESETS[this.layout];
+    const premium = isPremiumActive();
+    const rows: HelpRow[] = [];
+
+    for (const binding of preset.bindings) {
+      if (binding.command === "showHelp") continue;
+      const label = COMMANDS[binding.command] || binding.command;
+      const cat = COMMAND_CATEGORIES[binding.command];
+      const baseCmd = binding.command.replace(/_.*$/, "");
+      rows.push({
+        display: binding.display,
+        label,
+        category: cat,
+        premium: premium && PREMIUM_COMMANDS.has(baseCmd),
+      });
+    }
+
+    // Tab-by-number (not in presets)
+    rows.push({ display: "g1\u2013g9", label: "Go to tab by number", category: "tabs", premium: false });
+    rows.push({ display: "g0 / g^", label: "First tab", category: "tabs", premium: false });
+    rows.push({ display: "g$", label: "Last tab", category: "tabs", premium: false });
+
+    return rows;
   }
 
   private createOverlay(): void {
@@ -55,38 +97,34 @@ export class HelpOverlay {
     title.textContent = "tabi keyboard shortcuts";
     modal.appendChild(title);
 
-    const grid = document.createElement("div");
-    grid.className = "tabi-help-grid";
+    const rows = this.buildRows();
+    const body = document.createElement("div");
+    body.className = "tabi-help-body";
 
-    const bindings = this.keyHandler.getBindings();
-    const normalBindings = bindings.get("NORMAL");
-    let goToTabDigitShown = false;
-    if (normalBindings) {
-      for (const [seq, cmd] of normalBindings) {
-        // Collapse g1-g9 into a single help row
-        if (/^goToTab\d$/.test(cmd)) {
-          if (goToTabDigitShown) continue;
-          goToTabDigitShown = true;
-          HelpOverlay.addRow(grid, "g1\u2013g9", "Go to tab by number");
-          continue;
-        }
-        if (cmd === "goToTabFirst") {
-          HelpOverlay.addRow(grid, "g0 / g^", "First tab");
-          continue;
-        }
-        if (cmd === "goToTabLast") {
-          HelpOverlay.addRow(grid, "g$", "Last tab");
-          continue;
-        }
+    for (const { cat, label: catLabel } of CATEGORY_LABELS) {
+      const catRows = rows.filter((r) => r.category === cat);
+      if (catRows.length === 0) continue;
 
-        const label = COMMANDS[cmd] || cmd;
-        const baseCmd = cmd.replace(/_.*$/, "");
-        const premium = isPremiumActive() && PREMIUM_COMMANDS.has(baseCmd);
-        HelpOverlay.addRow(grid, HelpOverlay.formatSequence(seq), label, premium);
+      const section = document.createElement("div");
+      section.className = "tabi-help-section";
+
+      const heading = document.createElement("div");
+      heading.className = `tabi-help-section-label cat-${cat}`;
+      heading.textContent = catLabel;
+      section.appendChild(heading);
+
+      const grid = document.createElement("div");
+      grid.className = "tabi-help-grid";
+
+      for (const row of catRows) {
+        HelpOverlay.addRow(grid, row.display, row.label, cat, row.premium);
       }
+
+      section.appendChild(grid);
+      body.appendChild(section);
     }
 
-    modal.appendChild(grid);
+    modal.appendChild(body);
 
     const hint = document.createElement("p");
     hint.className = "tabi-help-hint";
@@ -97,11 +135,17 @@ export class HelpOverlay {
     document.body.appendChild(this.overlay);
   }
 
-  private static addRow(grid: HTMLElement, keyText: string, descText: string, premium = false): void {
+  private static addRow(
+    grid: HTMLElement,
+    keyText: string,
+    descText: string,
+    category: CommandCategory,
+    premium: boolean,
+  ): void {
     const row = document.createElement("div");
     row.className = "tabi-help-row";
     const keyEl = document.createElement("kbd");
-    keyEl.className = "tabi-help-key";
+    keyEl.className = `tabi-help-key cat-${category}`;
     keyEl.textContent = keyText;
     const descEl = document.createElement("span");
     descEl.className = "tabi-help-desc";
@@ -115,25 +159,6 @@ export class HelpOverlay {
     row.appendChild(keyEl);
     row.appendChild(descEl);
     grid.appendChild(row);
-  }
-
-  static formatSequence(seq: string): string {
-    return seq.split(" ").map((part) => {
-      const modifiers: string[] = [];
-      let code = part;
-      for (const [prefix, symbol] of [
-        ["Shift-", "\u21E7"], ["Ctrl-", "\u2303"],
-        ["Alt-", "\u2325"], ["Meta-", "\u2318"],
-      ] as const) {
-        if (code.startsWith(prefix)) {
-          modifiers.push(symbol);
-          code = code.slice(prefix.length);
-        }
-      }
-      code = code.replace(/^Key/, "").replace(/^Digit/, "");
-      if (code === "Slash") code = "/";
-      return modifiers.join("") + code.toLowerCase();
-    }).join(" ");
   }
 
   private deactivate(): void {

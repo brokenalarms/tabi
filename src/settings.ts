@@ -14,8 +14,9 @@ import { SECONDS_PER_ACTION } from "./modules/constants";
 import type { StatCounters } from "./modules/Statistics";
 import { loadMarks } from "./modules/QuickMarks";
 import type { MarkMap } from "./modules/QuickMarks";
-import { COMMANDS } from "./commands";
-import { DEFAULTS, FORCE_PREMIUM } from "./types";
+import { COMMANDS, COMMAND_CATEGORIES, CATEGORY_LABELS } from "./commands";
+import type { CommandCategory } from "./commands";
+import { DEFAULTS, DEBUG, resolvePremiumStatus } from "./types";
 import type { KeyLayout, Theme, KeyBindingMode } from "./types";
 import { PremiumPrompt, PREMIUM_FEATURES } from "./modules/PremiumPrompt";
 
@@ -66,7 +67,7 @@ function text(tag: keyof HTMLElementTagNameMap, className: string, content: stri
 
 // ── Navigation ────────────────────────────────────────────────
 
-type PageId = "statistics" | "quickmarks" | "keylayouts" | "premium";
+type PageId = "statistics" | "quickmarks" | "keylayouts" | "premium" | "debug";
 
 interface NavEntry {
   id: PageId;
@@ -78,7 +79,8 @@ const NAV_ITEMS: NavEntry[] = [
   { id: "statistics", label: "Statistics", icon: "\ud83d\udcca" },
   { id: "quickmarks", label: "Quick Marks", icon: "\ud83d\udccc" },
   { id: "keylayouts", label: "Key Layouts", icon: "\u2328" },
-  { id: "premium", label: "Premium", icon: "\u2726" },
+  { id: "premium", label: "License", icon: "\u2726" },
+  ...(DEBUG ? [{ id: "debug" as const, label: "Debug", icon: "\ud83d\udee0" }] : []),
 ];
 
 // ── State ─────────────────────────────────────────────────────
@@ -107,7 +109,7 @@ function buildSegmented(
     if (opt.value === activeValue) btn.classList.add("active");
     if (opt.premium && !isPremium) {
       btn.disabled = true;
-      btn.title = "Premium feature";
+      btn.title = "Requires license";
     }
     container.appendChild(btn);
   }
@@ -178,20 +180,23 @@ interface DistanceMilestone {
 }
 
 const DISTANCE_MILESTONES: DistanceMilestone[] = [
-  { feet: 6, emoji: "\ud83e\uddca", label: "1 trip to the fridge", pct: 0 },
-  { feet: 100, emoji: "\ud83d\udc0b", label: "Length of a blue whale", pct: 10 },
-  { feet: 300, emoji: "\ud83c\udfc8", label: "1 football field", pct: 20 },
-  { feet: 1063, emoji: "\ud83d\uddfc", label: "Height of the Eiffel Tower", pct: 32 },
-  { feet: 2717, emoji: "\ud83c\udfd9", label: "Height of Burj Khalifa", pct: 44 },
-  { feet: 29032, emoji: "\ud83c\udfd4", label: "Summit of Mt Everest", pct: 60 },
-  { feet: 35000, emoji: "\u2708\ufe0f", label: "Cruising altitude", pct: 72 },
-  { feet: 137500, emoji: "\ud83c\udfc3", label: "A marathon", pct: 84 },
-  { feet: 330000, emoji: "\ud83e\uddd1\u200d\ud83d\ude80", label: "Edge of space (K\u00e1rm\u00e1n line)", pct: 100 },
+  { feet: 100, emoji: "\ud83d\udeb2", label: "First pedal stroke", pct: 0 },
+  { feet: 500, emoji: "\ud83c\udfd5\ufe0f", label: "S24O overnighter", pct: 6 },
+  { feet: 2000, emoji: "\ud83c\udfdc\ufe0f", label: "White Rim Trail (100 mi)", pct: 14 },
+  { feet: 5000, emoji: "\u26f0\ufe0f", label: "Kokopelli Trail (142 mi)", pct: 24 },
+  { feet: 10000, emoji: "\ud83c\udf3e", label: "Katy Trail (240 mi)", pct: 32 },
+  { feet: 20000, emoji: "\ud83c\udf3f", label: "C&O Canal + GAP (340 mi)", pct: 42 },
+  { feet: 40000, emoji: "\ud83c\udfd4\ufe0f", label: "Colorado Trail (486 mi)", pct: 52 },
+  { feet: 75000, emoji: "\ud83c\udf32", label: "Oregon Timber Trail (670 mi)", pct: 62 },
+  { feet: 125000, emoji: "\ud83c\udf35", label: "Arizona Trail (800 mi)", pct: 72 },
+  { feet: 200000, emoji: "\ud83d\udc2b", label: "Silk Road Mountain Race (1,689 km)", pct: 82 },
+  { feet: 350000, emoji: "\ud83c\udf0a", label: "Baja Divide (1,700 mi)", pct: 90 },
+  { feet: 500000, emoji: "\ud83d\udeb5", label: "Great Divide (2,768 mi)", pct: 100 },
 ];
 
 function buildMilestoneTimeline(currentFeet: number): HTMLElement {
   const section = el("div", { class: "section" });
-  section.appendChild(text("label", "section-label", "Distance Milestones"));
+  section.appendChild(text("label", "section-label", "Route Milestones"));
 
   const graph = el("div", { class: "milestone-graph" });
   const track = el("div", { class: "milestone-track" });
@@ -221,6 +226,7 @@ function buildMilestoneTimeline(currentFeet: number): HTMLElement {
 
     const marker = el("div", { class: `milestone-marker${reached ? " reached" : ""}` });
     marker.style.bottom = `${pct}%`;
+    marker.title = `${ms.label} — ${ms.feet.toLocaleString()} ft saved`;
 
     const dot = el("div", { class: "milestone-dot" });
     if (reached) dot.textContent = "\u2713";
@@ -245,7 +251,7 @@ function buildMilestoneTimeline(currentFeet: number): HTMLElement {
     youMarker.appendChild(youDot);
 
     const youInfo = el("div", { class: "milestone-info" });
-    youInfo.appendChild(el("span", { class: "milestone-emoji", text: "\ud83d\udccd" }));
+    youInfo.appendChild(el("span", { class: "milestone-emoji", text: "\ud83d\udeb4" }));
     youInfo.appendChild(el("span", { class: "milestone-value", text: currentFeet.toLocaleString() + " ft" }));
     youInfo.appendChild(el("span", { class: "milestone-fact", text: "\u2014 You are here!" }));
     youMarker.appendChild(youInfo);
@@ -271,9 +277,9 @@ function buildStatisticsPage(): HTMLElement {
     const empty = el("div", { class: "empty-state empty-state-gated" });
     empty.appendChild(text("div", "empty-state-icon", "\ud83d\udcca"));
     empty.appendChild(
-      text("div", "empty-state-text", "Statistics tracking is a premium feature. Upgrade to see your usage insights.")
+      text("div", "empty-state-text", "Statistics tracking requires a license. Purchase to see your usage insights.")
     );
-    const emptyBtn = el("button", { class: "upgrade-btn empty-state-cta", text: "Upgrade to Premium" });
+    const emptyBtn = el("button", { class: "upgrade-btn empty-state-cta", text: "Purchase License" });
     emptyBtn.addEventListener("click", () => navigate("premium"));
     empty.appendChild(emptyBtn);
     page.appendChild(empty);
@@ -292,7 +298,6 @@ function buildStatisticsPage(): HTMLElement {
 
   // 4 stat cards with emoji icons and detail lines
   const dist = distanceSaved(counters);
-  const fridgeTrips = Math.round(dist / 6);
   const cards = el("div", { class: "stat-cards" });
   const cardData: { icon: string; value: string; label: string; detail: string; cls: string }[] = [
     {
@@ -317,11 +322,11 @@ function buildStatisticsPage(): HTMLElement {
       cls: "stat-card",
     },
     {
-      icon: "\ud83d\uddb1",
+      icon: "\ud83d\udeb2",
       value: `${Math.round(dist).toLocaleString()} ft`,
       label: "Mouse Distance Saved",
-      detail: fridgeTrips > 0
-        ? `That\u2019s about ${fridgeTrips} trip${fridgeTrips !== 1 ? "s" : ""} to the fridge \ud83e\uddca`
+      detail: dist > 0
+        ? `${(dist / 5280).toFixed(1)} miles of arm travel saved`
         : "Start clicking hints to save distance!",
       cls: "stat-card emerald-border",
     },
@@ -384,6 +389,86 @@ function buildStatisticsPage(): HTMLElement {
 
 // ── Quick Marks page ──────────────────────────────────────────
 
+function usedMarkLetters(): Set<string> {
+  return new Set(Object.keys(marks));
+}
+
+function buildAddMarkForm(): HTMLElement {
+  const form = el("div", { class: "add-mark-form" });
+
+  const letterInput = el("input", {
+    class: "add-mark-letter",
+    type: "text",
+    maxlength: "1",
+    placeholder: "a",
+  });
+
+  const urlInput = el("input", {
+    class: "add-mark-url",
+    type: "url",
+    placeholder: "https://example.com",
+  });
+
+  const titleInput = el("input", {
+    class: "add-mark-title",
+    type: "text",
+    placeholder: "Title (optional)",
+  });
+
+  const saveBtn = el("button", { class: "add-mark-save", text: "Add Mark" });
+  saveBtn.disabled = true;
+
+  const errorEl = el("div", { class: "add-mark-error" });
+
+  function validate(): string | null {
+    const letter = letterInput.value.toLowerCase();
+    if (!letter || letter < "a" || letter > "z") return "Letter must be a\u2013z";
+    if (usedMarkLetters().has(letter)) return `Mark "${letter}" already exists`;
+    const url = urlInput.value.trim();
+    if (!url) return "URL is required";
+    try { new URL(url); } catch { return "Invalid URL"; }
+    return null;
+  }
+
+  function updateState(): void {
+    const err = validate();
+    saveBtn.disabled = err !== null;
+    errorEl.textContent = "";
+  }
+
+  letterInput.addEventListener("input", () => {
+    letterInput.value = letterInput.value.toLowerCase().replace(/[^a-z]/g, "");
+    updateState();
+  });
+  urlInput.addEventListener("input", updateState);
+  titleInput.addEventListener("input", updateState);
+
+  saveBtn.addEventListener("click", async () => {
+    const err = validate();
+    if (err) {
+      errorEl.textContent = err;
+      return;
+    }
+    const letter = letterInput.value.toLowerCase();
+    const url = urlInput.value.trim();
+    const title = titleInput.value.trim() || url;
+    marks[letter] = { url, scrollY: 0, title };
+    await browser.storage.local.set({ quickMarks: marks });
+    refreshPage();
+  });
+
+  const row = el("div", { class: "add-mark-row" });
+  row.appendChild(letterInput);
+  row.appendChild(urlInput);
+  row.appendChild(titleInput);
+  row.appendChild(saveBtn);
+
+  form.appendChild(row);
+  form.appendChild(errorEl);
+
+  return form;
+}
+
 function buildQuickMarksPage(): HTMLElement {
   const page = el("div", { class: "page", id: "page-quickmarks" });
 
@@ -400,10 +485,10 @@ function buildQuickMarksPage(): HTMLElement {
       text(
         "div",
         "empty-state-text",
-        "Quick Marks is a premium feature. Set marks with m+letter, jump with '+letter."
+        "Quick Marks requires a license. Set marks with m+letter, jump with '+letter."
       )
     );
-    const emptyBtn = el("button", { class: "upgrade-btn empty-state-cta", text: "Upgrade to Premium" });
+    const emptyBtn = el("button", { class: "upgrade-btn empty-state-cta", text: "Purchase License" });
     emptyBtn.addEventListener("click", () => navigate("premium"));
     empty.appendChild(emptyBtn);
     page.appendChild(empty);
@@ -419,86 +504,59 @@ function buildQuickMarksPage(): HTMLElement {
   if (entries.length === 0) {
     const empty = el("div", { class: "empty-state" });
     empty.appendChild(text("div", "empty-state-icon", "\ud83d\udccc"));
-    empty.appendChild(text("div", "empty-state-text", "No marks set yet. Press m + a-z on any page to create one."));
+    empty.appendChild(text("div", "empty-state-text", "No marks set yet."));
     page.appendChild(empty);
-    return page;
+  } else {
+    const grid = el("div", { class: "marks-grid" });
+    for (const [letter, mark] of entries) {
+      if (!mark) continue;
+      const card = el("div", { class: "mark-card" });
+      card.appendChild(text("span", "mark-letter", letter));
+
+      const info = el("div", { class: "mark-info" });
+      info.appendChild(text("div", "mark-title", mark.title || "Untitled"));
+      info.appendChild(text("div", "mark-url", mark.url));
+      card.appendChild(info);
+
+      const deleteBtn = el("button", { class: "mark-delete", title: "Delete mark", text: "\u00d7" });
+      deleteBtn.addEventListener("click", async () => {
+        delete marks[letter];
+        await browser.storage.local.set({ quickMarks: marks });
+        refreshPage();
+      });
+      card.appendChild(deleteBtn);
+
+      grid.appendChild(card);
+    }
+    page.appendChild(grid);
   }
 
-  const grid = el("div", { class: "marks-grid" });
-  for (const [letter, mark] of entries) {
-    if (!mark) continue;
-    const card = el("div", { class: "mark-card" });
-    card.appendChild(text("span", "mark-letter", letter));
-
-    const info = el("div", { class: "mark-info" });
-    info.appendChild(text("div", "mark-title", mark.title || "Untitled"));
-    info.appendChild(text("div", "mark-url", mark.url));
-    card.appendChild(info);
-
-    const deleteBtn = el("button", { class: "mark-delete", title: "Delete mark", text: "\u00d7" });
-    deleteBtn.addEventListener("click", async () => {
-      delete marks[letter];
-      await browser.storage.local.set({ quickMarks: marks });
-      refreshPage();
-    });
-    card.appendChild(deleteBtn);
-
-    grid.appendChild(card);
-  }
-  page.appendChild(grid);
+  page.appendChild(buildAddMarkForm());
 
   return page;
 }
 
 // ── Key Layouts page ──────────────────────────────────────────
 
-type CommandCategory = "hints" | "scroll" | "page" | "tabs" | "actions" | "marks";
-
-const COMMAND_CATEGORIES: Record<string, CommandCategory> = {
-  activateHints: "hints",
-  multiOpen: "hints",
-  yankLink: "hints",
-  scrollDown: "scroll",
-  scrollUp: "scroll",
-  scrollLeft: "scroll",
-  scrollRight: "scroll",
-  scrollHalfPageDown: "page",
-  scrollHalfPageUp: "page",
-  scrollToBottom: "page",
-  scrollToTop: "page",
-  createTab: "tabs",
-  openTabSearch: "tabs",
-  closeTab: "tabs",
-  restoreTab: "tabs",
-  tabLeft: "tabs",
-  tabRight: "tabs",
-  tabNext: "tabs",
-  tabPrev: "tabs",
-  goBack: "actions",
-  goForward: "actions",
-  pageRefresh: "actions",
-  showHelp: "actions",
-  focusInput: "actions",
-  goUpUrl: "actions",
-  setMark: "marks",
-  jumpMark: "marks",
-};
-
-const CATEGORY_LABELS: { cat: CommandCategory; label: string }[] = [
-  { cat: "hints", label: "Hints" },
-  { cat: "scroll", label: "Scroll" },
-  { cat: "page", label: "Page" },
-  { cat: "tabs", label: "Tabs" },
-  { cat: "actions", label: "Actions" },
-  { cat: "marks", label: "Marks" },
-];
-
 // QWERTY keyboard rows for visualization
 const KB_ROWS = [
   ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
-  ["a", "s", "d", "f", "g", "h", "j", "k", "l"],
-  ["z", "x", "c", "v", "b", "n", "m"],
+  ["a", "s", "d", "f", "g", "h", "j", "k", "l", ";"],
+  ["z", "x", "c", "v", "b", "n", "m", ",", ".", "/"],
 ];
+
+const CODE_TO_DISPLAY: Record<string, string> = {
+  Semicolon: ";",
+  Period: ".",
+  Comma: ",",
+  Slash: "/",
+  Quote: "'",
+};
+
+function codeToKey(code: string): string | null {
+  if (code.startsWith("Key")) return code.slice(3).toLowerCase();
+  return CODE_TO_DISPLAY[code] ?? null;
+}
 
 function getKeyCategories(preset: PresetMeta): Map<string, CommandCategory> {
   const keys = new Map<string, CommandCategory>();
@@ -507,12 +565,9 @@ function getKeyCategories(preset: PresetMeta): Map<string, CommandCategory> {
   for (const binding of preset.bindings) {
     if (binding.sequence.includes(" ")) continue;
     if (binding.sequence.startsWith("Shift-")) continue;
-    const code = binding.sequence;
-    if (code.startsWith("Key")) {
-      const key = code.slice(3).toLowerCase();
-      const cat = COMMAND_CATEGORIES[binding.command];
-      if (cat) keys.set(key, cat);
-    }
+    const key = codeToKey(binding.sequence);
+    const cat = COMMAND_CATEGORIES[binding.command];
+    if (key && cat) keys.set(key, cat);
   }
 
   // Shift bindings (fill gaps)
@@ -520,11 +575,9 @@ function getKeyCategories(preset: PresetMeta): Map<string, CommandCategory> {
     if (binding.sequence.includes(" ")) continue;
     if (!binding.sequence.startsWith("Shift-")) continue;
     const code = binding.sequence.replace(/^Shift-/, "");
-    if (code.startsWith("Key")) {
-      const key = code.slice(3).toLowerCase();
-      const cat = COMMAND_CATEGORIES[binding.command];
-      if (cat && !keys.has(key)) keys.set(key, cat);
-    }
+    const key = codeToKey(code);
+    const cat = COMMAND_CATEGORIES[binding.command];
+    if (key && cat && !keys.has(key)) keys.set(key, cat);
   }
 
   // Sequence keys (fill remaining gaps)
@@ -532,11 +585,9 @@ function getKeyCategories(preset: PresetMeta): Map<string, CommandCategory> {
     if (!binding.sequence.includes(" ")) continue;
     for (const part of binding.sequence.split(" ")) {
       const code = part.replace(/^Shift-/, "");
-      if (code.startsWith("Key")) {
-        const key = code.slice(3).toLowerCase();
-        const cat = COMMAND_CATEGORIES[binding.command];
-        if (cat && !keys.has(key)) keys.set(key, cat);
-      }
+      const key = codeToKey(code);
+      const cat = COMMAND_CATEGORIES[binding.command];
+      if (key && cat && !keys.has(key)) keys.set(key, cat);
     }
   }
 
@@ -610,8 +661,9 @@ function buildBindingTable(layout: KeyLayout): HTMLElement {
   return table;
 }
 
-function buildModeColorPreviews(): HTMLElement {
+function buildModeColorPreviews(theme: Theme): HTMLElement {
   const row = el("div", { class: "mode-colors" });
+  row.dataset.tagTheme = theme;
   const modes: { cls: string; label: string }[] = [
     { cls: "click", label: "Click" },
     { cls: "yank", label: "Yank" },
@@ -619,7 +671,9 @@ function buildModeColorPreviews(): HTMLElement {
   ];
   for (const { cls, label } of modes) {
     const preview = el("div", { class: "mode-color-preview" });
-    preview.appendChild(el("span", { class: `mode-hint-tag ${cls}`, text: "ab" }));
+    const tag = el("span", { class: `mode-hint-tag ${cls}`, text: "ab" });
+    tag.dataset.label = "ab";
+    preview.appendChild(tag);
     preview.appendChild(el("span", { class: "mode-color-label", text: label }));
     row.appendChild(preview);
   }
@@ -648,7 +702,7 @@ function buildKeyLayoutsPage(): HTMLElement {
       }
     )
   );
-  tagSection.appendChild(buildModeColorPreviews());
+  tagSection.appendChild(buildModeColorPreviews(currentTheme));
   page.appendChild(tagSection);
 
   // Animations
@@ -742,6 +796,17 @@ function buildKeyLayoutsPage(): HTMLElement {
   page.appendChild(buildFullKeyboard(PRESETS[currentLayout]));
   page.appendChild(buildLegend());
 
+  if (!isPosition) {
+    page.appendChild(
+      text(
+        "p",
+        "kb-note",
+        "These are the characters each command produces — but we can't tell which physical key they're on for your layout. " +
+          "If a character doesn't match where you'd expect, check your OS keyboard settings."
+      )
+    );
+  }
+
   page.appendChild(el("hr", { class: "separator" }));
 
   // Full binding reference
@@ -755,12 +820,12 @@ function buildKeyLayoutsPage(): HTMLElement {
 
 function buildPremiumPage(): HTMLElement {
   const page = el("div", { class: "page", id: "page-premium" });
-  page.appendChild(text("h2", "page-title", "Premium"));
+  page.appendChild(text("h2", "page-title", "License"));
 
   const hero = el("div", { class: "premium-hero" });
   hero.appendChild(text("div", "premium-icon", isPremium ? "\u2726" : "\u2728"));
   hero.appendChild(
-    text("div", "premium-status", isPremium ? "You're on Premium" : "Upgrade to Premium")
+    text("div", "premium-status", isPremium ? "Licensed" : "Unlicensed")
   );
   hero.appendChild(
     text(
@@ -768,7 +833,7 @@ function buildPremiumPage(): HTMLElement {
       "premium-subtitle",
       isPremium
         ? "Thanks for supporting tabi! All features unlocked."
-        : "Unlock all layouts, statistics, and quick marks."
+        : "Purchase a license to unlock all features."
     )
   );
   page.appendChild(hero);
@@ -776,7 +841,7 @@ function buildPremiumPage(): HTMLElement {
   // Feature list — sourced from the shared feature catalog
   const features = [
     { icon: PREMIUM_FEATURES.leftHand.icon, name: "One-handed Layouts", desc: PREMIUM_FEATURES.leftHand.description },
-    { icon: PREMIUM_FEATURES.fuzzySearch.icon, name: PREMIUM_FEATURES.fuzzySearch.name, desc: PREMIUM_FEATURES.fuzzySearch.description },
+    { icon: PREMIUM_FEATURES.tabSearch.icon, name: PREMIUM_FEATURES.tabSearch.name, desc: PREMIUM_FEATURES.tabSearch.description },
     { icon: PREMIUM_FEATURES.statistics.icon, name: PREMIUM_FEATURES.statistics.name, desc: PREMIUM_FEATURES.statistics.description },
     { icon: PREMIUM_FEATURES.quickmarks.icon, name: PREMIUM_FEATURES.quickmarks.name, desc: PREMIUM_FEATURES.quickmarks.description },
   ];
@@ -793,11 +858,50 @@ function buildPremiumPage(): HTMLElement {
   }
   page.appendChild(list);
 
-  // CTA button
-  const btn = el("button", { class: isPremium ? "upgrade-btn active-plan" : "upgrade-btn" });
-  btn.textContent = isPremium ? "Active Plan" : "Upgrade to Premium";
-  if (isPremium) btn.disabled = true;
-  page.appendChild(btn);
+  if (!isPremium) {
+    const btn = el("button", { class: "upgrade-btn" });
+    btn.textContent = "Purchase License";
+    page.appendChild(btn);
+    page.appendChild(text("p", "license-hint", "One-time purchase via the App Store"));
+  }
+
+  // Support link
+  const support = el("div", { class: "license-support" });
+  const link = el("a", {
+    href: "https://github.com/anthropics/tabi/issues",
+    class: "license-support-link",
+  });
+  link.textContent = "Report a problem";
+  link.setAttribute("target", "_blank");
+  link.setAttribute("rel", "noopener");
+  support.appendChild(link);
+  page.appendChild(support);
+
+  return page;
+}
+
+// ── Debug page ────────────────────────────────────────────────
+
+function buildDebugPage(): HTMLElement {
+  const page = el("div", { class: "page", id: "page-debug" });
+
+  const titleRow = el("h2", { class: "page-title" });
+  titleRow.textContent = "Debug";
+  const badge = el("span", { class: "debug-badge", text: "Dev" });
+  titleRow.appendChild(badge);
+  page.appendChild(titleRow);
+
+  page.appendChild(
+    text("p", "section-hint", "Runtime overrides for development. Changes take effect immediately.")
+  );
+
+  page.appendChild(
+    buildToggle("Premium Mode", "Simulate premium entitlement without rebuilding", isPremium, (v) => {
+      isPremium = v;
+      browser.storage.local.set({ isPremium: v, debugPremium: v });
+      refreshPage();
+    })
+  );
 
   return page;
 }
@@ -810,7 +914,7 @@ function buildSidebar(): HTMLElement {
   const header = el("div", { class: "sidebar-header" });
   header.appendChild(el("h1", { text: "tabi" }));
   const pill = el("span", { class: isPremium ? "premium-pill premium" : "premium-pill" });
-  pill.textContent = isPremium ? "\u2726 Premium" : "Free";
+  pill.textContent = isPremium ? "\u2726 Licensed" : "Free";
   header.appendChild(pill);
   sidebar.appendChild(header);
 
@@ -832,6 +936,7 @@ const PAGE_BUILDERS: Record<PageId, () => HTMLElement> = {
   quickmarks: buildQuickMarksPage,
   keylayouts: buildKeyLayoutsPage,
   premium: buildPremiumPage,
+  ...(DEBUG ? { debug: buildDebugPage } : {}),
 };
 
 function render(): void {
@@ -874,9 +979,10 @@ async function init(): Promise<void> {
     "autoNotifications",
     "statistics",
     "quickMarks",
+    ...(DEBUG ? ["debugPremium"] : []),
   ]);
 
-  isPremium = FORCE_PREMIUM || stored.isPremium === true;
+  isPremium = resolvePremiumStatus(stored, DEBUG);
   currentLayout = (stored.keyLayout as KeyLayout) || DEFAULTS.keyLayout;
   currentBindingMode = (stored.keyBindingMode as KeyBindingMode) || DEFAULTS.keyBindingMode;
   currentTheme = (stored.theme as Theme) || DEFAULTS.theme;
@@ -892,7 +998,10 @@ async function init(): Promise<void> {
     if (areaName !== "local") return;
     let needsRefresh = false;
 
-    if (changes.isPremium?.newValue !== undefined) {
+    if (DEBUG && changes.debugPremium?.newValue !== undefined) {
+      isPremium = changes.debugPremium.newValue === true;
+      needsRefresh = true;
+    } else if (!DEBUG && changes.isPremium?.newValue !== undefined) {
       isPremium = changes.isPremium.newValue === true;
       needsRefresh = true;
     }

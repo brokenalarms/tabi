@@ -1,6 +1,6 @@
 // Tabi background service worker
 // Handles tab management and messaging with content scripts
-import { MAX_CLOSED_TABS } from "./modules/constants";
+import { MAX_CLOSED_TABS, MAX_TAB_HISTORY } from "./modules/constants";
 
 // Command names handled by the background service worker
 type Command =
@@ -8,7 +8,8 @@ type Command =
   | "restoreTab" | "tabLeft" | "tabRight" | "tabNext" | "tabPrev"
   | "goToTab" | "goToTabFirst" | "goToTabLast" | "extensionActive" | "extensionInactive"
   | "syncSettings"
-  | "jumpToMark";
+  | "jumpToMark"
+  | "tabHistoryBack" | "tabHistoryForward";
 
 const APP_BUNDLE_ID = "com.brokenalarms.tabi";
 
@@ -75,6 +76,13 @@ export const tabOrder: number[] = [];
 
 // Track the previously active tab so we can return to it after closing
 export const activeHistory = { previous: null as number | null, current: null as number | null };
+
+// Full tab activation history for back/forward navigation (browser-style)
+export const tabHistory = {
+  stack: [] as number[],
+  index: -1,
+  navigating: false,
+};
 
 export async function updateIconState(tabId: number): Promise<void> {
   try {
@@ -235,6 +243,39 @@ export async function handleCommand(command: Command, sender: MessageSender, mes
       break;
     }
 
+    case "tabHistoryBack": {
+      if (tabHistory.index > 0) {
+        tabHistory.navigating = true;
+        tabHistory.index--;
+        try { await browser.tabs.update(tabHistory.stack[tabHistory.index], { active: true }); } catch (_) {
+          // Tab no longer exists — remove it and retry
+          tabHistory.stack.splice(tabHistory.index, 1);
+          if (tabHistory.index > tabHistory.stack.length - 1) {
+            tabHistory.index = tabHistory.stack.length - 1;
+          }
+        } finally {
+          tabHistory.navigating = false;
+        }
+      }
+      break;
+    }
+
+    case "tabHistoryForward": {
+      if (tabHistory.index < tabHistory.stack.length - 1) {
+        tabHistory.navigating = true;
+        tabHistory.index++;
+        try { await browser.tabs.update(tabHistory.stack[tabHistory.index], { active: true }); } catch (_) {
+          tabHistory.stack.splice(tabHistory.index, 1);
+          if (tabHistory.index > tabHistory.stack.length - 1) {
+            tabHistory.index = tabHistory.stack.length - 1;
+          }
+        } finally {
+          tabHistory.navigating = false;
+        }
+      }
+      break;
+    }
+
     case "jumpToMark": {
       const url = message && typeof message.url === "string" ? message.url : undefined;
       const scrollY = message && typeof message.scrollY === "number" ? message.scrollY : 0;
@@ -278,6 +319,21 @@ export function init(): void {
   browser.tabs.onActivated.addListener((activeInfo: { tabId: number }) => {
     activeHistory.previous = activeHistory.current;
     activeHistory.current = activeInfo.tabId;
+
+    if (!tabHistory.navigating) {
+      // Wipe forward history (browser-style)
+      if (tabHistory.index < tabHistory.stack.length - 1) {
+        tabHistory.stack.length = tabHistory.index + 1;
+      }
+      // Deduplicate consecutive visits to the same tab
+      if (tabHistory.stack[tabHistory.stack.length - 1] !== activeInfo.tabId) {
+        tabHistory.stack.push(activeInfo.tabId);
+        if (tabHistory.stack.length > MAX_TAB_HISTORY) {
+          tabHistory.stack.shift();
+        }
+      }
+      tabHistory.index = tabHistory.stack.length - 1;
+    }
   });
 
   // Track tab URLs for closed-tab restore
@@ -300,6 +356,19 @@ export function init(): void {
     if (idx >= 0) tabOrder.splice(idx, 1);
     tabUrlCache.delete(tabId);
     activeTabSet.delete(tabId);
+
+    // Remove closed tab from history stack, adjusting index as needed
+    for (let i = tabHistory.stack.length - 1; i >= 0; i--) {
+      if (tabHistory.stack[i] === tabId) {
+        tabHistory.stack.splice(i, 1);
+        if (tabHistory.index >= i && tabHistory.index > 0) {
+          tabHistory.index--;
+        }
+      }
+    }
+    if (tabHistory.index >= tabHistory.stack.length) {
+      tabHistory.index = tabHistory.stack.length - 1;
+    }
   });
 
   // Populate caches on startup

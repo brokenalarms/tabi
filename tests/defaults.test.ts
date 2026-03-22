@@ -64,4 +64,26 @@ describe("Key layouts", () => {
     const bindings = new Map(bindingsForPreset("rightHand"));
     assert.equal(bindings.get("Semicolon"), "activateHints");
   });
+
+  // All layouts must include setMark and jumpMark so marks work everywhere.
+  // rightHand previously used KeyM for yankLink, blocking marks entirely.
+  it("all layouts include mark bindings", () => {
+    for (const layout of ["optimized", "vim", "leftHand", "rightHand"] as const) {
+      const commands = new Set(bindingsForPreset(layout).map(([, cmd]) => cmd));
+      assert.ok(commands.has("setMark"), `${layout} should have setMark`);
+      assert.ok(commands.has("jumpMark"), `${layout} should have jumpMark`);
+    }
+  });
+
+  // No layout should bind the same key sequence to two different commands.
+  it("no duplicate key sequences within any layout", () => {
+    for (const layout of ["optimized", "vim", "leftHand", "rightHand"] as const) {
+      const bindings = bindingsForPreset(layout);
+      const seen = new Map<string, string>();
+      for (const [seq, cmd] of bindings) {
+        assert.ok(!seen.has(seq), `${layout}: "${seq}" bound to both "${seen.get(seq)}" and "${cmd}"`);
+        seen.set(seq, cmd);
+      }
+    }
+  });
 });

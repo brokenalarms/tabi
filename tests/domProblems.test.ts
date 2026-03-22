@@ -428,6 +428,56 @@ describe("disclosure trigger dedup", () => {
         assert.ok(!hintMode.isActive(), "Expected 1 hint (lone disclosure button should be kept)");
     });
 
+    // GitHub PR: section header button with aria-expanded + aria-controls and
+    // a sibling "Details" link. The button is the primary section toggle — the
+    // dedup should not remove it because it's in a standalone section, not a
+    // repeating nav list.
+    // SITE: github.com — PR merge box "Expand checks" button
+    // FIX: disclosure dedup only applies inside repeating containers (li/tr)
+    it("keeps disclosure button outside repeating containers", () => {
+        // Base: in a <li>, disclosure button IS filtered (nav menu pattern)
+        const li = makeElement("LI", { top: 0, left: 0 });
+        const navLink = makeElement("A", { href: "#", top: 10, left: 0 });
+        const navToggle = makeElement("BUTTON", {
+            top: 10, left: 110,
+            attrs: { "aria-expanded": "false", "aria-controls": "submenu" },
+        });
+        li.appendChild(navLink);
+        li.appendChild(navToggle);
+
+        loadModules([navLink, navToggle]);
+        const { hintMode: baseMode } = getState();
+        baseMode.activate();
+        assert.ok(baseMode.isActive());
+        fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
+        assert.ok(!baseMode.isActive(), "In <li>, disclosure button should be filtered (1 hint)");
+        baseMode.destroy();
+
+        // Delta: in a <div> (standalone section header), disclosure button is KEPT
+        const header = makeElement("DIV", { top: 100, left: 0 });
+        const expandBtn = makeElement("BUTTON", {
+            top: 100, left: 0, width: 600, height: 40,
+            textContent: "5 checks passed",
+            attrs: { "aria-expanded": "false", "aria-controls": "checks-panel", "aria-label": "Expand checks" },
+        });
+        const detailsLink = makeElement("A", { href: "/checks", top: 100, left: 610, width: 80, height: 40, textContent: "Details" });
+        header.appendChild(expandBtn);
+        header.appendChild(detailsLink);
+
+        loadModules([expandBtn, detailsLink]);
+        const { hintMode } = getState();
+        hintMode.activate();
+        assert.ok(hintMode.isActive());
+        // 2 hints → both buttons should be discoverable
+        fireKeyDown(makeKeyEvent("KeyS", { key: "s" }));
+        assert.equal(expandBtn.click.mock.callCount() + detailsLink.click.mock.callCount(), 1);
+        hintMode.activate();
+        assert.ok(hintMode.isActive(), "Should reactivate — both elements should have hints");
+        fireKeyDown(makeKeyEvent("KeyA", { key: "a" }));
+        assert.equal(expandBtn.click.mock.callCount() + detailsLink.click.mock.callCount(), 2,
+            "Both expand button and details link should get hints in standalone section");
+    });
+
     // Regular button without aria-expanded is not affected
     it("does not filter regular button without aria-expanded", () => {
         const parent = makeElement("LI", { top: 0, left: 0 });
