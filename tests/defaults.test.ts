@@ -59,10 +59,10 @@ describe("Key layouts", () => {
     assert.equal(bindings.get("KeyD"), "scrollRight");
   });
 
-  // rightHand layout uses Semicolon for hint activation
-  it("rightHand uses Semicolon for activateHints", () => {
+  // rightHand layout uses H for hint activation (action column toward center)
+  it("rightHand uses H for activateHints", () => {
     const bindings = new Map(bindingsForPreset("rightHand"));
-    assert.equal(bindings.get("Semicolon"), "activateHints");
+    assert.equal(bindings.get("KeyH"), "activateHints");
   });
 
   // All layouts must include setMark and jumpMark so marks work everywhere.
@@ -72,6 +72,16 @@ describe("Key layouts", () => {
       const commands = new Set(bindingsForPreset(layout).map(([, cmd]) => cmd));
       assert.ok(commands.has("setMark"), `${layout} should have setMark`);
       assert.ok(commands.has("jumpMark"), `${layout} should have jumpMark`);
+    }
+  });
+
+  // All preset bindings are single keystroke or Shift+key — no multi-key sequences
+  it("no multi-key sequences in any layout", () => {
+    for (const layout of ["optimized", "vim", "leftHand", "rightHand"] as const) {
+      const bindings = bindingsForPreset(layout);
+      for (const [seq] of bindings) {
+        assert.ok(!seq.includes(" "), `${layout}: "${seq}" is a multi-key sequence`);
+      }
     }
   });
 

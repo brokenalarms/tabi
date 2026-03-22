@@ -136,24 +136,25 @@ describe("KeyHandler", () => {
         });
     });
 
-    describe("Multi-key sequence with timeout", () => {
-        // Tests that g+i dispatches focusInput
-        it("dispatches gi sequence", () => {
+    describe("Single-key navigation commands", () => {
+        // I dispatches focusInput (replaced multi-key gi)
+        it("dispatches focusInput on I", () => {
             let called = false;
             keyHandler.on("focusInput", () => { called = true; });
-            fireKeyDown(makeKeyEvent("KeyG"));
             fireKeyDown(makeKeyEvent("KeyI"));
-            assert.ok(called, "focusInput should be called for gi");
+            assert.ok(called, "focusInput should be called for I");
         });
 
-        // Tests that g+u dispatches goUpUrl
-        it("dispatches gu sequence", () => {
+        // U dispatches goUpUrl (replaced multi-key gu)
+        it("dispatches goUpUrl on U", () => {
             let called = false;
             keyHandler.on("goUpUrl", () => { called = true; });
-            fireKeyDown(makeKeyEvent("KeyG"));
             fireKeyDown(makeKeyEvent("KeyU"));
             assert.ok(called);
         });
+    });
+
+    describe("Multi-key sequence with timeout", () => {
 
         // Tests that g+0 dispatches goToTabFirst
         it("dispatches g0 sequence", () => {
@@ -460,19 +461,19 @@ describe("KeyHandler", () => {
             assert.ok(scrollDownCalled, "S dispatches scrollDown in leftHand layout");
         });
 
-        it("switches to rightHand layout — semicolon changes from jumpMark to activateHints", () => {
+        it("switches to rightHand layout — semicolon changes from jumpMark to goUpUrl", () => {
             // Base: optimized layout — Semicolon dispatches jumpMark
             let jumpMarkCalled = false;
             keyHandler.on("jumpMark", () => { jumpMarkCalled = true; });
             fireKeyDown(makeKeyEvent("Semicolon"));
             assert.ok(jumpMarkCalled, "Semicolon dispatches jumpMark in optimized layout");
 
-            // Delta: rightHand layout — Semicolon dispatches activateHints instead
-            let hintsCalled = false;
-            keyHandler.on("activateHints", () => { hintsCalled = true; });
+            // Delta: rightHand layout — Semicolon dispatches goUpUrl instead
+            let goUpCalled = false;
+            keyHandler.on("goUpUrl", () => { goUpCalled = true; });
             keyHandler.setLayout("rightHand");
             fireKeyDown(makeKeyEvent("Semicolon"));
-            assert.ok(hintsCalled, "Semicolon dispatches activateHints in rightHand layout");
+            assert.ok(goUpCalled, "Semicolon dispatches goUpUrl in rightHand layout");
         });
 
         it("clears old bindings when switching layouts", () => {
