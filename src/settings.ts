@@ -67,7 +67,8 @@ function text(tag: keyof HTMLElementTagNameMap, className: string, content: stri
 
 // ── Navigation ────────────────────────────────────────────────
 
-type PageId = "statistics" | "quickmarks" | "keylayouts" | "premium" | "debug";
+type CorePageId = "statistics" | "quickmarks" | "keylayouts" | "premium";
+type PageId = CorePageId | "debug";
 
 interface NavEntry {
   id: PageId;
@@ -972,7 +973,7 @@ function buildSidebar(): HTMLElement {
 
 // ── Render ────────────────────────────────────────────────────
 
-const PAGE_BUILDERS: Record<PageId, () => HTMLElement> = {
+const PAGE_BUILDERS: Record<CorePageId, () => HTMLElement> & Partial<Record<"debug", () => HTMLElement>> = {
   statistics: buildStatisticsPage,
   quickmarks: buildQuickMarksPage,
   keylayouts: buildKeyLayoutsPage,
