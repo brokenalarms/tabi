@@ -661,30 +661,36 @@ function buildLegend(): HTMLElement {
 
 function buildBindingTable(layout: KeyLayout): HTMLElement {
   const preset = PRESETS[layout];
-  const table = el("table", { class: "binding-table" });
 
-  const thead = el("thead");
-  const headerRow = el("tr");
-  headerRow.appendChild(el("th", { text: "Key" }));
-  headerRow.appendChild(el("th", { text: "Action" }));
-  thead.appendChild(headerRow);
-  table.appendChild(thead);
-
-  const tbody = el("tbody");
+  const grouped = new Map<CommandCategory, KeyBinding[]>();
+  for (const { cat } of CATEGORY_LABELS) grouped.set(cat, []);
   for (const binding of preset.bindings) {
-    const row = el("tr");
-    const keyCell = el("td");
     const cat = COMMAND_CATEGORIES[binding.command];
-    const keyCls = cat ? `binding-key cat-${cat}` : "binding-key";
-    keyCell.appendChild(el("span", { class: keyCls, text: binding.display }));
-    row.appendChild(keyCell);
-
-    const desc = COMMANDS[binding.command] || binding.command;
-    row.appendChild(el("td", { text: desc }));
-    tbody.appendChild(row);
+    if (cat) grouped.get(cat)!.push(binding);
   }
-  table.appendChild(tbody);
-  return table;
+
+  const container = el("div", { class: "binding-groups" });
+  for (const { cat, label } of CATEGORY_LABELS) {
+    const bindings = grouped.get(cat)!;
+    if (bindings.length === 0) continue;
+
+    const group = el("div", { class: "binding-group" });
+    const header = el("div", { class: "binding-group-header" });
+    header.appendChild(el("div", { class: `kb-legend-swatch cat-${cat}` }));
+    header.appendChild(document.createTextNode(label));
+    group.appendChild(header);
+
+    for (const binding of bindings) {
+      const row = el("div", { class: "binding-row" });
+      const keyCls = `binding-key cat-${cat}`;
+      row.appendChild(el("span", { class: keyCls, text: binding.display }));
+      const desc = COMMANDS[binding.command] || binding.command;
+      row.appendChild(el("span", { class: "binding-action", text: desc }));
+      group.appendChild(row);
+    }
+    container.appendChild(group);
+  }
+  return container;
 }
 
 function buildModeColorPreviews(theme: Theme): HTMLElement {

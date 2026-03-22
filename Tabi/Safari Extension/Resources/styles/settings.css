@@ -1048,6 +1048,7 @@ body {
 .kb-legend {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 14px;
   margin-top: 14px;
 }
@@ -1079,32 +1080,43 @@ body {
   color: var(--tabi-color-secondary);
 }
 
-/* Full binding reference table */
+/* Full binding reference — two-column grouped layout */
 
-.binding-table {
-  width: 100%;
-  border-collapse: collapse;
+.binding-groups {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px 32px;
 }
 
-.binding-table th {
-  text-align: left;
+.binding-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--tabi-color-secondary);
-  padding: 8px 0;
+  padding-bottom: 6px;
   border-bottom: 1px solid var(--tabi-separator);
+  margin-bottom: 4px;
 }
 
-.binding-table td {
-  padding: 7px 0;
+.binding-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.binding-action {
   font-size: 13px;
-  border-bottom: 1px solid var(--tabi-border);
 }
 
 .binding-key {
   display: inline-block;
+  min-width: 28px;
+  text-align: center;
   padding: 2px 7px;
   border-radius: 4px;
   background: var(--tabi-segmented-bg);
