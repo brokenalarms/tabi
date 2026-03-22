@@ -2,7 +2,7 @@
 // Uses composable builder functions for DOM construction. Reads/writes
 // browser.storage.local for all settings, statistics, and quick marks.
 
-import { PRESETS, isLayoutPremium } from "./keybindings";
+import { PRESETS, isLayoutPremium, KB_ROWS } from "./keybindings";
 import type { PresetMeta, KeyBinding } from "./keybindings";
 import {
   loadCounters,
@@ -661,13 +661,6 @@ function buildQuickMarksPage(): HTMLElement {
 }
 
 // ── Key Layouts page ──────────────────────────────────────────
-
-// QWERTY keyboard rows for visualization (null = invisible spacer for rectangle fill)
-const KB_ROWS: (string | null)[][] = [
-  ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "[", "]"],
-  ["a", "s", "d", "f", "g", "h", "j", "k", "l", ";", "'", null],
-  ["z", "x", "c", "v", "b", "n", "m", ",", ".", "/", null, null],
-];
 
 const CODE_TO_DISPLAY: Record<string, string> = {
   Semicolon: ";",

@@ -530,6 +530,57 @@ test("screenshot: statistics page", async ({ page }) => {
   await page.screenshot({ path: path.join(SCREENSHOT_DIR, "settings-statistics.png"), fullPage: true });
 });
 
+// Full keyboard rows form a filled rectangle — every row has the same number of cells
+test("full keyboard rows all have equal child count", async ({ page }) => {
+  await setupStyledSettingsPage(page);
+  await page.waitForSelector(".full-keyboard");
+
+  const childCounts = await page.locator(".full-kb-row").evaluateAll(
+    (rows: Element[]) => rows.map((r) => r.children.length)
+  );
+  expect(childCounts.length).toBeGreaterThanOrEqual(3);
+  for (const count of childCounts) {
+    expect(count).toBe(childCounts[0]);
+  }
+});
+
+// Full keyboard is horizontally centered in its container via auto margins
+test("full keyboard is centered in its container", async ({ page }) => {
+  await setupStyledSettingsPage(page);
+  await page.waitForSelector(".full-keyboard");
+
+  const boxes = await page.evaluate(() => {
+    const kb = document.querySelector(".full-keyboard")!;
+    const parent = kb.parentElement!;
+    const kbRect = kb.getBoundingClientRect();
+    const parentRect = parent.getBoundingClientRect();
+    return { kbLeft: kbRect.left, kbRight: kbRect.right, parentLeft: parentRect.left, parentRight: parentRect.right };
+  });
+
+  const leftMargin = boxes.kbLeft - boxes.parentLeft;
+  const rightMargin = boxes.parentRight - boxes.kbRight;
+  // Centered means left and right margins are approximately equal (within 2px)
+  expect(Math.abs(leftMargin - rightMargin)).toBeLessThanOrEqual(2);
+});
+
+// Mini keyboards on layout cards also form filled rectangles
+test("mini keyboard rows all have equal child count", async ({ page }) => {
+  await setupStyledSettingsPage(page);
+
+  const miniKbs = page.locator(".mini-keyboard");
+  const count = await miniKbs.count();
+  expect(count).toBeGreaterThan(0);
+
+  for (let i = 0; i < count; i++) {
+    const childCounts = await miniKbs.nth(i).locator(".mini-kb-row").evaluateAll(
+      (rows: Element[]) => rows.map((r) => r.children.length)
+    );
+    for (const c of childCounts) {
+      expect(c).toBe(childCounts[0]);
+    }
+  }
+});
+
 test("screenshot: key layouts page", async ({ page }) => {
   await setupStyledSettingsPage(page, { isPremium: true });
 
