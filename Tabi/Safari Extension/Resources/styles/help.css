@@ -94,6 +94,7 @@
 .tabi-help-modal .cat-scroll { --cat: 16 185 129; }
 .tabi-help-modal .cat-page { --cat: 56 189 248; }
 .tabi-help-modal .cat-tabs { --cat: 10 132 255; }
+.tabi-help-modal .cat-go { --cat: 239 68 68; }
 .tabi-help-modal .cat-actions { --cat: 168 85 247; }
 .tabi-help-modal .cat-marks { --cat: 236 72 153; }
 
@@ -102,6 +103,7 @@
     .tabi-help-modal .cat-scroll { --cat: 5 150 105; }
     .tabi-help-modal .cat-page { --cat: 8 145 178; }
     .tabi-help-modal .cat-tabs { --cat: 37 99 235; }
+    .tabi-help-modal .cat-go { --cat: 185 28 28; }
     .tabi-help-modal .cat-actions { --cat: 124 58 237; }
     .tabi-help-modal .cat-marks { --cat: 219 39 119; }
 }

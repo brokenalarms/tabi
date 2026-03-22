@@ -986,6 +986,7 @@ body {
 .cat-scroll { --cat: 16 185 129; }
 .cat-page { --cat: 56 189 248; }
 .cat-tabs { --cat: 10 132 255; }
+.cat-go { --cat: 239 68 68; }
 .cat-actions { --cat: 168 85 247; }
 .cat-marks { --cat: 236 72 153; }
 
@@ -994,6 +995,7 @@ body {
   .cat-scroll { --cat: 5 150 105; }
   .cat-page { --cat: 8 145 178; }
   .cat-tabs { --cat: 37 99 235; }
+  .cat-go { --cat: 185 28 28; }
   .cat-actions { --cat: 124 58 237; }
   .cat-marks { --cat: 219 39 119; }
 }
