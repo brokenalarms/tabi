@@ -59,7 +59,7 @@ export function showPremiumPrompt(featureName: string): void {
   toast.className = TOAST_CLASS;
 
   const title = document.createElement("strong");
-  title.textContent = featureName + " requires a license";
+  title.textContent = featureName + " requires Premium";
 
   const cta = document.createElement("span");
   cta.className = "tabi-premium-cta";
