@@ -69,7 +69,7 @@ test("settings page renders sidebar with all navigation items", async ({ page })
   await setupSettingsPage(page);
 
   const navItems = await page.locator(".nav-item").allTextContents();
-  for (const label of ["Statistics", "Quick Marks", "Key Layouts", "License"]) {
+  for (const label of ["Key Layouts", "Quick Marks", "Statistics", "Premium"]) {
     expect(navItems.some(item => item.includes(label))).toBe(true);
   }
   expect(navItems).toHaveLength(4);
@@ -360,7 +360,7 @@ test("add-mark form disables save for invalid URL", async ({ page }) => {
 test("license page shows purchase CTA for unlicensed users", async ({ page }) => {
   await setupSettingsPage(page);
 
-  await page.locator(".nav-item", { hasText: "License" }).click();
+  await page.locator(".nav-item", { hasText: "Premium" }).click();
 
   const activePage = page.locator(".page.active");
   await expect(activePage.locator(".premium-status")).toHaveText("Unlicensed");
@@ -370,7 +370,7 @@ test("license page shows purchase CTA for unlicensed users", async ({ page }) =>
 test("license page shows licensed status without purchase button", async ({ page }) => {
   await setupSettingsPage(page, { isPremium: true });
 
-  await page.locator(".nav-item", { hasText: "License" }).click();
+  await page.locator(".nav-item", { hasText: "Premium" }).click();
 
   const activePage = page.locator(".page.active");
   await expect(activePage.locator(".premium-status")).toHaveText("Licensed");
