@@ -228,6 +228,34 @@ describe("QuickMarks class", () => {
     delete (globalThis as any).browser;
   });
 
+  // Jump mode must capture keys immediately — before storage resolves —
+  // so normal-mode commands (e.g. R for refresh) don't leak through.
+  it("modeKeyDelegate is installed synchronously before storage resolves", async () => {
+    let storageResolve: (() => void) | null = null;
+    (globalThis as any).browser.storage.local.get = () =>
+      new Promise<Record<string, unknown>>(resolve => {
+        storageResolve = () => resolve({ ...storedData });
+      });
+
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    // Fire jumpMark — activate() is async, storage is pending
+    const activatePromise = commands.get("jumpMark")!();
+
+    // Before storage resolves: mode and delegate should already be set
+    assert.equal(currentMode, "MARK");
+    assert.notEqual(modeKeyDelegate, null, "delegate must be set before storage resolves");
+
+    // Key press should be captured, not leak to the page
+    const handled = pressKey("r");
+    assert.equal(handled, true, "key must be captured while storage is pending");
+
+    // Resolve storage so activate() finishes cleanly
+    storageResolve!();
+    await activatePromise;
+  });
+
   // Verifies that QuickMarks registers setMark and jumpMark commands.
   it("registers setMark and jumpMark commands", async () => {
     const { QuickMarks } = await import("../src/modules/QuickMarks");

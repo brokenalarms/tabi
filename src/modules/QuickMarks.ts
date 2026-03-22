@@ -158,13 +158,13 @@ export class QuickMarks {
     this.labelBuffer = "";
     this.prefixKey = subMode === "set" ? this.prefixKeys.set : this.prefixKeys.jump;
     this.keyHandler.setMode(Mode.MARK);
+    this.keyHandler.setModeKeyDelegate(this.handleKey.bind(this));
+    this.createStatusBar();
 
     const stored = await browser.storage.local.get([STORAGE_KEY, SETTINGS_KEY]);
     this.marks = (stored[STORAGE_KEY] as MarkMap) || {};
     this.settings = { ...DEFAULT_SETTINGS, ...(stored[SETTINGS_KEY] as Partial<QuickMarkSettings>) };
 
-    this.createStatusBar();
-    this.keyHandler.setModeKeyDelegate(this.handleKey.bind(this));
     this.startPanelTimer();
   }
 
