@@ -601,12 +601,29 @@ describe("QuickMarks class", () => {
     assert.equal((favicons[0] as HTMLImageElement).src, "https://example.com/icon.png");
   });
 
-  // Verifies that the discovery panel header reflects two-char label support.
-  it("discovery panel header mentions label, not a-z", async () => {
+  // Verifies that set mode never shows the discovery panel — it's pure input mode.
+  it("set mode does not show discovery panel even after delay", async () => {
     const { QuickMarks } = await import("../src/modules/QuickMarks");
     activeInstance = new QuickMarks(fakeKeyHandler as any);
 
+    storedData.quickMarks = {
+      a: { url: "https://example.com", scrollY: 0, title: "Example" },
+    };
+
     await commands.get("setMark")!();
+
+    await new Promise(r => setTimeout(r, 450));
+
+    assert.equal(document.querySelector(".tabi-mark-panel"), null,
+      "set mode should never show discovery panel");
+  });
+
+  // Verifies that the discovery panel header in jump mode reflects two-char label support.
+  it("jump mode discovery panel header mentions label, not a-z", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    await commands.get("jumpMark")!();
 
     await new Promise(r => setTimeout(r, 450));
 

@@ -165,7 +165,9 @@ export class QuickMarks {
     this.marks = (stored[STORAGE_KEY] as MarkMap) || {};
     this.settings = { ...DEFAULT_SETTINGS, ...(stored[SETTINGS_KEY] as Partial<QuickMarkSettings>) };
 
-    this.startPanelTimer();
+    if (subMode === "jump") {
+      this.startPanelTimer();
+    }
   }
 
   // --- Key handling ---
