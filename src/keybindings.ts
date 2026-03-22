@@ -40,10 +40,6 @@ const SHARED: KeyBinding[] = [
   bind("BracketLeft", "tabHistoryBack", "["),
   bind("BracketRight", "tabHistoryForward", "]"),
 
-  // Navigation
-  bind("KeyG KeyI", "focusInput", "gi"),
-  bind("KeyG KeyU", "goUpUrl", "gu"),
-
   // Help
   bind("Shift-Slash", "showHelp", "?"),
 ];
@@ -80,7 +76,11 @@ export const PRESETS: Record<KeyLayout, PresetMeta> = {
       bind("Shift-Comma", "tabLeft", "<"),
       bind("Shift-Period", "tabRight", ">"),
 
-      // Marks (semicolon = home row, better than quote)
+      // Navigation (single key — no sequences)
+      bind("KeyI", "focusInput", "I"),
+      bind("KeyU", "goUpUrl", "U"),
+
+      // Marks
       bind("KeyM", "setMark", "M"),
       bind("Semicolon", "jumpMark", ";"),
     ],
@@ -100,18 +100,22 @@ export const PRESETS: Record<KeyLayout, PresetMeta> = {
       bind("KeyD", "scrollHalfPageDown", "d"),
       bind("KeyU", "scrollHalfPageUp", "u"),
       bind("Shift-KeyG", "scrollToBottom", "G"),
-      bind("KeyG KeyG", "scrollToTop", "gg"),
+      bind("Shift-KeyK", "scrollToTop", "Shift+K"),
 
       // History
       bind("Shift-KeyH", "goBack", "H"),
       bind("Shift-KeyL", "goForward", "L"),
       bind("KeyR", "pageRefresh", "r"),
 
-      // Tab movement
-      bind("Shift-KeyJ", "tabLeft", "J"),
-      bind("Shift-KeyK", "tabRight", "K"),
-      bind("KeyG KeyT", "tabNext", "gt"),
-      bind("KeyG Shift-KeyT", "tabPrev", "gT"),
+      // Tab switching
+      bind("KeyN", "tabNext", "n"),
+      bind("KeyP", "tabPrev", "p"),
+      bind("Shift-Comma", "tabLeft", "<"),
+      bind("Shift-Period", "tabRight", ">"),
+
+      // Navigation (single key — no sequences)
+      bind("KeyI", "focusInput", "I"),
+      bind("Shift-KeyU", "goUpUrl", "Shift+U"),
 
       // Marks
       bind("KeyM", "setMark", "m"),
@@ -124,48 +128,44 @@ export const PRESETS: Record<KeyLayout, PresetMeta> = {
     description: "All shortcuts on the left side of the keyboard — browse one-handed.",
     premium: true,
     bindings: [
-      // Scrolling (WASD)
+      // Navigation 3×3 (WASD grid)
+      bind("KeyQ", "scrollToTop", "Q"),
       bind("KeyW", "scrollUp", "W"),
-      bind("KeyS", "scrollDown", "S"),
+      bind("KeyE", "scrollHalfPageUp", "E"),
       bind("KeyA", "scrollLeft", "A"),
+      bind("KeyS", "scrollDown", "S"),
       bind("KeyD", "scrollRight", "D"),
-      bind("KeyQ", "scrollHalfPageUp", "Q"),
-      bind("KeyE", "scrollHalfPageDown", "E"),
-      bind("Shift-KeyW", "scrollToTop", "Shift+W"),
-      bind("Shift-KeyS", "scrollToBottom", "Shift+S"),
+      bind("KeyZ", "scrollToBottom", "Z"),
+      bind("KeyX", "focusInput", "X"),
+      bind("KeyC", "scrollHalfPageDown", "C"),
 
-      // History
-      bind("Shift-KeyA", "goBack", "Shift+A"),
-      bind("Shift-KeyD", "goForward", "Shift+D"),
-      bind("KeyR", "pageRefresh", "R"),
-
-      // Tab movement
+      // Shift-navigation (directional analogs)
       bind("Shift-KeyQ", "tabLeft", "Shift+Q"),
+      bind("Shift-KeyW", "tabPrev", "Shift+W"),
       bind("Shift-KeyE", "tabRight", "Shift+E"),
+      bind("Shift-KeyA", "goBack", "Shift+A"),
+      bind("Shift-KeyS", "tabNext", "Shift+S"),
+      bind("Shift-KeyD", "goForward", "Shift+D"),
+      bind("Shift-KeyZ", "tabHistoryBack", "Shift+Z"),
+      bind("Shift-KeyX", "closeTab", "Shift+X"),
+      bind("Shift-KeyC", "tabHistoryForward", "Shift+C"),
 
-      // Hints
+      // Actions (columns right of navigation)
+      bind("KeyR", "pageRefresh", "R"),
       bind("KeyF", "activateHints", "F"),
-      bind("Shift-KeyF", "multiOpen", "Shift+F"),
       bind("KeyV", "yankLink", "V"),
+      bind("KeyT", "createTab", "T"),
+      bind("KeyG", "goUpUrl", "G"),
+      bind("KeyB", "multiOpen", "B"),
 
-      // Tabs
-      bind("KeyT", "createTab", "t"),
+      // Shift-actions
+      bind("Shift-KeyR", "restoreTab", "Shift+R"),
+      bind("Shift-KeyF", "setMark", "Shift+F"),
       bind("Shift-KeyT", "openTabSearch", "Shift+T"),
-      bind("KeyX", "closeTab", "x"),
-      bind("Shift-KeyX", "restoreTab", "X"),
-      bind("BracketLeft", "tabHistoryBack", "["),
-      bind("BracketRight", "tabHistoryForward", "]"),
-
-      // Navigation
-      bind("KeyG KeyR", "focusInput", "gr"),
-      bind("KeyG KeyC", "goUpUrl", "gc"),
-
-      // Marks
-      bind("KeyZ", "setMark", "Z"),
-      bind("Shift-KeyZ", "jumpMark", "Shift+Z"),
+      bind("Shift-KeyG", "jumpMark", "Shift+G"),
 
       // Help
-      bind("KeyB", "showHelp", "B"),
+      bind("Shift-Slash", "showHelp", "?"),
     ],
   },
 
@@ -174,47 +174,46 @@ export const PRESETS: Record<KeyLayout, PresetMeta> = {
     description: "All shortcuts on the right side of the keyboard — browse one-handed.",
     premium: true,
     bindings: [
-      // Scrolling (HJKL)
-      bind("KeyJ", "scrollDown", "J"),
-      bind("KeyK", "scrollUp", "K"),
-      bind("KeyH", "scrollLeft", "H"),
-      bind("KeyL", "scrollRight", "L"),
+      // Navigation 3×3 (mirror of WASD)
       bind("KeyU", "scrollHalfPageUp", "U"),
-      bind("KeyO", "scrollHalfPageDown", "O"),
-      bind("Shift-KeyK", "scrollToTop", "Shift+K"),
-      bind("Shift-KeyJ", "scrollToBottom", "Shift+J"),
+      bind("KeyI", "scrollUp", "I"),
+      bind("KeyO", "scrollToTop", "O"),
+      bind("KeyJ", "scrollLeft", "J"),
+      bind("KeyK", "scrollDown", "K"),
+      bind("KeyL", "scrollRight", "L"),
+      bind("KeyM", "scrollHalfPageDown", "M"),
+      bind("Comma", "focusInput", ","),
+      bind("Period", "scrollToBottom", "."),
 
-      // History
-      bind("Shift-KeyH", "goBack", "Shift+H"),
-      bind("Shift-KeyL", "goForward", "Shift+L"),
-      bind("KeyN", "pageRefresh", "N"),
-
-      // Tab movement
+      // Shift-navigation (directional analogs)
       bind("Shift-KeyU", "tabLeft", "Shift+U"),
+      bind("Shift-KeyI", "tabPrev", "Shift+I"),
       bind("Shift-KeyO", "tabRight", "Shift+O"),
+      bind("Shift-KeyJ", "goBack", "Shift+J"),
+      bind("Shift-KeyK", "tabNext", "Shift+K"),
+      bind("Shift-KeyL", "goForward", "Shift+L"),
+      bind("Shift-KeyM", "tabHistoryBack", "Shift+M"),
+      bind("Shift-Comma", "closeTab", "<"),
+      bind("Shift-Period", "tabHistoryForward", ">"),
 
-      // Hints
-      bind("Semicolon", "activateHints", ";"),
-      bind("Shift-Semicolon", "multiOpen", ":"),
+      // Actions (columns left of navigation, toward center)
       bind("KeyY", "yankLink", "Y"),
+      bind("KeyH", "activateHints", "H"),
+      bind("KeyN", "multiOpen", "N"),
 
-      // Tabs
-      bind("KeyP", "openTabSearch", "P"),
-      bind("Period", "closeTab", "."),
-      bind("Shift-Period", "restoreTab", ">"),
-      bind("BracketLeft", "tabHistoryBack", "["),
-      bind("BracketRight", "tabHistoryForward", "]"),
+      // Secondary actions (right pinky column)
+      bind("KeyP", "createTab", "P"),
+      bind("Semicolon", "goUpUrl", ";"),
 
-      // Navigation
-      bind("KeyI", "focusInput", "I"),
-      bind("KeyU KeyU", "goUpUrl", "uu"),
-
-      // Marks
-      bind("KeyM", "setMark", "M"),
+      // Shift-actions
+      bind("Shift-KeyY", "restoreTab", "Shift+Y"),
+      bind("Shift-KeyH", "pageRefresh", "Shift+H"),
+      bind("Shift-KeyP", "openTabSearch", "Shift+P"),
+      bind("Shift-Semicolon", "setMark", ":"),
       bind("Quote", "jumpMark", "'"),
 
       // Help
-      bind("Slash", "showHelp", "/"),
+      bind("Shift-Slash", "showHelp", "?"),
     ],
   },
 };
