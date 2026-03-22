@@ -81,7 +81,7 @@ describe("premium", () => {
       const toast = win.document.querySelector(".tabi-premium-toast");
       assert.notEqual(toast, null);
       const strong = toast!.querySelector("strong");
-      assert.equal(strong!.textContent, "Tab search requires a license");
+      assert.equal(strong!.textContent, "Tab search requires Premium");
       const cta = toast!.querySelector(".tabi-premium-cta");
       assert.equal(cta!.textContent, "Purchase in the Tabi app");
     });

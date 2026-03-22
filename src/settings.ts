@@ -111,7 +111,7 @@ function buildSegmented(
     if (opt.value === activeValue) btn.classList.add("active");
     if (opt.premium && !isPremium) {
       btn.disabled = true;
-      btn.title = "Requires license";
+      btn.title = "Requires Premium";
     }
     container.appendChild(btn);
   }
@@ -279,9 +279,9 @@ function buildStatisticsPage(): HTMLElement {
     const empty = el("div", { class: "empty-state empty-state-gated" });
     empty.appendChild(text("div", "empty-state-icon", "\ud83d\udcca"));
     empty.appendChild(
-      text("div", "empty-state-text", "Statistics tracking requires a license. Purchase to see your usage insights.")
+      text("div", "empty-state-text", "Statistics tracking is a Premium feature. Purchase to see your usage insights.")
     );
-    const emptyBtn = el("button", { class: "upgrade-btn empty-state-cta", text: "Purchase License" });
+    const emptyBtn = el("button", { class: "upgrade-btn empty-state-cta", text: "Upgrade to Premium" });
     emptyBtn.addEventListener("click", () => navigate("premium"));
     empty.appendChild(emptyBtn);
     page.appendChild(empty);
@@ -611,10 +611,10 @@ function buildQuickMarksPage(): HTMLElement {
       text(
         "div",
         "empty-state-text",
-        "Quick Marks requires a license. Set marks with m+letter, jump with '+letter."
+        "Quick Marks is a Premium feature. Set marks with m+letter, jump with '+letter."
       )
     );
-    const emptyBtn = el("button", { class: "upgrade-btn empty-state-cta", text: "Purchase License" });
+    const emptyBtn = el("button", { class: "upgrade-btn empty-state-cta", text: "Upgrade to Premium" });
     emptyBtn.addEventListener("click", () => navigate("premium"));
     empty.appendChild(emptyBtn);
     page.appendChild(empty);
@@ -955,13 +955,13 @@ function buildPremiumPage(): HTMLElement {
   const header = el("div", { class: "premium-header" });
   header.appendChild(
     text("div", isPremium ? "premium-status licensed" : "premium-status free",
-      isPremium ? "Licensed" : "Unlicensed")
+      isPremium ? "Premium Active" : "Free")
   );
   header.appendChild(
     text("p", "premium-tagline",
       isPremium
         ? "Thanks for supporting tabi! All features unlocked."
-        : "Purchase a license to unlock all features.")
+        : "Upgrade to unlock all features.")
   );
   page.appendChild(header);
 
@@ -1007,9 +1007,9 @@ function buildPremiumPage(): HTMLElement {
 
   if (!isPremium) {
     const btn = el("button", { class: "upgrade-cta" });
-    btn.textContent = "Purchase License";
+    btn.textContent = "Upgrade to Premium";
     page.appendChild(btn);
-    page.appendChild(text("p", "license-hint", "One-time purchase via the App Store"));
+    page.appendChild(text("p", "premium-hint", "One-time purchase via the App Store"));
   }
 
   const support = el("div", { class: "license-support" });
@@ -1060,7 +1060,7 @@ function buildSidebar(): HTMLElement {
   const header = el("div", { class: "sidebar-header" });
   header.appendChild(el("h1", { text: "tabi" }));
   const pill = el("span", { class: isPremium ? "premium-pill premium" : "premium-pill" });
-  pill.textContent = isPremium ? "\u2726 Licensed" : "Free";
+  pill.textContent = isPremium ? "\u2726 Premium" : "Free";
   header.appendChild(pill);
   sidebar.appendChild(header);
 

@@ -136,7 +136,7 @@ export class PremiumPrompt {
       marginBottom: "12px",
       transition: "opacity 0.15s",
     });
-    cta.textContent = "Purchase License";
+    cta.textContent = "Upgrade to Premium";
     cta.addEventListener("mouseenter", () => { cta.style.opacity = "0.9"; });
     cta.addEventListener("mouseleave", () => { cta.style.opacity = "1"; });
     cta.addEventListener("click", () => {
