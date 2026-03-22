@@ -828,6 +828,8 @@ function buildKeyLayoutsPage(): HTMLElement {
       (v) => {
         currentTheme = v as Theme;
         browser.storage.local.set({ theme: v });
+        const preview = tagSection.querySelector<HTMLElement>(".mode-colors");
+        if (preview) preview.dataset.tagTheme = v;
       }
     )
   );
