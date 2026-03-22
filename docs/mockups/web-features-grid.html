@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tabi — Full Page Wireframe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f14;
+    --bg-alt: #141419;
+    --bg-card: #1a1a22;
+    --text: #d8d5cc;
+    --text-bright: #f0ede6;
+    --text-secondary: #9a9790;
+    --text-dim: #6a6760;
+    --accent: #e8553e;
+    --accent-hover: #d44830;
+    --accent-glow: rgba(232, 85, 62, 0.15);
+    --accent-glow-strong: rgba(232, 85, 62, 0.25);
+    --green: #4aad6a;
+    --green-soft: rgba(74, 173, 106, 0.12);
+    --border: #2a2a34;
+    --border-light: #333340;
+
+    --cat-hints: 245 158 11;
+    --cat-scroll: 16 185 129;
+    --cat-tabs: 10 132 255;
+    --cat-actions: 168 85 247;
+    --cat-marks: 236 72 153;
+    --cat-go: 56 189 248;
+
+    --font-display: 'Outfit', system-ui, sans-serif;
+    --font-body: 'Outfit', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+    --container: 1100px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: var(--font-body); font-weight: 500; background: var(--bg); color: var(--text); line-height: 1.65; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+  .container { max-width: var(--container); margin: 0 auto; padding: 0 24px; }
+  a { color: var(--accent); text-decoration: none; }
+
+  .section-badge { font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
+  .section-heading { font-family: var(--font-display); font-size: clamp(2rem, 4.5vw, 3rem); font-weight: 800; color: var(--text-bright); line-height: 1.15; letter-spacing: -0.02em; margin-bottom: 20px; }
+
+  kbd { display: inline-block; font-family: var(--font-mono); font-size: 0.82em; font-weight: 600; padding: 2px 8px; border-radius: 5px; box-shadow: 0 2px 0 var(--border); vertical-align: baseline; line-height: 1.4; background: var(--bg-card); border: 1px solid var(--border-light); color: var(--accent); }
+
+  .btn { display: inline-block; font-family: var(--font-body); font-weight: 600; font-size: 1rem; padding: 14px 30px; border-radius: 10px; border: none; cursor: pointer; text-decoration: none; transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); color: #fff; box-shadow: 0 6px 24px var(--accent-glow-strong); transform: translateY(-2px); }
+  .btn-ghost { background: transparent; color: var(--text-bright); border: 1px solid var(--border-light); }
+  .btn-ghost:hover { background: var(--bg-card); color: var(--text-bright); transform: translateY(-2px); }
+  .btn-outline { background: transparent; color: var(--text-bright); border: 1px solid var(--border-light); }
+  .btn-outline:hover { background: var(--bg-card); color: var(--text-bright); transform: translateY(-2px); }
+
+  /* ═══════ NAV ═══════ */
+  .nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(15,15,20,0.88); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--border); }
+  .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .nav-logo { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 1.4rem; color: var(--text-bright); letter-spacing: -0.02em; text-decoration: none; }
+  .nav-logo:hover { color: var(--accent); }
+  .nav-logo img { width: 30px; height: 30px; border-radius: 7px; filter: drop-shadow(0 0 8px rgba(212,160,32,0.3)); }
+  .nav-links { display: flex; align-items: center; gap: 28px; }
+  .nav-links a { font-size: 0.9rem; font-weight: 500; color: var(--text-secondary); text-decoration: none; }
+  .nav-links a:hover { color: var(--text-bright); }
+  .nav-cta { background: var(--accent); color: #fff !important; padding: 8px 18px; border-radius: 8px; font-weight: 600 !important; }
+  .nav-cta:hover { background: var(--accent-hover); }
+
+  /* ═══════ HERO ═══════ */
+  .hero { position: relative; min-height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center; padding: 120px 24px 80px; overflow: hidden; }
+  .hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 60% 50% at 50% 0%, var(--accent-glow) 0%, transparent 70%), radial-gradient(ellipse 40% 40% at 30% 80%, rgba(74,173,106,0.04) 0%, transparent 70%); pointer-events: none; }
+  .hero-inner { position: relative; z-index: 1; max-width: 740px; }
+  .hero-mascot { width: 150px; height: 150px; border-radius: 32px; margin: 0 auto 28px; box-shadow: 0 0 60px rgba(212,160,32,0.35); display: block; }
+  .hero-wordmark { font-family: var(--font-display); font-size: clamp(3rem,8vw,4.5rem); font-weight: 900; color: var(--text-bright); letter-spacing: -0.03em; line-height: 1; margin-bottom: 12px; }
+  .hero-eyebrow { font-family: var(--font-mono); font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 24px; }
+  .hero-title { font-family: var(--font-display); font-size: clamp(2.8rem,7vw,4.2rem); font-weight: 900; color: var(--text-bright); line-height: 1.1; letter-spacing: -0.03em; margin-bottom: 24px; }
+  .hero-subtitle { font-size: 1.15rem; font-weight: 500; color: var(--text); line-height: 1.7; margin-bottom: 36px; max-width: 540px; margin-left: auto; margin-right: auto; }
+  .hero-cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-bottom: 48px; }
+  .hero-steps { display: flex; align-items: flex-start; justify-content: center; gap: 0; margin-top: 8px; }
+  .hero-step { display: flex; flex-direction: column; align-items: center; gap: 10px; flex: 0 0 220px; }
+  .hero-step-num { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--accent); letter-spacing: 0.05em; }
+  .hero-step-label { font-size: 0.95rem; font-weight: 600; color: var(--text); text-align: center; max-width: 200px; margin-top: 4px; }
+  .hero-step-arrow { color: var(--text-dim); font-size: 1.4rem; margin: 60px 4px 0; }
+  .hero-kbd { font-family: var(--font-mono); font-size: 1.1rem; font-weight: 600; padding: 8px 14px; background: var(--bg-card); border: 1px solid var(--border-light); border-radius: 6px; color: var(--text-bright); box-shadow: 0 2px 0 var(--border); }
+  .hero-kbd--trigger { background: linear-gradient(to bottom, #fff785, #ffc542); color: #3d2c0a; border-color: #c38a22; box-shadow: 0 2px 0 #c38a22; }
+  .hero-step-keys { display: flex; gap: 6px; }
+
+  /* Step 1: mini preview of hints on fake links */
+  .hero-mini-preview {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 180px;
+  }
+
+  .hero-mini-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
+
+  .hero-mini-hint {
+    display: inline-block;
+    padding: 1px 4px;
+    background: linear-gradient(to bottom, #fff785, #ffc542);
+    border: 1px solid #c38a22;
+    border-radius: 3px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    color: #3d2c0a;
+    font: bold 10px/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  /* Step 2: narrowed hints */
+  .hero-mini-preview--typed .hero-mini-link { opacity: 0.25; }
+  .hero-mini-preview--typed .hero-mini-link.hero-mini-match { opacity: 1; }
+  .hero-mini-preview--typed .hero-mini-match .hero-mini-hint .hero-hint-dim { opacity: 0.35; }
+  .hero-mini-preview--typed .hero-mini-match .hero-mini-hint { box-shadow: 0 0 8px rgba(255,247,133,0.4), 0 1px 2px rgba(0,0,0,0.2); }
+
+  /* Step 3: result page with floating mascot */
+  .hero-result-page {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    width: 180px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .hero-result-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 6px 10px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .hero-result-dot { width: 6px; height: 6px; border-radius: 50%; }
+  .hero-result-dot:nth-child(1) { background: #ff5f57; }
+  .hero-result-dot:nth-child(2) { background: #ffbd2e; }
+  .hero-result-dot:nth-child(3) { background: #28c840; }
+
+  .hero-result-url {
+    flex: 1;
+    margin-left: 4px;
+    font-family: var(--font-mono);
+    font-size: 7px;
+    color: #555;
+    background: rgba(255,255,255,0.04);
+    border-radius: 3px;
+    padding: 2px 6px;
+  }
+
+  .hero-result-body {
+    padding: 12px;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+  }
+
+  .hero-result-body h4 {
+    font-family: var(--font-display);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--text-bright);
+    margin-bottom: 4px;
+  }
+
+  .hero-result-body p {
+    font-size: 0.65rem;
+    line-height: 1.5;
+    color: var(--text-dim);
+  }
+
+  .hero-result-items {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .hero-result-item {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 6px;
+    text-align: center;
+  }
+
+  .hero-result-item-img {
+    width: 100%;
+    height: 20px;
+    background: linear-gradient(135deg, #1a2a1a, #2a3a2a);
+    border-radius: 3px;
+    margin-bottom: 4px;
+  }
+
+  .hero-result-item span {
+    font-size: 0.6rem;
+    color: var(--text-secondary);
+  }
+
+  .hero-mascot-float {
+    position: absolute;
+    bottom: -12px;
+    right: -12px;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    filter: drop-shadow(0 0 16px rgba(255,247,133,0.5)) drop-shadow(0 0 32px rgba(255,197,66,0.25));
+  }
+
+  /* ═══════ FEATURES ═══════ */
+  .features { padding: 100px 0; text-align: center; background: var(--bg-alt); }
+  .features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 48px; }
+
+  .feature-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 32px 28px; text-align: left; transition: border-color 0.3s var(--ease), transform 0.3s var(--ease); position: relative; overflow: hidden; }
+  .feature-card:hover { transform: translateY(-4px); }
+  .feature-card::before { content: ""; position: absolute; top: 0; left: 0; right: 0; height: 3px; border-radius: 16px 16px 0 0; background: rgb(var(--cat)); opacity: 0.6; }
+  .feature-card:hover { border-color: rgb(var(--cat) / 0.4); }
+
+  .feature-card[data-cat="hints"] { --cat: var(--cat-hints); }
+  .feature-card[data-cat="scroll"] { --cat: var(--cat-scroll); }
+  .feature-card[data-cat="tabs"] { --cat: var(--cat-tabs); }
+  .feature-card[data-cat="actions"] { --cat: var(--cat-actions); }
+  .feature-card[data-cat="marks"] { --cat: var(--cat-marks); }
+  .feature-card[data-cat="go"] { --cat: var(--cat-go); }
+
+  .feature-icon-wrap { width: 44px; height: 44px; border-radius: 10px; background: rgb(var(--cat) / 0.1); border: 1px solid rgb(var(--cat) / 0.2); display: flex; align-items: center; justify-content: center; margin-bottom: 16px; font-size: 20px; color: rgb(var(--cat)); }
+  .feature-card h3 { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; color: var(--text-bright); margin-bottom: 8px; }
+  .feature-card p { font-size: 0.9rem; font-weight: 500; line-height: 1.6; color: var(--text-secondary); }
+  .feature-card kbd { background: rgb(var(--cat) / 0.1); border: 1px solid rgb(var(--cat) / 0.25); color: rgb(var(--cat)); box-shadow: 0 2px 0 rgb(var(--cat) / 0.15); }
+
+  .premium-badge { display: inline-block; font-family: var(--font-mono); font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 6px; border-radius: 4px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.25); color: #f59e0b; margin-left: 8px; vertical-align: 2px; }
+
+  /* ═══════ DEMO ═══════ */
+  .demo-section { padding: 100px 0; text-align: center; }
+  .demo-intro { font-size: 1rem; font-weight: 500; color: var(--text); max-width: 540px; margin: 0 auto 48px; line-height: 1.7; }
+
+  .demo-browser { max-width: 780px; margin: 0 auto 24px; border-radius: 12px; overflow: hidden; box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 24px 64px rgba(0,0,0,0.5); }
+  .demo-toolbar { display: flex; align-items: center; gap: 14px; padding: 10px 16px; background: #1a1a28; border-bottom: 1px solid rgba(255,255,255,0.06); }
+  .demo-dots { display: flex; gap: 7px; }
+  .ddot { width: 11px; height: 11px; border-radius: 50%; }
+  .ddot-close { background: #ff5f57; }
+  .ddot-min { background: #ffbd2e; }
+  .ddot-max { background: #28c840; }
+  .demo-url-bar { flex: 1; background: rgba(255,255,255,0.05); border-radius: 5px; padding: 5px 12px; font-size: 0.75rem; font-family: var(--font-mono); color: #555; }
+
+  .demo-content { position: relative; background: #12121a; min-height: 400px; }
+
+  .fake-page { color: #c0bdb4; font-family: var(--font-body); font-size: 13px; text-align: left; }
+  .fake-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px; background: #181820; border-bottom: 1px solid #2a2a36; }
+  .fake-logo { font-weight: 700; font-size: 1rem; color: #e0ddd6; }
+  .fake-nav { display: flex; gap: 18px; }
+  .fake-link { color: #888; font-size: 0.8rem; font-weight: 500; cursor: default; text-decoration: none; }
+
+  .fake-hero-area { padding: 40px 20px; text-align: center; background: linear-gradient(135deg, #1a2a4a 0%, #2a1a3a 100%); color: #d0cdc4; }
+  .fake-hero-area h2 { font-family: var(--font-body); font-size: 1.4rem; font-weight: 700; margin-bottom: 6px; color: #f0ede6; }
+  .fake-hero-area p { font-size: 0.85rem; opacity: 0.7; margin-bottom: 16px; }
+  .fake-hero-buttons { display: flex; gap: 10px; justify-content: center; }
+  .fake-button { display: inline-block; padding: 8px 20px; background: rgba(255,255,255,0.1); color: #d0cdc4; border-radius: 6px; font-weight: 600; font-size: 0.8rem; cursor: default; text-decoration: none; border: 1px solid rgba(255,255,255,0.12); }
+  .fake-button-outline { background: transparent; border: 1px solid rgba(255,255,255,0.2); }
+
+  .fake-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; padding: 20px; background: #0f0f16; }
+  .fake-card { background: #1a1a24; border-radius: 8px; padding: 14px; border: 1px solid #2a2a36; }
+  .fake-card-img { width: 100%; height: 64px; background: linear-gradient(135deg, #1a2a3a, #2a1a2a); border-radius: 5px; margin-bottom: 10px; }
+  .fake-card h4 { font-size: 0.85rem; font-weight: 600; color: #d0cdc4; margin-bottom: 3px; }
+  .fake-card p { font-size: 0.75rem; color: #666; margin-bottom: 6px; }
+  .fake-card .fake-link { color: #6a9fd8; font-size: 0.75rem; font-weight: 600; }
+
+  .fake-footer-bar { display: flex; justify-content: center; gap: 20px; padding: 14px 20px; background: #181820; border-top: 1px solid #2a2a36; }
+
+  /* Hint tags in demo — use tabi yellow gradient */
+  .demo-hint-tag { position: absolute; padding: 2px 5px; background: linear-gradient(to bottom, #fff785, #ffc542); border: 1px solid #c38a22; border-radius: 3px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); color: #3d2c0a; font: bold 11px/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif; text-transform: uppercase; pointer-events: none; z-index: 15; }
+  .demo-hint-tag::before { content: ""; position: absolute; top: -4px; left: 6px; width: 0; height: 0; border-left: 3px solid transparent; border-right: 3px solid transparent; border-bottom: 4px solid #c38a22; }
+
+  .demo-status { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(20,20,30,0.92); color: #888; font-family: var(--font-mono); font-size: 0.8rem; padding: 9px; text-align: center; z-index: 20; }
+  .demo-footnote { font-size: 0.82rem; color: var(--text-dim); font-style: italic; }
+
+  /* ═══════ INTERLUDE ═══════ */
+  .interlude { padding: 80px 0; text-align: center; background: var(--bg-alt); }
+  .interlude-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; max-width: 860px; margin: 40px auto 0; text-align: left; }
+  .interlude-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 36px 32px; }
+  .interlude-card h3 { font-family: var(--font-display); font-size: 1.2rem; font-weight: 700; color: var(--text-bright); margin-bottom: 16px; }
+  .interlude-card p { font-size: 0.92rem; font-weight: 500; line-height: 1.7; color: var(--text); margin-bottom: 12px; }
+  .interlude-card p:last-child { margin-bottom: 0; }
+  .interlude-card em { color: var(--text-bright); font-style: normal; font-weight: 600; }
+  .interlude-card .dim { color: var(--text-dim); }
+
+  .safari-bullets { list-style: none; padding: 0; margin: 12px 0 16px; }
+  .safari-bullets li { font-size: 0.92rem; font-weight: 500; color: var(--text); padding: 5px 0; line-height: 1.5; }
+
+  /* Why Safari grid removed — Safari advantages now inline as emoji bullets in the Chrome interlude card */
+
+  /* ═══════ PRICING ═══════ */
+  .pricing { padding: 100px 0; text-align: center; background: var(--bg-alt); }
+  .pricing-subtitle { font-size: 1.05rem; font-weight: 500; color: var(--text); margin-bottom: 48px; }
+  .pricing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; max-width: 820px; margin: 0 auto; text-align: left; }
+  .pricing-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 16px; padding: 36px 32px; display: flex; flex-direction: column; position: relative; }
+  .pricing-card--pro { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), 0 8px 32px rgba(232,85,62,0.1); }
+  .pricing-badge { position: absolute; top: -11px; left: 32px; background: var(--accent); color: #fff; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 12px; border-radius: 20px; }
+  .pricing-tier { font-family: var(--font-display); font-size: 1.4rem; font-weight: 700; color: var(--text-bright); margin-bottom: 4px; }
+  .pricing-price { font-family: var(--font-mono); font-size: 2.2rem; font-weight: 600; color: var(--text-bright); margin-bottom: 4px; }
+  .pricing-once { font-size: 0.75rem; font-weight: 400; color: var(--text-dim); vertical-align: middle; }
+  .pricing-desc { font-size: 0.88rem; font-weight: 500; color: var(--text-secondary); margin-bottom: 24px; }
+  .pricing-features { list-style: none; padding: 0; margin-bottom: 28px; flex: 1; }
+  .pricing-features li { font-size: 0.88rem; font-weight: 500; color: var(--text); padding: 6px 0; line-height: 1.5; }
+  .pricing-includes { font-weight: 600; color: var(--text-bright); border-bottom: 1px solid var(--border-light); padding-bottom: 10px; margin-bottom: 2px; }
+  .pcheck { color: var(--green); font-weight: 700; margin-right: 6px; }
+  .pcheck--pro { color: var(--accent); }
+  .pricing-card .btn { text-align: center; width: 100%; }
+
+  /* ═══════ DOWNLOAD ═══════ */
+  .download { padding: 100px 0; text-align: center; }
+  .download-sub { font-size: 1.05rem; font-weight: 500; color: var(--text); margin-bottom: 32px; }
+  .download-cta { margin-bottom: 16px; }
+  .download-reqs { font-size: 0.82rem; color: var(--text-dim); }
+
+  /* ═══════ FOOTER ═══════ */
+  .footer { padding: 48px 0; border-top: 1px solid var(--border); }
+  .footer-inner { text-align: center; }
+  .footer-brand { font-family: var(--font-display); font-size: 1.2rem; font-weight: 800; color: var(--text-bright); margin-bottom: 12px; }
+  .footer-links { display: flex; gap: 20px; justify-content: center; margin-bottom: 16px; }
+  .footer-links a { font-size: 0.85rem; color: var(--text-secondary); text-decoration: none; }
+  .footer-links a:hover { color: var(--text-bright); }
+  .footer-copy { font-size: 0.8rem; color: var(--text-dim); }
+
+  @media (max-width: 768px) {
+    .features-grid { grid-template-columns: 1fr; }
+    .interlude-grid, .pricing-grid { grid-template-columns: 1fr; }
+    .hero-steps { flex-wrap: wrap; gap: 12px; }
+    .hero-step { flex: 0 0 100px; }
+    .hero-step-arrow { margin: 0 4px; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- ═══════ NAV ═══════ -->
+  <nav class="nav">
+    <div class="nav-inner container">
+      <a href="#" class="nav-logo">
+        <img src="../../Tabi/Safari Extension/Resources/images/icon-48.png" alt="Tabi">
+        Tabi
+      </a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#demo">Try it</a>
+        <a href="#pricing">Pricing</a>
+        <a href="#download" class="nav-cta">Get Tabi</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ═══════ HERO ═══════ -->
+  <section class="hero" id="hero">
+    <div class="container hero-inner">
+      <img class="hero-mascot" src="../../Tabi/Safari Extension/Resources/images/icon-256.png" alt="Tabi">
+      <div class="hero-wordmark">Tabi</div>
+      <p class="hero-eyebrow">Safari extension for macOS</p>
+      <h1 class="hero-title">Click any link.<br>Type two letters.</h1>
+      <p class="hero-subtitle">
+        Tabi puts every clickable element at your fingertips.
+        Press one key, type two letters, done.
+        Your hands never leave the keyboard.
+      </p>
+      <div class="hero-cta-row">
+        <a href="#pricing" class="btn btn-primary">Get Tabi Premium — $4.99</a>
+        <a href="#demo" class="btn btn-ghost">Try the demo</a>
+      </div>
+      <div class="hero-steps">
+        <div class="hero-step">
+          <div class="hero-step-num">1</div>
+          <kbd class="hero-kbd hero-kbd--trigger">F</kbd>
+          <div class="hero-mini-preview">
+            <div class="hero-mini-link"><span class="hero-mini-hint">SA</span> Shop All</div>
+            <div class="hero-mini-link"><span class="hero-mini-hint">DG</span> Build Guides</div>
+            <div class="hero-mini-link"><span class="hero-mini-hint">JK</span> Route Maps</div>
+          </div>
+          <div class="hero-step-label">Every link gets a label</div>
+        </div>
+        <div class="hero-step-arrow">→</div>
+        <div class="hero-step">
+          <div class="hero-step-num">2</div>
+          <div class="hero-step-keys"><kbd class="hero-kbd">S</kbd> <kbd class="hero-kbd">A</kbd></div>
+          <div class="hero-mini-preview hero-mini-preview--typed">
+            <div class="hero-mini-link hero-mini-match"><span class="hero-mini-hint"><span class="hero-hint-dim">S</span>A</span> Shop All</div>
+            <div class="hero-mini-link"><span class="hero-mini-hint">DG</span> Build Guides</div>
+            <div class="hero-mini-link"><span class="hero-mini-hint">JK</span> Route Maps</div>
+          </div>
+          <div class="hero-step-label">Type the letters — that's the click</div>
+        </div>
+        <div class="hero-step-arrow">→</div>
+        <div class="hero-step">
+          <div class="hero-step-num">3</div>
+          <div class="hero-result-page">
+            <div class="hero-result-toolbar">
+              <div class="hero-result-dot"></div>
+              <div class="hero-result-dot"></div>
+              <div class="hero-result-dot"></div>
+              <div class="hero-result-url">/shop-all</div>
+            </div>
+            <div class="hero-result-body">
+              <h4>Shop All</h4>
+              <p>Bikepacking gear for the long way round.</p>
+              <div class="hero-result-items">
+                <div class="hero-result-item">
+                  <div class="hero-result-item-img"></div>
+                  <span>Framebags</span>
+                </div>
+                <div class="hero-result-item">
+                  <div class="hero-result-item-img" style="background:linear-gradient(135deg,#2a1a1a,#3a2a2a);"></div>
+                  <span>Lighting</span>
+                </div>
+              </div>
+            </div>
+            <img class="hero-mascot-float" src="../../Tabi/Safari Extension/Resources/images/icon-96.png" alt="Tabi">
+          </div>
+          <div class="hero-step-label">You've tabbied ✨</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════ FEATURES ═══════ -->
+  <section class="features" id="features">
+    <div class="container">
+      <p class="section-badge">More than just hints</p>
+      <h2 class="section-heading">Full keyboard control.<br>Every page. Every action.</h2>
+      <div class="features-grid">
+        <div class="feature-card" data-cat="hints">
+          <div class="feature-icon-wrap">⎆</div>
+          <h3>Click any link</h3>
+          <p>Press <kbd>F</kbd> and every clickable element gets a label. Type two letters to click. Hold Shift to open in a new tab.</p>
+        </div>
+        <div class="feature-card" data-cat="scroll">
+          <div class="feature-icon-wrap">⇕</div>
+          <h3>Scroll from home row</h3>
+          <p><kbd>J</kbd>/<kbd>K</kbd> to scroll. <kbd>D</kbd>/<kbd>E</kbd> to jump half a page. Top and bottom in one keystroke.</p>
+        </div>
+        <div class="feature-card" data-cat="tabs">
+          <div class="feature-icon-wrap">⊞</div>
+          <h3>Fuzzy tab search<span class="premium-badge">Premium</span></h3>
+          <p><kbd>⇧T</kbd> to search open tabs by title or URL. fzf-style fuzzy matching finds the tab you want instantly.</p>
+        </div>
+        <div class="feature-card" data-cat="tabs">
+          <div class="feature-icon-wrap">⟲</div>
+          <h3>Tab memory<span class="premium-badge">Premium</span></h3>
+          <p>Navigate back and forward through your tab history. <kbd>[</kbd>/<kbd>]</kbd> — like browser back/forward, but for tabs.</p>
+        </div>
+        <div class="feature-card" data-cat="actions">
+          <div class="feature-icon-wrap">⊕</div>
+          <h3>Batch open links<span class="premium-badge">Premium</span></h3>
+          <p><kbd>B</kbd> to enter batch mode. Select multiple links, then open them all in new tabs at once.</p>
+        </div>
+        <div class="feature-card" data-cat="marks">
+          <div class="feature-icon-wrap">⚑</div>
+          <h3>Quick marks<span class="premium-badge">Premium</span></h3>
+          <p><kbd>M</kbd> to bookmark any tab with a label. Jump back instantly. Persists across sessions.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════ DEMO ═══════ -->
+  <section class="demo-section" id="demo">
+    <div class="container">
+      <h2 class="section-heading">Try it. Right here.</h2>
+      <p class="demo-intro">Click inside the browser below to focus it, then press <kbd>F</kbd> to see hints. Type a two-letter combo to "click" a link.</p>
+      <div class="demo-browser">
+        <div class="demo-toolbar">
+          <div class="demo-dots">
+            <span class="ddot ddot-close"></span>
+            <span class="ddot ddot-min"></span>
+            <span class="ddot ddot-max"></span>
+          </div>
+          <div class="demo-url-bar">https://brokenalarmsbikes.com</div>
+        </div>
+        <div class="demo-content">
+          <!-- Static hint tags showing what it looks like -->
+          <div style="position:relative">
+            <div class="demo-hint-tag" style="top:18px; left:200px;">SA</div>
+            <div class="demo-hint-tag" style="top:18px; left:280px;">DG</div>
+            <div class="demo-hint-tag" style="top:18px; left:350px;">JK</div>
+            <div class="demo-hint-tag" style="top:18px; left:430px;">LE</div>
+            <div class="demo-hint-tag" style="top:90px; left:220px;">WC</div>
+            <div class="demo-hint-tag" style="top:90px; left:360px;">MP</div>
+          </div>
+          <div class="fake-page">
+            <div class="fake-header">
+              <div class="fake-logo">🚲 Broken Alarms Bikes</div>
+              <div class="fake-nav">
+                <a class="fake-link">Shop</a>
+                <a class="fake-link">Builds</a>
+                <a class="fake-link">Routes</a>
+                <a class="fake-link">Journal</a>
+                <a class="fake-link">About</a>
+              </div>
+            </div>
+            <div class="fake-hero-area">
+              <h2>Bikepacking gear for the long way round</h2>
+              <p>Handpicked components for riders who'd rather sleep under the stars.</p>
+              <div class="fake-hero-buttons">
+                <a class="fake-button">Shop All</a>
+                <a class="fake-button fake-button-outline">Build Guides</a>
+              </div>
+            </div>
+            <div class="fake-cards">
+              <div class="fake-card">
+                <div class="fake-card-img" style="background: linear-gradient(135deg, #1a2a1a, #2a3a2a);"></div>
+                <h4>Framebags</h4>
+                <p>Custom-fit bags for every frame geometry.</p>
+                <a class="fake-link">Browse →</a>
+              </div>
+              <div class="fake-card">
+                <div class="fake-card-img" style="background: linear-gradient(135deg, #2a1a1a, #3a2a2a);"></div>
+                <h4>Dynamo Lighting</h4>
+                <p>Ride all night. Charge on the move.</p>
+                <a class="fake-link">Browse →</a>
+              </div>
+              <div class="fake-card">
+                <div class="fake-card-img" style="background: linear-gradient(135deg, #1a1a2a, #2a2a3a);"></div>
+                <h4>Route Guides</h4>
+                <p>GPX files for classics and hidden gems.</p>
+                <a class="fake-link">Browse →</a>
+              </div>
+            </div>
+            <div class="fake-footer-bar">
+              <a class="fake-link">Shipping</a>
+              <a class="fake-link">Returns</a>
+              <a class="fake-link">Contact</a>
+              <a class="fake-link">Instagram</a>
+            </div>
+          </div>
+          <div class="demo-status">Click here, then press <kbd style="background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.15);color:#fff;box-shadow:none;font-size:0.75rem;">F</kbd> to activate hints</div>
+        </div>
+      </div>
+      <p class="demo-footnote">This is a simulation — the real extension works on every website in Safari.</p>
+    </div>
+  </section>
+
+  <!-- ═══════ INTERLUDE ═══════ -->
+  <section class="interlude">
+    <div class="container">
+      <h2 class="section-heading">But wait…</h2>
+      <div class="interlude-grid">
+        <div class="interlude-card">
+          <h3>"Why not just use Chrome?"</h3>
+          <p>Chrome is a great browser. But on a Mac, Safari gives you things Chrome <em>literally can't</em>:</p>
+          <ul class="safari-bullets">
+            <li>🔐 Touch ID logins & Passkeys</li>
+            <li>📲 One-time passwords from your iPhone — automatically</li>
+            <li>📱 iCloud tab sync across Mac, iPhone, iPad</li>
+            <li>💳 Apple Pay checkout — one click, no extensions</li>
+            <li>🔋 Hours more battery life</li>
+            <li>🛡 Tracking prevention on by default</li>
+          </ul>
+          <p class="dim">Chrome is for everyone. Safari is for your Mac.</p>
+        </div>
+        <div class="interlude-card">
+          <h3>"What about Vimium?"</h3>
+          <p>We tried <em>everything</em> — every keyboard extension for every browser. Some had janky scrolling. Some broke on half the sites we visited. Some hadn't been updated in years.</p>
+          <p>Tabi isn't a fork or a port. It's a clean implementation built for Safari — smooth scrolling, hints that actually land on the right elements, and a UI that doesn't make you wince.</p>
+          <p>But the real difference is <em>tab sanity</em>. Fuzzy tab search finds any open tab instantly. Tab memory lets you retrace your steps. Marks jump to a site that's already open instead of spawning a duplicate. Together, they solve the problem every power user knows — fifty tabs deep, half of them the same site, and no idea where the one you need went.</p>
+          <p class="dim">Same idea. Entirely different execution.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════ PRICING ═══════ -->
+  <section class="pricing" id="pricing">
+    <div class="container">
+      <h2 class="section-heading">One price. No subscriptions.</h2>
+      <p class="pricing-subtitle">Core keyboard navigation is free forever. Power features are a one-time purchase.</p>
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <div class="pricing-tier">Free</div>
+          <div class="pricing-price">$0</div>
+          <div class="pricing-desc">Everything you need to ditch your mouse.</div>
+          <ul class="pricing-features">
+            <li><span class="pcheck">✓</span> Link hints — click any element</li>
+            <li><span class="pcheck">✓</span> Scrolling — home row navigation</li>
+            <li><span class="pcheck">✓</span> Go mode — jump to any tab, URL, input</li>
+            <li><span class="pcheck">✓</span> Tab management — new, close, restore</li>
+            <li><span class="pcheck">✓</span> History navigation — back/forward</li>
+            <li><span class="pcheck">✓</span> All themes & keyboard layouts</li>
+            <li><span class="pcheck">✓</span> Site exclusions</li>
+          </ul>
+          <a href="#download" class="btn btn-outline">Download Free</a>
+        </div>
+        <div class="pricing-card pricing-card--pro">
+          <div class="pricing-badge">Recommended</div>
+          <div class="pricing-tier">Tabi Premium</div>
+          <div class="pricing-price">$4.99 <span class="pricing-once">one-time</span></div>
+          <div class="pricing-desc">For power users who want the full toolkit.</div>
+          <ul class="pricing-features">
+            <li class="pricing-includes">Everything in Free, plus:</li>
+            <li><span class="pcheck pcheck--pro">✓</span> Fuzzy tab search — find any tab instantly</li>
+            <li><span class="pcheck pcheck--pro">✓</span> Tab memory — navigate your tab history</li>
+            <li><span class="pcheck pcheck--pro">✓</span> Batch mode — open multiple links at once</li>
+            <li><span class="pcheck pcheck--pro">✓</span> Yank mode — copy any link URL</li>
+            <li><span class="pcheck pcheck--pro">✓</span> Quick marks — persistent tab bookmarks</li>
+            <li><span class="pcheck pcheck--pro">✓</span> Usage statistics — track your keyboard savings</li>
+          </ul>
+          <a href="#download" class="btn btn-primary">Get Tabi Premium — $4.99</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════ DOWNLOAD ═══════ -->
+  <section class="download" id="download">
+    <div class="container">
+      <h2 class="section-heading">Ready to retire your mouse?</h2>
+      <p class="download-sub">One-time purchase. No account. No data collected.</p>
+      <div class="download-cta">
+        <a href="#" class="btn btn-primary" style="font-size:1.1rem;padding:16px 38px;">Download on the Mac App Store</a>
+      </div>
+      <p class="download-reqs">Requires macOS 13 (Ventura) or later and Safari.</p>
+    </div>
+  </section>
+
+  <!-- ═══════ FOOTER ═══════ -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">Tabi</div>
+      <div class="footer-links">
+        <a href="#">Privacy</a>
+        <a href="#">Support</a>
+        <a href="https://github.com/brokenalarms/tabi">GitHub</a>
+      </div>
+      <p class="footer-copy">Made by <a href="https://github.com/brokenalarms" style="color:var(--text-dim)">brokenalarms</a></p>
+    </div>
+  </footer>
+
+</body>
+</html>
