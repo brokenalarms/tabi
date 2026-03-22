@@ -77,7 +77,7 @@
     --tabi-hint-bar-glow: rgba(110, 192, 201, 0.15);
 }
 
-/* ── Multi-select mode hint theme (green) ────────────────────────────── */
+/* ── Batch mode hint theme (green) ───────────────────────────────────── */
 
 .tabi-hint-overlay[data-hint-mode="multi"] .tabi-hint {
     --tabi-hint-bg: linear-gradient(to bottom, #85ff9a, #42d65a);

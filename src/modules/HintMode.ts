@@ -67,9 +67,9 @@ export class HintMode {
   private readonly onResize: () => void;
   /** Resolved hint placement for each discovered element. Populated in activate(). */
   private hintPlacementMap: Map<HTMLElement, HintPlacement>;
-  /** Multi-select: accumulated selections waiting for Space to execute. */
+  /** Batch: accumulated selections waiting for Space to execute. */
   private multiSelections: MultiSelection[];
-  /** Multi-select: status bar element shown at bottom of viewport. */
+  /** Batch: status bar element shown at bottom of viewport. */
   private statusBar: HTMLDivElement | null;
   /** Optional callback fired when a hint action completes (click, yank, multi). */
   onAction: ((type: HintModeType) => void) | null;
@@ -648,7 +648,7 @@ export class HintMode {
     hint.div.addEventListener("animationend", afterCollapse, { once: true });
   }
 
-  // --- Multi-select ---
+  // --- Batch ---
 
   private selectForMulti(hint: Hint): void {
     // Already selected — deselect
@@ -669,7 +669,7 @@ export class HintMode {
 
   private executeMultiSelections(): void {
     const selections = [...this.multiSelections];
-    // Fire once per multi-select batch, not per link
+    // Fire once per batch, not per link
     this.onAction?.("multi");
     this.deactivate();
 
@@ -694,7 +694,7 @@ export class HintMode {
   private static readonly MODE_LABELS: Record<HintModeType, string> = {
     click: "Hint mode",
     yank: "Link copy mode",
-    multi: "Multi-select mode",
+    multi: "Batch mode",
   };
 
   private createStatusBar(): void {
