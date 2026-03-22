@@ -1,11 +1,6 @@
 .demo-section {
   padding: 100px 0;
   text-align: center;
-  background: var(--bg-alt);
-}
-
-.demo-section .section-heading--light {
-  color: var(--text-bright);
 }
 
 .demo-intro {
@@ -32,7 +27,7 @@
   align-items: center;
   gap: 14px;
   padding: 10px 16px;
-  background: #2a2a42;
+  background: #1a1a28;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -52,12 +47,12 @@
 
 .demo-url-bar {
   flex: 1;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 5px;
   padding: 5px 12px;
   font-size: 0.75rem;
   font-family: var(--font-mono);
-  color: #777;
+  color: #555;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -65,7 +60,7 @@
 
 .demo-content {
   position: relative;
-  background: #f2f2f6;
+  background: #12121a;
   min-height: 400px;
   outline: none;
   cursor: default;
@@ -83,9 +78,9 @@
   pointer-events: none;
 }
 
-/* Fake page */
+/* Dark fake page */
 .fake-page {
-  color: #333;
+  color: #c0bdb4;
   font-family: var(--font-body);
   font-size: 13px;
   text-align: left;
@@ -96,14 +91,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 14px 20px;
-  background: #fff;
-  border-bottom: 1px solid #e4e4e4;
+  background: #181820;
+  border-bottom: 1px solid #2a2a36;
 }
 
 .fake-logo {
   font-weight: 700;
   font-size: 1rem;
-  color: #222;
+  color: #e0ddd6;
 }
 
 .fake-nav {
@@ -112,7 +107,7 @@
 }
 
 .fake-link {
-  color: #555;
+  color: #888;
   font-size: 0.8rem;
   font-weight: 500;
   cursor: default;
@@ -123,19 +118,19 @@
 .fake-hero-area {
   padding: 40px 20px;
   text-align: center;
-  background: linear-gradient(135deg, #3a5fc8 0%, #6b46a8 100%);
-  color: #fff;
+  background: linear-gradient(135deg, #1a2a4a 0%, #2a1a3a 100%);
+  color: #d0cdc4;
 }
 .fake-hero-area h2 {
   font-family: var(--font-body);
   font-size: 1.4rem;
   font-weight: 700;
   margin-bottom: 6px;
-  color: #fff;
+  color: #f0ede6;
 }
 .fake-hero-area p {
   font-size: 0.85rem;
-  opacity: 0.85;
+  opacity: 0.7;
   margin-bottom: 16px;
 }
 
@@ -148,20 +143,20 @@
 .fake-button {
   display: inline-block;
   padding: 8px 20px;
-  background: #fff;
-  color: #3a5fc8;
+  background: rgba(255, 255, 255, 0.1);
+  color: #d0cdc4;
   border-radius: 6px;
   font-weight: 600;
   font-size: 0.8rem;
   cursor: default;
   text-decoration: none;
   position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .fake-button-outline {
   background: transparent;
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .fake-cards {
@@ -169,39 +164,48 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 14px;
   padding: 20px;
-  background: #f8f8fb;
+  background: #0f0f16;
 }
 
 .fake-card {
-  background: #fff;
+  background: #1a1a24;
   border-radius: 8px;
   padding: 14px;
-  border: 1px solid #eee;
+  border: 1px solid #2a2a36;
 }
 
 .fake-card-img {
   width: 100%;
   height: 64px;
-  background: linear-gradient(135deg, #e0e7ff, #fce7f3);
   border-radius: 5px;
   margin-bottom: 10px;
+}
+
+.fake-card-img--green {
+  background: linear-gradient(135deg, #1a2a1a, #2a3a2a);
+}
+.fake-card-img--red {
+  background: linear-gradient(135deg, #2a1a1a, #3a2a2a);
+}
+.fake-card-img--blue {
+  background: linear-gradient(135deg, #1a1a2a, #2a2a3a);
 }
 
 .fake-card h4 {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #222;
+  color: #d0cdc4;
   margin-bottom: 3px;
 }
 
 .fake-card p {
   font-size: 0.75rem;
-  color: #888;
+  color: #666;
   margin-bottom: 6px;
 }
 
 .fake-card .fake-link {
-  color: #3a5fc8;
+  color: #6a9fd8;
   font-size: 0.75rem;
   font-weight: 600;
 }
@@ -211,8 +215,8 @@
   justify-content: center;
   gap: 20px;
   padding: 14px 20px;
-  background: #fff;
-  border-top: 1px solid #e4e4e4;
+  background: #181820;
+  border-top: 1px solid #2a2a36;
 }
 .fake-footer-bar .fake-link {
   font-size: 0.75rem;
@@ -223,8 +227,8 @@
   bottom: 0;
   left: 0;
   right: 0;
-  background: rgba(40, 40, 60, 0.88);
-  color: #d0d0e0;
+  background: rgba(20, 20, 30, 0.92);
+  color: #888;
   font-family: var(--font-mono);
   font-size: 0.8rem;
   padding: 9px;
@@ -247,25 +251,26 @@
   font-style: italic;
 }
 
-/* Hint labels */
+/* Hint labels — tabi yellow gradient */
 .demo-hint {
   position: absolute;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
-  padding: 3px 5px;
-  background: var(--accent);
-  color: #fff;
+  padding: 2px 5px;
+  background: linear-gradient(to bottom, #fff785, #ffc542);
+  border: 1px solid #c38a22;
   border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  color: #3d2c0a;
+  font: bold 11px/1.2 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  text-transform: uppercase;
   z-index: 15;
   pointer-events: none;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
   animation: hintPop 0.12s var(--ease);
 }
 
 .demo-hint.matched {
   background: var(--green);
+  border-color: var(--green);
+  color: #fff;
 }
 
 .demo-hint .hint-dim {

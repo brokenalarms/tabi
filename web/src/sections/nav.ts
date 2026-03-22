@@ -11,7 +11,6 @@ export function createNav(): HTMLElement {
         Tabi
       </a>
       <div class="nav-links" id="nav-links">
-        <a href="#how-it-works">How it works</a>
         <a href="#features">Features</a>
         <a href="#demo">Try it</a>
         <a href="#pricing">Pricing</a>

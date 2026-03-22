@@ -31,6 +31,13 @@
   --border: #2a2a34;
   --border-light: #333340;
 
+  --cat-hints: 245 158 11;
+  --cat-scroll: 16 185 129;
+  --cat-tabs: 10 132 255;
+  --cat-actions: 168 85 247;
+  --cat-marks: 236 72 153;
+  --cat-go: 56 189 248;
+
   --font-display: 'Outfit', system-ui, sans-serif;
   --font-body: 'Outfit', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;

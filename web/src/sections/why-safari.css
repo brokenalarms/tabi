@@ -1,0 +1,54 @@
+.why-safari {
+  padding: 100px 0;
+  text-align: center;
+}
+
+.ws-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin-top: 48px;
+}
+
+.ws-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 32px 28px;
+  text-align: left;
+  transition: border-color 0.3s var(--ease), transform 0.3s var(--ease);
+}
+.ws-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--border-light);
+}
+
+.ws-emoji {
+  font-size: 1.8rem;
+  margin-bottom: 14px;
+  line-height: 1;
+}
+
+.ws-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-bright);
+  margin-bottom: 8px;
+}
+
+.ws-card p {
+  font-size: 0.9rem;
+  font-weight: 500;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 768px) {
+  .why-safari {
+    padding: 72px 0;
+  }
+  .ws-grid {
+    grid-template-columns: 1fr;
+  }
+}
