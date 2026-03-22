@@ -14,7 +14,7 @@ export const PREMIUM_COMMANDS = new Set([
   "jumpMark",
 ]);
 
-export type CommandCategory = "hints" | "scroll" | "page" | "tabs" | "actions" | "marks";
+export type CommandCategory = "hints" | "scroll" | "page" | "tabs" | "go" | "actions" | "marks";
 
 export const COMMAND_CATEGORIES: Record<string, CommandCategory> = {
   activateHints: "hints",
@@ -42,8 +42,8 @@ export const COMMAND_CATEGORIES: Record<string, CommandCategory> = {
   goForward: "actions",
   pageRefresh: "actions",
   showHelp: "actions",
-  focusInput: "actions",
-  goUpUrl: "actions",
+  focusInput: "go",
+  goUpUrl: "go",
   setMark: "marks",
   jumpMark: "marks",
 };
@@ -53,6 +53,7 @@ export const CATEGORY_LABELS: { cat: CommandCategory; label: string }[] = [
   { cat: "scroll", label: "Scroll" },
   { cat: "page", label: "Page" },
   { cat: "tabs", label: "Tabs" },
+  { cat: "go", label: "Go" },
   { cat: "actions", label: "Actions" },
   { cat: "marks", label: "Marks" },
 ];

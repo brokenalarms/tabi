@@ -78,9 +78,9 @@ export class HelpOverlay {
     }
 
     // Tab-by-number (not in presets)
-    rows.push({ display: "g1\u2013g9", label: "Go to tab by number", category: "tabs", premium: false });
-    rows.push({ display: "g0 / g^", label: "First tab", category: "tabs", premium: false });
-    rows.push({ display: "g$", label: "Last tab", category: "tabs", premium: false });
+    rows.push({ display: "g1\u2013g9", label: "Go to tab by number", category: "go", premium: false });
+    rows.push({ display: "g0 / g^", label: "First tab", category: "go", premium: false });
+    rows.push({ display: "g$", label: "Last tab", category: "go", premium: false });
 
     return rows;
   }
