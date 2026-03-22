@@ -664,8 +664,8 @@ function buildQuickMarksPage(): HTMLElement {
 
 // QWERTY keyboard rows for visualization
 const KB_ROWS = [
-  ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
-  ["a", "s", "d", "f", "g", "h", "j", "k", "l", ";"],
+  ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "[", "]"],
+  ["a", "s", "d", "f", "g", "h", "j", "k", "l", ";", "'"],
   ["z", "x", "c", "v", "b", "n", "m", ",", ".", "/"],
 ];
 
@@ -675,6 +675,8 @@ const CODE_TO_DISPLAY: Record<string, string> = {
   Comma: ",",
   Slash: "/",
   Quote: "'",
+  BracketLeft: "[",
+  BracketRight: "]",
 };
 
 function codeToKey(code: string): string | null {
