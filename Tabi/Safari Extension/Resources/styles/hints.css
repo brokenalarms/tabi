@@ -120,15 +120,57 @@
     animation: tabi-confirm-glow 0.6s ease-out;
 }
 
+.tabi-mark-key-tag {
+    display: inline-block;
+    padding: 1px 4px;
+    background: linear-gradient(to bottom, #fff785, #ffc542);
+    border: 1px solid #c38a22;
+    border-radius: 3px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    color: #302505;
+    font: bold 12px/1.2 "Helvetica Neue", Helvetica, Arial, sans-serif;
+    text-transform: uppercase;
+    vertical-align: middle;
+    margin-left: 6px;
+}
+
+.tabi-mark-prompt {
+    opacity: 0.5;
+    font-size: 13px;
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
 .tabi-confirm-key {
-    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.tabi-confirm-key .tabi-mark-key-tag {
     font-size: 14px;
+    padding: 2px 6px;
+    margin-left: 0;
+}
+
+.tabi-confirm-status {
+    font-size: 13px;
+    opacity: 0.6;
+}
+
+.tabi-confirm-site {
+    font-weight: 600;
+    font-size: 13px;
+    margin-top: 6px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .tabi-confirm-url {
     font-size: 11px;
-    opacity: 0.7;
-    margin-top: 4px;
+    opacity: 0.5;
+    margin-top: 2px;
     word-break: break-all;
 }
 

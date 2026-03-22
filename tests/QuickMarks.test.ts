@@ -277,11 +277,12 @@ describe("QuickMarks class", () => {
 
     const bar = document.querySelector(".tabi-mark-mode-bar");
     assert.ok(bar, "status bar should appear");
-    assert.equal(bar!.textContent, "Set Mark:");
+    assert.equal(bar!.querySelector(".tabi-mark-mode-label")!.textContent, "Set Mark:");
+    assert.equal(bar!.querySelector(".tabi-mark-key-tag"), null, "no key tag when empty");
   });
 
-  // Verifies that typing a letter shows it in the status bar with save prompt.
-  it("typing a letter in set mode shows label with save prompt", async () => {
+  // Verifies that typing a letter shows it in hint-tag style with ⏎ prompt.
+  it("typing a letter in set mode shows hint-tag label with ⏎ prompt", async () => {
     const { QuickMarks } = await import("../src/modules/QuickMarks");
     activeInstance = new QuickMarks(fakeKeyHandler as any);
 
@@ -290,11 +291,16 @@ describe("QuickMarks class", () => {
 
     const bar = document.querySelector(".tabi-mark-mode-bar");
     assert.ok(bar);
-    assert.equal(bar!.textContent, "Set Mark: a \u23ce save");
+    const tag = bar!.querySelector(".tabi-mark-key-tag");
+    assert.ok(tag, "typed letter should appear in hint-tag style");
+    assert.equal(tag!.textContent, "a");
+    const prompt = bar!.querySelector(".tabi-mark-prompt");
+    assert.ok(prompt, "⏎ prompt should appear in set mode");
+    assert.equal(prompt!.textContent, "⏎");
   });
 
-  // Verifies that typing two letters shows the full label in status bar.
-  it("typing two letters shows both in status bar", async () => {
+  // Verifies that typing two letters shows both in hint-tag style.
+  it("typing two letters shows both in hint-tag status bar", async () => {
     const { QuickMarks } = await import("../src/modules/QuickMarks");
     activeInstance = new QuickMarks(fakeKeyHandler as any);
 
@@ -304,7 +310,8 @@ describe("QuickMarks class", () => {
 
     const bar = document.querySelector(".tabi-mark-mode-bar");
     assert.ok(bar);
-    assert.equal(bar!.textContent, "Set Mark: gh \u23ce save");
+    const tag = bar!.querySelector(".tabi-mark-key-tag");
+    assert.equal(tag!.textContent, "gh");
   });
 
   // Verifies that Enter after typing a label saves the mark.
@@ -363,20 +370,21 @@ describe("QuickMarks class", () => {
     pressKey("h");
 
     const bar = document.querySelector(".tabi-mark-mode-bar");
-    assert.equal(bar!.textContent, "Set Mark: gh \u23ce save");
+    assert.equal(bar!.querySelector(".tabi-mark-key-tag")!.textContent, "gh");
 
     pressBackspace();
-    assert.equal(bar!.textContent, "Set Mark: g \u23ce save");
+    assert.equal(bar!.querySelector(".tabi-mark-key-tag")!.textContent, "g");
 
     pressBackspace();
-    assert.equal(bar!.textContent, "Set Mark:");
+    assert.equal(bar!.querySelector(".tabi-mark-key-tag"), null, "key tag removed when buffer empty");
   });
 
-  // Verifies that set mark confirmation shows multi-line format with glow.
+  // Verifies that set mark confirmation shows hint-tag label, site name, and summarized URL.
   it("setMark confirmation has multi-line format", async () => {
     const { QuickMarks } = await import("../src/modules/QuickMarks");
     activeInstance = new QuickMarks(fakeKeyHandler as any);
 
+    document.title = "Test Page";
     await commands.get("setMark")!();
     pressKey("a");
     pressEnter();
@@ -387,12 +395,21 @@ describe("QuickMarks class", () => {
     const lastBar = bar[bar.length - 1];
     assert.ok(lastBar);
     assert.ok(lastBar.classList.contains("tabi-mode-bar-confirm"));
-    const keyLine = lastBar.querySelector(".tabi-confirm-key");
-    assert.ok(keyLine);
-    assert.equal(keyLine!.textContent, "Set Mark: a — saved");
+
+    const tag = lastBar.querySelector(".tabi-mark-key-tag");
+    assert.ok(tag, "label should appear in hint-tag style");
+    assert.equal(tag!.textContent, "a");
+
+    const status = lastBar.querySelector(".tabi-confirm-status");
+    assert.ok(status);
+    assert.equal(status!.textContent, "saved");
+
+    const siteLine = lastBar.querySelector(".tabi-confirm-site");
+    assert.ok(siteLine, "site name should appear");
+
     const urlLine = lastBar.querySelector(".tabi-confirm-url");
     assert.ok(urlLine);
-    assert.equal(urlLine!.textContent, "https://localhost/");
+    assert.equal(urlLine!.textContent, "localhost");
   });
 
   // Verifies that mark mode captures non-letter keys without leaking them.
@@ -434,7 +451,9 @@ describe("QuickMarks class", () => {
     assert.equal(currentMode, "MARK");
     const bar = document.querySelector(".tabi-mark-mode-bar");
     assert.ok(bar);
-    assert.equal(bar!.textContent, "Jump to Mark:");
+    assert.equal(bar!.querySelector(".tabi-mark-mode-label")!.textContent, "Jump to Mark:");
+    assert.equal(bar!.querySelector(".tabi-mark-key-tag"), null, "no key tag when empty");
+    assert.equal(bar!.querySelector(".tabi-mark-prompt"), null, "no ⏎ prompt in jump mode");
   });
 
   // Verifies that typing a letter in jump mode debounces then jumps.
@@ -516,9 +535,12 @@ describe("QuickMarks class", () => {
     const bars = document.querySelectorAll(".tabi-mark-mode-bar");
     const lastBar = bars[bars.length - 1];
     assert.ok(lastBar);
-    const keyLine = lastBar.querySelector(".tabi-confirm-key");
-    assert.ok(keyLine);
-    assert.equal(keyLine!.textContent, "Jump to Mark: z — not set");
+    const tag = lastBar.querySelector(".tabi-mark-key-tag");
+    assert.ok(tag);
+    assert.equal(tag!.textContent, "z");
+    const status = lastBar.querySelector(".tabi-confirm-status");
+    assert.ok(status);
+    assert.equal(status!.textContent, "not set");
   });
 
   // Verifies that deactivate cleans up all DOM elements and resets mode.
