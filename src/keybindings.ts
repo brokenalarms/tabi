@@ -233,3 +233,10 @@ export function bindingsForPreset(layout: KeyLayout): Array<[string, string]> {
 export function isLayoutPremium(layout: KeyLayout): boolean {
   return PRESETS[layout].premium === true;
 }
+
+// QWERTY keyboard rows for visualization (null = invisible spacer for rectangle fill)
+export const KB_ROWS: (string | null)[][] = [
+  ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "[", "]"],
+  ["a", "s", "d", "f", "g", "h", "j", "k", "l", ";", "'", null],
+  ["z", "x", "c", "v", "b", "n", "m", ",", ".", "/", null, null],
+];

@@ -2,7 +2,7 @@
 // Uses composable builder functions for DOM construction. Reads/writes
 // browser.storage.local for all settings, statistics, and quick marks.
 
-import { PRESETS, isLayoutPremium } from "./keybindings";
+import { PRESETS, isLayoutPremium, KB_ROWS } from "./keybindings";
 import type { PresetMeta, KeyBinding } from "./keybindings";
 import {
   loadCounters,
@@ -662,19 +662,14 @@ function buildQuickMarksPage(): HTMLElement {
 
 // ── Key Layouts page ──────────────────────────────────────────
 
-// QWERTY keyboard rows for visualization
-const KB_ROWS = [
-  ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p"],
-  ["a", "s", "d", "f", "g", "h", "j", "k", "l", ";"],
-  ["z", "x", "c", "v", "b", "n", "m", ",", ".", "/"],
-];
-
 const CODE_TO_DISPLAY: Record<string, string> = {
   Semicolon: ";",
   Period: ".",
   Comma: ",",
   Slash: "/",
   Quote: "'",
+  BracketLeft: "[",
+  BracketRight: "]",
 };
 
 function codeToKey(code: string): string | null {
@@ -729,9 +724,13 @@ function buildKeyboard(
   for (const row of KB_ROWS) {
     const rowEl = el("div", { class: rowClass });
     for (const key of row) {
-      const cat = categories.get(key);
-      const cls = cat ? `${keyClass} cat-${cat}` : keyClass;
-      rowEl.appendChild(el("div", { class: cls, text: key }));
+      if (key === null) {
+        rowEl.appendChild(el("div", { class: `${keyClass} key-spacer` }));
+      } else {
+        const cat = categories.get(key);
+        const cls = cat ? `${keyClass} cat-${cat}` : keyClass;
+        rowEl.appendChild(el("div", { class: cls, text: key }));
+      }
     }
     kb.appendChild(rowEl);
   }
