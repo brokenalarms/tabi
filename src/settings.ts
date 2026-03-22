@@ -662,11 +662,11 @@ function buildQuickMarksPage(): HTMLElement {
 
 // ── Key Layouts page ──────────────────────────────────────────
 
-// QWERTY keyboard rows for visualization
-const KB_ROWS = [
+// QWERTY keyboard rows for visualization (null = invisible spacer for rectangle fill)
+const KB_ROWS: (string | null)[][] = [
   ["q", "w", "e", "r", "t", "y", "u", "i", "o", "p", "[", "]"],
-  ["a", "s", "d", "f", "g", "h", "j", "k", "l", ";", "'"],
-  ["z", "x", "c", "v", "b", "n", "m", ",", ".", "/"],
+  ["a", "s", "d", "f", "g", "h", "j", "k", "l", ";", "'", null],
+  ["z", "x", "c", "v", "b", "n", "m", ",", ".", "/", null, null],
 ];
 
 const CODE_TO_DISPLAY: Record<string, string> = {
@@ -731,9 +731,13 @@ function buildKeyboard(
   for (const row of KB_ROWS) {
     const rowEl = el("div", { class: rowClass });
     for (const key of row) {
-      const cat = categories.get(key);
-      const cls = cat ? `${keyClass} cat-${cat}` : keyClass;
-      rowEl.appendChild(el("div", { class: cls, text: key }));
+      if (key === null) {
+        rowEl.appendChild(el("div", { class: `${keyClass} key-spacer` }));
+      } else {
+        const cat = categories.get(key);
+        const cls = cat ? `${keyClass} cat-${cat}` : keyClass;
+        rowEl.appendChild(el("div", { class: cls, text: key }));
+      }
     }
     kb.appendChild(rowEl);
   }
