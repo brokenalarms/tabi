@@ -112,6 +112,7 @@
     --tabi-panel-color: #f0f0f0;
     --tabi-panel-border: rgba(255, 255, 255, 0.08);
     --tabi-panel-muted: rgba(255, 255, 255, 0.4);
+    color-scheme: dark;
 }
 
 /* ── Mode bar overrides ───────────────────────────────────────────────── */
@@ -162,6 +163,7 @@
         --tabi-panel-color: #1a1a1a;
         --tabi-panel-border: rgba(0, 0, 0, 0.08);
         --tabi-panel-muted: rgba(0, 0, 0, 0.4);
+        color-scheme: light;
     }
 
     .tabi-mode-bar {
