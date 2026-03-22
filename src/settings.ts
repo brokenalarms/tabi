@@ -12,8 +12,8 @@ import {
 } from "./modules/Statistics";
 import { SECONDS_PER_ACTION } from "./modules/constants";
 import type { StatCounters } from "./modules/Statistics";
-import { loadMarks, loadSettings } from "./modules/QuickMarks";
-import type { MarkMap, QuickMarkSettings } from "./modules/QuickMarks";
+import { loadMarks, loadSettings, summarizeUrl } from "./modules/QuickMarks";
+import type { MarkMap, Mark, QuickMarkSettings } from "./modules/QuickMarks";
 import { COMMANDS, COMMAND_CATEGORIES, CATEGORY_LABELS } from "./commands";
 import type { CommandCategory } from "./commands";
 import { DEFAULTS, DEBUG, resolvePremiumStatus } from "./types";
@@ -395,6 +395,130 @@ function usedMarkLabels(): Set<string> {
   return new Set(Object.keys(marks));
 }
 
+function buildMarkCard(label: string, mark: Mark): HTMLElement {
+  const card = el("div", { class: "mark-card" });
+
+  if (mark.favicon) {
+    const img = el("img", { class: "mark-favicon" }) as HTMLImageElement;
+    img.src = mark.favicon;
+    img.width = 16;
+    img.height = 16;
+    img.alt = "";
+    card.appendChild(img);
+  }
+
+  card.appendChild(text("span", "mark-letter", label));
+
+  const info = el("div", { class: "mark-info" });
+  info.appendChild(text("div", "mark-title", mark.title || "Untitled"));
+  info.appendChild(text("div", "mark-url", summarizeUrl(mark.url)));
+  card.appendChild(info);
+
+  const actions = el("div", { class: "mark-actions" });
+
+  const editBtn = el("button", { class: "mark-edit", title: "Edit mark", text: "\u270E" });
+  editBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    enterEditMode(card, label, mark);
+  });
+  actions.appendChild(editBtn);
+
+  const deleteBtn = el("button", { class: "mark-delete", title: "Delete mark", text: "\u00d7" });
+  deleteBtn.addEventListener("click", async (e) => {
+    e.stopPropagation();
+    delete marks[label];
+    await browser.storage.local.set({ quickMarks: marks });
+    refreshPage();
+  });
+  actions.appendChild(deleteBtn);
+
+  card.appendChild(actions);
+
+  card.addEventListener("click", () => enterEditMode(card, label, mark));
+
+  return card;
+}
+
+function enterEditMode(card: HTMLElement, label: string, mark: Mark): void {
+  if (card.classList.contains("mark-card-editing")) return;
+  card.classList.add("mark-card-editing");
+  card.textContent = "";
+
+  const letterInput = el("input", {
+    class: "mark-edit-letter",
+    type: "text",
+    maxlength: "2",
+    value: label,
+  }) as HTMLInputElement;
+  letterInput.value = label;
+
+  const titleInput = el("input", {
+    class: "mark-edit-title",
+    type: "text",
+    placeholder: "Title",
+  }) as HTMLInputElement;
+  titleInput.value = mark.title || "";
+
+  const urlInput = el("input", {
+    class: "mark-edit-url",
+    type: "url",
+    placeholder: "URL",
+  }) as HTMLInputElement;
+  urlInput.value = mark.url;
+
+  const errorEl = el("div", { class: "mark-edit-error" });
+
+  function validate(): string | null {
+    const newLabel = letterInput.value.toLowerCase();
+    if (!newLabel || !/^[a-z]{1,2}$/.test(newLabel)) return "Label must be 1\u20132 letters";
+    if (newLabel !== label && usedMarkLabels().has(newLabel)) return `"${newLabel}" already exists`;
+    const url = urlInput.value.trim();
+    if (!url) return "URL is required";
+    try { new URL(url); } catch { return "Invalid URL"; }
+    return null;
+  }
+
+  const btnRow = el("div", { class: "mark-edit-buttons" });
+
+  const saveBtn = el("button", { class: "mark-edit-save", text: "Save" });
+  saveBtn.addEventListener("click", async () => {
+    const err = validate();
+    if (err) {
+      errorEl.textContent = err;
+      return;
+    }
+    const newLabel = letterInput.value.toLowerCase();
+    const newUrl = urlInput.value.trim();
+    const newTitle = titleInput.value.trim() || newUrl;
+
+    if (newLabel !== label) delete marks[label];
+    marks[newLabel] = { ...mark, url: newUrl, title: newTitle };
+    await browser.storage.local.set({ quickMarks: marks });
+    refreshPage();
+  });
+
+  const cancelBtn = el("button", { class: "mark-edit-cancel", text: "Cancel" });
+  cancelBtn.addEventListener("click", () => refreshPage());
+
+  btnRow.appendChild(saveBtn);
+  btnRow.appendChild(cancelBtn);
+
+  const topRow = el("div", { class: "mark-edit-row" });
+  topRow.appendChild(letterInput);
+  topRow.appendChild(titleInput);
+
+  card.appendChild(topRow);
+  card.appendChild(urlInput);
+  card.appendChild(errorEl);
+  card.appendChild(btnRow);
+
+  letterInput.addEventListener("input", () => {
+    letterInput.value = letterInput.value.toLowerCase().replace(/[^a-z]/g, "").slice(0, 2);
+  });
+
+  titleInput.focus();
+}
+
 function buildAddMarkForm(): HTMLElement {
   const form = el("div", { class: "add-mark-form" });
 
@@ -526,33 +650,7 @@ function buildQuickMarksPage(): HTMLElement {
     const grid = el("div", { class: "marks-grid" });
     for (const [label, mark] of entries) {
       if (!mark) continue;
-      const card = el("div", { class: "mark-card" });
-
-      if (mark.favicon) {
-        const img = el("img", { class: "mark-favicon" }) as HTMLImageElement;
-        img.src = mark.favicon;
-        img.width = 16;
-        img.height = 16;
-        img.alt = "";
-        card.appendChild(img);
-      }
-
-      card.appendChild(text("span", "mark-letter", label));
-
-      const info = el("div", { class: "mark-info" });
-      info.appendChild(text("div", "mark-title", mark.title || "Untitled"));
-      info.appendChild(text("div", "mark-url", mark.url));
-      card.appendChild(info);
-
-      const deleteBtn = el("button", { class: "mark-delete", title: "Delete mark", text: "\u00d7" });
-      deleteBtn.addEventListener("click", async () => {
-        delete marks[label];
-        await browser.storage.local.set({ quickMarks: marks });
-        refreshPage();
-      });
-      card.appendChild(deleteBtn);
-
-      grid.appendChild(card);
+      grid.appendChild(buildMarkCard(label, mark));
     }
     page.appendChild(grid);
   }
