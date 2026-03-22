@@ -77,10 +77,10 @@ interface NavEntry {
 }
 
 const NAV_ITEMS: NavEntry[] = [
-  { id: "statistics", label: "Statistics", icon: "\ud83d\udcca" },
-  { id: "quickmarks", label: "Quick Marks", icon: "\ud83d\udccc" },
   { id: "keylayouts", label: "Key Layouts", icon: "\u2328" },
-  { id: "premium", label: "License", icon: "\u2726" },
+  { id: "quickmarks", label: "Quick Marks", icon: "\ud83d\udccc" },
+  { id: "statistics", label: "Statistics", icon: "\ud83d\udcca" },
+  { id: "premium", label: "Premium", icon: "\u2726" },
   ...(DEBUG ? [{ id: "debug" as const, label: "Debug", icon: "\ud83d\udee0" }] : []),
 ];
 
@@ -846,7 +846,7 @@ function buildKeyLayoutsPage(): HTMLElement {
 
 function buildPremiumPage(): HTMLElement {
   const page = el("div", { class: "page", id: "page-premium" });
-  page.appendChild(text("h1", "page-title", "License"));
+  page.appendChild(text("h2", "page-title", "Premium"));
 
   const header = el("div", { class: "premium-header" });
   header.appendChild(
