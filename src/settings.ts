@@ -869,7 +869,7 @@ function buildPremiumPage(): HTMLElement {
     { icon: "\ud83d\udcdc", name: "Scroll Navigation", desc: "Smooth scrolling with hjkl / arrow keys", tier: "free" },
     { icon: "\ud83d\udd04", name: "Tab Switching", desc: "Next/previous tab with keyboard shortcuts", tier: "free" },
     { icon: "\u2753", name: "Help Overlay", desc: "Quick reference for all keybindings", tier: "free" },
-    { icon: PREMIUM_FEATURES.tabSearch.icon, name: "Fuzzy Tab Search", desc: PREMIUM_FEATURES.tabSearch.description, tier: "premium" },
+    { icon: PREMIUM_FEATURES.tabSearch.icon, name: "Fuzzy Tab Search", desc: "Find and switch tabs instantly with fuzzy matching", tier: "premium" },
     { icon: "\ud83d\udccb", name: "Yank Mode", desc: "Copy any link URL to clipboard with one keystroke", tier: "premium" },
     { icon: PREMIUM_FEATURES.quickmarks.icon, name: PREMIUM_FEATURES.quickmarks.name, desc: PREMIUM_FEATURES.quickmarks.description, tier: "premium" },
     { icon: "\u2328", name: "Optimized Layout", desc: "Home row, both hands \u2014 the recommended default", tier: "free" },
