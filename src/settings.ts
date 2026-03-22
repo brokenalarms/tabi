@@ -930,8 +930,7 @@ function buildKeyLayoutsPage(): HTMLElement {
       text(
         "p",
         "kb-note",
-        "These are the characters each command produces — but we can't tell which physical key they're on for your layout. " +
-          "If a character doesn't match where you'd expect, check your OS keyboard settings."
+        "These are the characters each command produces. Safari extensions can't detect your keyboard layout, so we can't show which physical keys they're on — the positions shown assume a QWERTY layout."
       )
     );
   }
