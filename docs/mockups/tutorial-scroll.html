@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tabi — Scrolling</title>
+<style>
+  :root {
+    --tabi-bg: #1e1e22;
+    --tabi-color: #e0e0e0;
+    --tabi-color-secondary: #888;
+    --tabi-muted: rgba(255, 255, 255, 0.4);
+    --tabi-accent: #0a84ff;
+    --tabi-border: rgba(255, 255, 255, 0.08);
+    --cat-scroll: 16 185 129;
+    --cat-hints: 245 158 11;
+    --hint-bg: linear-gradient(to bottom, #fff785, #ffc542);
+    --hint-border: #c38a22;
+    --hint-color: #333;
+  }
+
+  @media (prefers-color-scheme: light) {
+    :root {
+      --tabi-bg: #f8f8fa;
+      --tabi-color: #333;
+      --tabi-color-secondary: #888;
+      --tabi-muted: rgba(0, 0, 0, 0.4);
+      --tabi-accent: #007aff;
+      --tabi-border: rgba(0, 0, 0, 0.08);
+      --cat-scroll: 5 150 105;
+    }
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+    background: var(--tabi-bg);
+    color: var(--tabi-color);
+    letter-spacing: -0.01em;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Lesson header ── */
+  .lesson-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    padding: 16px 32px;
+    background: rgba(30, 30, 34, 0.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--tabi-border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  @media (prefers-color-scheme: light) {
+    .lesson-header { background: rgba(248, 248, 250, 0.85); }
+  }
+
+  .lesson-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+  }
+
+  .lesson-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: rgb(var(--cat-scroll));
+    margin-bottom: 1px;
+  }
+
+  .lesson-title {
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+
+  .lesson-step {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--tabi-color-secondary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ── Key reference card ── */
+  .key-ref {
+    position: fixed;
+    top: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 100;
+    display: flex;
+    gap: 20px;
+    padding: 16px 24px;
+    background: rgba(30, 30, 30, 0.88);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 12px;
+    box-shadow:
+      0 8px 40px rgba(0, 0, 0, 0.55),
+      0 0 0 0.5px rgba(255, 255, 255, 0.1);
+    animation: float-in 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes float-in {
+    0% { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+    100% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  .key-pair {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .key-cap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    font-size: 15px;
+    font-weight: 700;
+    font-family: "SF Mono", "Menlo", monospace;
+    background: rgb(var(--cat-scroll) / 0.12);
+    border: 1px solid rgb(var(--cat-scroll) / 0.3);
+    color: rgb(var(--cat-scroll));
+  }
+
+  .key-desc {
+    font-size: 12px;
+    color: var(--tabi-color-secondary);
+  }
+
+  .key-sep {
+    width: 1px;
+    height: 24px;
+    background: var(--tabi-border);
+  }
+
+  /* ── Content ── */
+  .content {
+    padding: 160px 40px 60px;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .section {
+    padding: 60px 0;
+    border-bottom: 1px solid var(--tabi-border);
+  }
+
+  .section:last-child { border-bottom: none; }
+
+  .section-number {
+    font-size: 48px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    color: rgb(var(--cat-scroll) / 0.1);
+    line-height: 1;
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 8px;
+  }
+
+  .section-body {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--tabi-color-secondary);
+  }
+
+  .section-body kbd {
+    display: inline-block;
+    padding: 1px 5px;
+    background: rgb(var(--cat-scroll) / 0.12);
+    border: 1px solid rgb(var(--cat-scroll) / 0.25);
+    border-radius: 4px;
+    color: rgb(var(--cat-scroll));
+    font: bold 12px/1.4 "SF Mono", "Menlo", monospace;
+    vertical-align: 1px;
+  }
+
+  /* ── Next lesson link ── */
+  .next-lesson {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 24px;
+    padding: 12px 20px;
+    border-radius: 10px;
+    background: rgb(var(--cat-scroll) / 0.08);
+    border: 1px solid rgb(var(--cat-scroll) / 0.2);
+    color: rgb(var(--cat-scroll));
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
+  }
+
+  .next-prompt {
+    font-size: 12px;
+    color: var(--tabi-muted);
+    margin-top: 8px;
+  }
+
+  /* ── Step dots ── */
+  .step-dots {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+  }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--tabi-muted);
+  }
+
+  .dot.active { background: rgb(var(--cat-scroll)); transform: scale(1.3); }
+  .dot.done { background: rgb(var(--cat-hints) / 0.5); }
+</style>
+</head>
+<body>
+
+  <div class="lesson-header">
+    <img class="lesson-icon"
+         src="../../Tabi/Safari Extension/Resources/images/icon-48.png"
+         alt="Tabi">
+    <div>
+      <div class="lesson-label">Scrolling</div>
+      <div class="lesson-title">Navigate the page</div>
+    </div>
+    <div class="lesson-step">2 / 6</div>
+  </div>
+
+  <!-- Key reference — always visible -->
+  <div class="key-ref">
+    <div class="key-pair"><div class="key-cap">J</div><div class="key-desc">Down</div></div>
+    <div class="key-pair"><div class="key-cap">K</div><div class="key-desc">Up</div></div>
+    <div class="key-sep"></div>
+    <div class="key-pair"><div class="key-cap">D</div><div class="key-desc">Half page ↓</div></div>
+    <div class="key-pair"><div class="key-cap">E</div><div class="key-desc">Half page ↑</div></div>
+    <div class="key-sep"></div>
+    <div class="key-pair"><div class="key-cap">⇧J</div><div class="key-desc">Bottom</div></div>
+    <div class="key-pair"><div class="key-cap">⇧K</div><div class="key-desc">Top</div></div>
+  </div>
+
+  <div class="content">
+    <div class="section">
+      <div class="section-number">01</div>
+      <div class="section-title">Scroll with J and K</div>
+      <div class="section-body">
+        <kbd>J</kbd> scrolls down. <kbd>K</kbd> scrolls up. Try it now.
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-number">02</div>
+      <div class="section-title">Jump with D and E</div>
+      <div class="section-body">
+        <kbd>D</kbd> jumps half a page down. <kbd>E</kbd> jumps half a page up.
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-number">03</div>
+      <div class="section-title">Top and bottom</div>
+      <div class="section-body">
+        <kbd>⇧J</kbd> jumps to the bottom of the page.
+        <kbd>⇧K</kbd> jumps back to the top.
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-number">04</div>
+      <div class="section-title">That's all for scrolling</div>
+      <div class="section-body">
+        Six keys. Full page control.
+      </div>
+      <a href="tutorial-tabs.html" class="next-lesson" role="button">
+        Next: Tab management →
+      </a>
+      <div class="next-prompt">Press <kbd>F</kbd> then type the hint</div>
+    </div>
+  </div>
+
+  <div class="step-dots">
+    <div class="dot done"></div>
+    <div class="dot active"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+  </div>
+
+</body>
+</html>
