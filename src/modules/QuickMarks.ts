@@ -72,6 +72,11 @@ const DEFAULT_SETTINGS: QuickMarkSettings = { reuseTab: true };
 
 type MarkSubMode = "set" | "jump";
 
+const MODE_LABELS: Record<MarkSubMode, string> = {
+  set: "Set Mark:",
+  jump: "Jump to Mark:",
+};
+
 interface KeyHandlerLike {
   setMode(mode: ModeValue): void;
   setModeKeyDelegate(handler: (event: KeyboardEvent) => boolean): void;
@@ -209,12 +214,13 @@ export class QuickMarks {
   }
 
   private updateStatusBarForInput(): void {
+    const modeLabel = MODE_LABELS[this.subMode];
     if (this.labelBuffer.length === 0) {
-      this.updateStatusBar(this.prefixKey);
+      this.updateStatusBar(modeLabel);
     } else {
       const label = this.labelBuffer;
       const prompt = this.subMode === "set" ? " ⏎ save" : "";
-      this.updateStatusBar(`${this.prefixKey}${label}${prompt}`);
+      this.updateStatusBar(`${modeLabel} ${label}${prompt}`);
     }
   }
 
@@ -322,8 +328,9 @@ export class QuickMarks {
 
     const keyLine = document.createElement("div");
     keyLine.className = "tabi-confirm-key";
-    const prefix = type === "set" ? "saved" : type === "jump" ? "jump" : "not set";
-    keyLine.textContent = `${this.prefixKey}${label} — ${prefix}`;
+    const modeLabel = MODE_LABELS[this.subMode];
+    const suffix = type === "set" ? "saved" : type === "jump" ? "jump" : "not set";
+    keyLine.textContent = `${modeLabel} ${label} — ${suffix}`;
     bar.appendChild(keyLine);
 
     if (url) {
@@ -346,7 +353,7 @@ export class QuickMarks {
   private createStatusBar(): void {
     this.statusBar = document.createElement("div");
     this.statusBar.className = "tabi-panel tabi-mode-bar tabi-mark-mode-bar";
-    this.updateStatusBar(this.prefixKey);
+    this.updateStatusBar(MODE_LABELS[this.subMode]);
     document.documentElement.appendChild(this.statusBar);
   }
 
