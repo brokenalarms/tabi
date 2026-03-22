@@ -364,7 +364,7 @@ test("license page shows purchase CTA for unlicensed users", async ({ page }) =>
 
   const activePage = page.locator(".page.active");
   await expect(activePage.locator(".premium-status")).toHaveText("Unlicensed");
-  await expect(activePage.locator(".upgrade-btn")).toBeEnabled();
+  await expect(activePage.locator(".upgrade-cta")).toBeEnabled();
 });
 
 test("license page shows licensed status without purchase button", async ({ page }) => {
@@ -374,7 +374,7 @@ test("license page shows licensed status without purchase button", async ({ page
 
   const activePage = page.locator(".page.active");
   await expect(activePage.locator(".premium-status")).toHaveText("Licensed");
-  await expect(activePage.locator(".upgrade-btn")).toHaveCount(0);
+  await expect(activePage.locator(".upgrade-cta")).toHaveCount(0);
 });
 
 // ── Storage reactivity ─────────────────────────────────────────────

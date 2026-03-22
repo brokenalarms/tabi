@@ -24,6 +24,10 @@
     --tabi-segmented-border: #444;
     --tabi-segmented-color: #ccc;
     --tabi-segmented-hover: #333;
+    --tabi-emerald: #10b981;
+    --tabi-emerald-dim: rgba(16, 185, 129, 0.12);
+    --tabi-accent-dim: rgba(245, 158, 11, 0.15);
+    --tabi-accent-border: rgba(245, 158, 11, 0.3);
 }
 
 @media (prefers-color-scheme: light) {
@@ -41,5 +45,9 @@
         --tabi-segmented-border: #ccc;
         --tabi-segmented-color: #333;
         --tabi-segmented-hover: #e8e8e8;
+        --tabi-emerald: #059669;
+        --tabi-emerald-dim: rgba(5, 150, 105, 0.08);
+        --tabi-accent-dim: rgba(217, 119, 6, 0.1);
+        --tabi-accent-border: rgba(217, 119, 6, 0.25);
     }
 }

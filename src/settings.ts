@@ -845,52 +845,68 @@ function buildKeyLayoutsPage(): HTMLElement {
 
 function buildPremiumPage(): HTMLElement {
   const page = el("div", { class: "page", id: "page-premium" });
-  page.appendChild(text("h2", "page-title", "License"));
+  page.appendChild(text("h1", "page-title", "License"));
 
-  const hero = el("div", { class: "premium-hero" });
-  hero.appendChild(text("div", "premium-icon", isPremium ? "\u2726" : "\u2728"));
-  hero.appendChild(
-    text("div", "premium-status", isPremium ? "Licensed" : "Unlicensed")
+  const header = el("div", { class: "premium-header" });
+  header.appendChild(
+    text("div", isPremium ? "premium-status licensed" : "premium-status free",
+      isPremium ? "Licensed" : "Unlicensed")
   );
-  hero.appendChild(
-    text(
-      "div",
-      "premium-subtitle",
+  header.appendChild(
+    text("p", "premium-tagline",
       isPremium
         ? "Thanks for supporting tabi! All features unlocked."
-        : "Purchase a license to unlock all features."
-    )
+        : "Purchase a license to unlock all features.")
   );
-  page.appendChild(hero);
+  page.appendChild(header);
 
-  // Feature list — sourced from the shared feature catalog
-  const features = [
-    { icon: PREMIUM_FEATURES.leftHand.icon, name: "One-handed Layouts", desc: PREMIUM_FEATURES.leftHand.description },
-    { icon: PREMIUM_FEATURES.tabSearch.icon, name: PREMIUM_FEATURES.tabSearch.name, desc: PREMIUM_FEATURES.tabSearch.description },
-    { icon: PREMIUM_FEATURES.statistics.icon, name: PREMIUM_FEATURES.statistics.name, desc: PREMIUM_FEATURES.statistics.description },
-    { icon: PREMIUM_FEATURES.quickmarks.icon, name: PREMIUM_FEATURES.quickmarks.name, desc: PREMIUM_FEATURES.quickmarks.description },
+  const card = el("div", { class: "card" });
+  card.appendChild(text("div", "card-label", "What\u2019s Included"));
+
+  const features: { icon: string; name: string; desc: string; tier: "free" | "premium" }[] = [
+    { icon: "\ud83c\udfaf", name: "Hint Mode", desc: "Click any link or button with keyboard hints", tier: "free" },
+    { icon: "\ud83d\udcdc", name: "Scroll Navigation", desc: "Smooth scrolling with hjkl / arrow keys", tier: "free" },
+    { icon: "\ud83d\udd04", name: "Tab Switching", desc: "Next/previous tab with keyboard shortcuts", tier: "free" },
+    { icon: "\u2753", name: "Help Overlay", desc: "Quick reference for all keybindings", tier: "free" },
+    { icon: PREMIUM_FEATURES.tabSearch.icon, name: "Fuzzy Tab Search", desc: PREMIUM_FEATURES.tabSearch.description, tier: "premium" },
+    { icon: "\ud83d\udccb", name: "Yank Mode", desc: "Copy any link URL to clipboard with one keystroke", tier: "premium" },
+    { icon: PREMIUM_FEATURES.quickmarks.icon, name: PREMIUM_FEATURES.quickmarks.name, desc: PREMIUM_FEATURES.quickmarks.description, tier: "premium" },
+    { icon: "\u2328", name: "Optimized Layout", desc: "Home row, both hands \u2014 the recommended default", tier: "free" },
+    { icon: "\ud83e\udd1a", name: "One-handed Layouts", desc: "Left-hand or right-hand layouts for mouse users", tier: "premium" },
+    { icon: PREMIUM_FEATURES.statistics.icon, name: "Statistics Dashboard", desc: PREMIUM_FEATURES.statistics.description, tier: "premium" },
+    { icon: "\ud83d\ude80", name: "Multi-Open", desc: "Open multiple links at once with batch mode", tier: "premium" },
   ];
 
-  const list = el("ul", { class: "feature-list" });
+  const list = el("div", { class: "feature-list" });
+  let premiumSectionStarted = false;
   for (const feat of features) {
-    const item = el("li", { class: "feature-item" });
-    item.appendChild(text("span", "feature-icon", feat.icon));
-    const info = el("div");
+    const item = el("div", { class: "feature-item" });
+    if (feat.tier === "premium" && !premiumSectionStarted) {
+      premiumSectionStarted = true;
+      item.style.marginTop = "8px";
+      item.style.paddingTop = "12px";
+      item.style.borderTop = "1px solid var(--tabi-border)";
+    }
+    item.appendChild(text("div", "feature-icon", feat.icon));
+    const info = el("div", { class: "feature-info" });
     info.appendChild(text("div", "feature-name", feat.name));
     info.appendChild(text("div", "feature-desc", feat.desc));
     item.appendChild(info);
+    const badgeClass = feat.tier === "free" ? "feature-badge free" : "feature-badge premium";
+    const badgeText = feat.tier === "free" ? "Free" : "\u2726 Premium";
+    item.appendChild(text("span", badgeClass, badgeText));
     list.appendChild(item);
   }
-  page.appendChild(list);
+  card.appendChild(list);
+  page.appendChild(card);
 
   if (!isPremium) {
-    const btn = el("button", { class: "upgrade-btn" });
+    const btn = el("button", { class: "upgrade-cta" });
     btn.textContent = "Purchase License";
     page.appendChild(btn);
     page.appendChild(text("p", "license-hint", "One-time purchase via the App Store"));
   }
 
-  // Support link
   const support = el("div", { class: "license-support" });
   const link = el("a", {
     href: "https://github.com/anthropics/tabi/issues",
