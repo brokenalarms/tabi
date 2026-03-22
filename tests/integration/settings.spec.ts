@@ -355,6 +355,71 @@ test("add-mark form disables save for invalid URL", async ({ page }) => {
   await expect(page.locator(".add-mark-save")).toBeDisabled();
 });
 
+// mark card shows summarized URL, not raw URL
+test("mark card displays summarized URL", async ({ page }) => {
+  await setupSettingsPage(page, {
+    isPremium: true,
+    quickMarks: { g: { url: "https://github.com/user/repo/pulls", scrollY: 0, title: "PR List" } },
+  });
+
+  await page.locator(".nav-item", { hasText: "Quick Marks" }).click();
+
+  const markCard = page.locator(".mark-card");
+  await expect(markCard.locator(".mark-url")).toHaveText("github.com/\u2026/pulls");
+});
+
+// clicking a mark card enters inline edit mode with current values
+test("clicking mark card enters edit mode", async ({ page }) => {
+  await setupSettingsPage(page, {
+    isPremium: true,
+    quickMarks: { a: { url: "https://example.com/page", scrollY: 100, title: "My Page" } },
+  });
+
+  await page.locator(".nav-item", { hasText: "Quick Marks" }).click();
+
+  const markCard = page.locator(".mark-card");
+  await markCard.click();
+
+  await expect(markCard).toHaveClass(/mark-card-editing/);
+  await expect(markCard.locator(".mark-edit-letter")).toHaveValue("a");
+  await expect(markCard.locator(".mark-edit-title")).toHaveValue("My Page");
+  await expect(markCard.locator(".mark-edit-url")).toHaveValue("https://example.com/page");
+});
+
+// editing a mark and saving persists the changes
+test("edit mode saves updated mark", async ({ page }) => {
+  await setupSettingsPage(page, {
+    isPremium: true,
+    quickMarks: { a: { url: "https://example.com/page", scrollY: 100, title: "Old Title" } },
+  });
+
+  await page.locator(".nav-item", { hasText: "Quick Marks" }).click();
+
+  await page.locator(".mark-card").click();
+  await page.locator(".mark-edit-title").fill("New Title");
+  await page.locator(".mark-edit-save").click();
+
+  const markCard = page.locator(".mark-card");
+  await expect(markCard.locator(".mark-title")).toHaveText("New Title");
+});
+
+// edit mode cancel returns to display mode without changes
+test("edit mode cancel restores original card", async ({ page }) => {
+  await setupSettingsPage(page, {
+    isPremium: true,
+    quickMarks: { a: { url: "https://example.com/page", scrollY: 100, title: "Original" } },
+  });
+
+  await page.locator(".nav-item", { hasText: "Quick Marks" }).click();
+
+  await page.locator(".mark-card").click();
+  await page.locator(".mark-edit-title").fill("Changed");
+  await page.locator(".mark-edit-cancel").click();
+
+  const markCard = page.locator(".mark-card");
+  await expect(markCard.locator(".mark-title")).toHaveText("Original");
+});
+
 // ── Premium page ───────────────────────────────────────────────────
 
 test("license page shows purchase CTA for unlicensed users", async ({ page }) => {
