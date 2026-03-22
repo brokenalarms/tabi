@@ -1,9 +1,10 @@
 import './style.css'
 import { createNav } from './sections/nav'
 import { createHero } from './sections/hero'
-import { createFeatures } from './sections/features'
 import { createDemo } from './sections/demo'
+import { createFeatures } from './sections/features'
 import { createInterlude } from './sections/interlude'
+import { createWhySafari } from './sections/why-safari'
 import { createPricing } from './sections/pricing'
 import { createDownload } from './sections/download'
 import { createFooter } from './sections/footer'
@@ -14,9 +15,10 @@ function mount(): void {
 
   app.appendChild(createNav())
   app.appendChild(createHero())
-  app.appendChild(createFeatures())
   app.appendChild(createDemo())
+  app.appendChild(createFeatures())
   app.appendChild(createInterlude())
+  app.appendChild(createWhySafari())
   app.appendChild(createPricing())
   app.appendChild(createDownload())
   app.appendChild(createFooter())

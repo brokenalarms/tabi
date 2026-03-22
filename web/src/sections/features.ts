@@ -13,51 +13,51 @@ interface FeatureCard {
 const FEATURES: FeatureCard[] = [
   {
     cat: 'hints',
-    icon: '⎆',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" rx="3" width="12" height="10"/><text x="9" y="10" text-anchor="middle" font-size="7" font-weight="700" fill="currentColor" stroke="none">ab</text><path d="M20 5v6"/><circle cx="20" cy="14" r="2" fill="currentColor" stroke="none"/></svg>`,
     title: 'Click any link',
     premium: false,
     description:
-      'Press <kbd data-cmd="activateHints"></kbd> and every clickable element gets a label. Type two letters to click. Hold Shift to open in a new tab.',
+      'Press <kbd data-cmd="activateHints"></kbd> and every clickable element gets a two-letter label you can type to click.',
   },
   {
     cat: 'scroll',
-    icon: '⇕',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" rx="4" width="14" height="20"/><line x1="12" y1="7" x2="12" y2="17"/><polyline points="9,9 12,6 15,9"/><polyline points="9,15 12,18 15,15"/></svg>`,
     title: 'Scroll from home row',
     premium: false,
     description:
-      '<kbd data-cmd="scrollDown"></kbd>/<kbd data-cmd="scrollUp"></kbd> to scroll. <kbd data-cmd="scrollHalfPageDown"></kbd>/<kbd data-cmd="scrollHalfPageUp"></kbd> to jump half a page. Top and bottom in one keystroke.',
+      'Smooth vim-style scrolling — line by line, half-page jumps, or straight to the top and bottom.',
   },
   {
     cat: 'tabs',
-    icon: '⊞',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="16" y1="16" x2="21" y2="21"/><text x="11" y="13" text-anchor="middle" font-size="7" font-weight="700" fill="currentColor" stroke="none">~</text></svg>`,
     title: 'Fuzzy tab search',
     premium: true,
     description:
-      '<kbd data-cmd="openTabSearch"></kbd> to search open tabs by title or URL. fzf-style fuzzy matching finds the tab you want instantly.',
+      'Press <kbd data-cmd="openTabSearch"></kbd> and find any open tab instantly with fzf-style fuzzy matching.',
   },
   {
     cat: 'tabs',
-    icon: '⟲',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12,7 12,12 8,14"/><path d="M20 4l1.5-1.5M4 4L2.5 2.5"/></svg>`,
     title: 'Tab memory',
     premium: true,
     description:
-      'Navigate back and forward through your tab history. <kbd data-cmd="tabHistoryBack"></kbd>/<kbd data-cmd="tabHistoryForward"></kbd> \u2014 like browser back/forward, but for tabs.',
+      'Navigate back and forward through your tab history — like undo/redo, but for which tab you were on.',
   },
   {
     cat: 'actions',
-    icon: '⊕',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" rx="2" width="8" height="7"/><rect x="14" y="3" rx="2" width="8" height="7"/><rect x="2" y="14" rx="2" width="8" height="7"/><rect x="14" y="14" rx="2" width="8" height="7" stroke-dasharray="3,2"/></svg>`,
     title: 'Batch open links',
     premium: true,
     description:
-      '<kbd data-cmd="multiOpen"></kbd> to enter batch mode. Select multiple links, then open them all in new tabs at once.',
+      'Select multiple links with <kbd data-cmd="multiOpen"></kbd>, then open them all in new tabs at once.',
   },
   {
     cat: 'marks',
-    icon: '⚑',
+    icon: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h14a1 1 0 011 1v16.5l-8-5-8 5V4a1 1 0 011-1z"/><circle cx="12" cy="10" r="2.5" fill="currentColor" stroke="none"/></svg>`,
     title: 'Quick marks',
     premium: true,
     description:
-      '<kbd data-cmd="setMark"></kbd> to bookmark any tab with a label. Jump back instantly. Persists across sessions.',
+      'Bookmark any tab with <kbd data-cmd="setMark"></kbd> and jump back to it instantly, even across sessions.',
   },
 ]
 
