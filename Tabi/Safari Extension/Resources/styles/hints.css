@@ -113,6 +113,30 @@
     pointer-events: none;
 }
 
+.tabi-mode-bar-confirm {
+    text-align: left;
+    white-space: normal;
+    max-width: 360px;
+    animation: tabi-confirm-glow 0.6s ease-out;
+}
+
+.tabi-confirm-key {
+    font-weight: 700;
+    font-size: 14px;
+}
+
+.tabi-confirm-url {
+    font-size: 11px;
+    opacity: 0.7;
+    margin-top: 4px;
+    word-break: break-all;
+}
+
+@keyframes tabi-confirm-glow {
+    0%   { box-shadow: 0 0 12px 4px rgba(168, 120, 255, 0.5); }
+    100% { box-shadow: none; }
+}
+
 .tabi-mode-bar-fade {
     opacity: 0;
     transition: opacity 0.3s ease-out;

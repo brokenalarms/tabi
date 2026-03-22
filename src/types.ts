@@ -74,7 +74,7 @@ export type CommandMessage =
   | { command: "goToTabLast" }
   | { command: "extensionActive" }
   | { command: "extensionInactive" }
-  | { command: "jumpToMark"; url: string; scrollY: number }
+  | { command: "jumpToMark"; url: string; scrollY: number; reuseTab: boolean }
   | { command: "tabHistoryBack" }
   | { command: "tabHistoryForward" };
 

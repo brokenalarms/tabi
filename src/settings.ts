@@ -12,8 +12,8 @@ import {
 } from "./modules/Statistics";
 import { SECONDS_PER_ACTION } from "./modules/constants";
 import type { StatCounters } from "./modules/Statistics";
-import { loadMarks } from "./modules/QuickMarks";
-import type { MarkMap } from "./modules/QuickMarks";
+import { loadMarks, loadSettings } from "./modules/QuickMarks";
+import type { MarkMap, QuickMarkSettings } from "./modules/QuickMarks";
 import { COMMANDS, COMMAND_CATEGORIES, CATEGORY_LABELS } from "./commands";
 import type { CommandCategory } from "./commands";
 import { DEFAULTS, DEBUG, resolvePremiumStatus } from "./types";
@@ -94,6 +94,7 @@ let animate = DEFAULTS.animate;
 let autoNotifications = DEFAULTS.autoNotifications;
 let counters: StatCounters = { hintsClicked: 0, linksYanked: 0, tabsSearched: 0, scrollActions: 0 };
 let marks: MarkMap = {};
+let markSettings: QuickMarkSettings = { reuseTab: true };
 const premiumPrompt = new PremiumPrompt();
 
 // ── Page builders ─────────────────────────────────────────────
@@ -389,7 +390,7 @@ function buildStatisticsPage(): HTMLElement {
 
 // ── Quick Marks page ──────────────────────────────────────────
 
-function usedMarkLetters(): Set<string> {
+function usedMarkLabels(): Set<string> {
   return new Set(Object.keys(marks));
 }
 
@@ -399,7 +400,7 @@ function buildAddMarkForm(): HTMLElement {
   const letterInput = el("input", {
     class: "add-mark-letter",
     type: "text",
-    maxlength: "1",
+    maxlength: "2",
     placeholder: "a",
   });
 
@@ -421,9 +422,9 @@ function buildAddMarkForm(): HTMLElement {
   const errorEl = el("div", { class: "add-mark-error" });
 
   function validate(): string | null {
-    const letter = letterInput.value.toLowerCase();
-    if (!letter || letter < "a" || letter > "z") return "Letter must be a\u2013z";
-    if (usedMarkLetters().has(letter)) return `Mark "${letter}" already exists`;
+    const label = letterInput.value.toLowerCase();
+    if (!label || !/^[a-z]{1,2}$/.test(label)) return "Label must be 1\u20132 letters (a\u2013z)";
+    if (usedMarkLabels().has(label)) return `Mark "${label}" already exists`;
     const url = urlInput.value.trim();
     if (!url) return "URL is required";
     try { new URL(url); } catch { return "Invalid URL"; }
@@ -437,7 +438,7 @@ function buildAddMarkForm(): HTMLElement {
   }
 
   letterInput.addEventListener("input", () => {
-    letterInput.value = letterInput.value.toLowerCase().replace(/[^a-z]/g, "");
+    letterInput.value = letterInput.value.toLowerCase().replace(/[^a-z]/g, "").slice(0, 2);
     updateState();
   });
   urlInput.addEventListener("input", updateState);
@@ -449,10 +450,10 @@ function buildAddMarkForm(): HTMLElement {
       errorEl.textContent = err;
       return;
     }
-    const letter = letterInput.value.toLowerCase();
+    const label = letterInput.value.toLowerCase();
     const url = urlInput.value.trim();
     const title = titleInput.value.trim() || url;
-    marks[letter] = { url, scrollY: 0, title };
+    marks[label] = { url, scrollY: 0, title };
     await browser.storage.local.set({ quickMarks: marks });
     refreshPage();
   });
@@ -496,8 +497,22 @@ function buildQuickMarksPage(): HTMLElement {
   }
 
   page.appendChild(
-    text("p", "section-hint", "Set marks with m + letter, jump with ' + letter. Marks persist across sessions.")
+    text("p", "section-hint", "Set marks with m + label + Enter, jump with ' + label. Labels are 1\u20132 characters. Marks persist across sessions.")
   );
+
+  // Reuse-tab toggle
+  const reuseSection = el("div", { class: "setting-row" });
+  const reuseLabel = el("label", { class: "setting-label" });
+  reuseLabel.textContent = "Reuse existing tab when jumping to mark";
+  const reuseCheck = el("input", { type: "checkbox" }) as HTMLInputElement;
+  reuseCheck.checked = markSettings.reuseTab;
+  reuseCheck.addEventListener("change", async () => {
+    markSettings = { ...markSettings, reuseTab: reuseCheck.checked };
+    await browser.storage.local.set({ quickMarkSettings: markSettings });
+  });
+  reuseLabel.prepend(reuseCheck);
+  reuseSection.appendChild(reuseLabel);
+  page.appendChild(reuseSection);
 
   const entries = Object.entries(marks).sort(([a], [b]) => a.localeCompare(b));
 
@@ -508,10 +523,20 @@ function buildQuickMarksPage(): HTMLElement {
     page.appendChild(empty);
   } else {
     const grid = el("div", { class: "marks-grid" });
-    for (const [letter, mark] of entries) {
+    for (const [label, mark] of entries) {
       if (!mark) continue;
       const card = el("div", { class: "mark-card" });
-      card.appendChild(text("span", "mark-letter", letter));
+
+      if (mark.favicon) {
+        const img = el("img", { class: "mark-favicon" }) as HTMLImageElement;
+        img.src = mark.favicon;
+        img.width = 16;
+        img.height = 16;
+        img.alt = "";
+        card.appendChild(img);
+      }
+
+      card.appendChild(text("span", "mark-letter", label));
 
       const info = el("div", { class: "mark-info" });
       info.appendChild(text("div", "mark-title", mark.title || "Untitled"));
@@ -520,7 +545,7 @@ function buildQuickMarksPage(): HTMLElement {
 
       const deleteBtn = el("button", { class: "mark-delete", title: "Delete mark", text: "\u00d7" });
       deleteBtn.addEventListener("click", async () => {
-        delete marks[letter];
+        delete marks[label];
         await browser.storage.local.set({ quickMarks: marks });
         refreshPage();
       });
@@ -979,6 +1004,7 @@ async function init(): Promise<void> {
     "autoNotifications",
     "statistics",
     "quickMarks",
+    "quickMarkSettings",
     ...(DEBUG ? ["debugPremium"] : []),
   ]);
 
@@ -990,6 +1016,7 @@ async function init(): Promise<void> {
   autoNotifications = stored.autoNotifications !== undefined ? (stored.autoNotifications as boolean) : DEFAULTS.autoNotifications;
   counters = loadCounters(stored);
   marks = loadMarks(stored);
+  markSettings = loadSettings(stored);
 
   render();
 
@@ -1011,6 +1038,10 @@ async function init(): Promise<void> {
     }
     if (changes.quickMarks?.newValue !== undefined) {
       marks = loadMarks({ quickMarks: changes.quickMarks.newValue });
+      needsRefresh = true;
+    }
+    if (changes.quickMarkSettings?.newValue !== undefined) {
+      markSettings = loadSettings({ quickMarkSettings: changes.quickMarkSettings.newValue });
       needsRefresh = true;
     }
     if (changes.keyLayout?.newValue !== undefined) {

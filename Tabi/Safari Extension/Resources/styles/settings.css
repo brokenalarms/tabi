@@ -567,6 +567,26 @@ body {
 
 /* ── Quick Marks page ────────────────────────────────────── */
 
+.setting-row {
+  margin-bottom: 12px;
+}
+
+.setting-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--tabi-color-secondary);
+  cursor: pointer;
+}
+
+.mark-favicon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: 2px;
+}
+
 .marks-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
@@ -645,7 +665,7 @@ body {
 }
 
 .add-mark-letter {
-  width: 38px;
+  width: 48px;
   height: 34px;
   text-align: center;
   font-family: "SF Mono", "Menlo", monospace;

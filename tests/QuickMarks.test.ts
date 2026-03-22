@@ -1,11 +1,14 @@
-// QuickMarks unit tests — verifies mark storage helpers, modal mark mode
-// with status bar feedback, discovery panel, and key capture that prevents
-// conflicts with normal-mode commands.
+// QuickMarks unit tests — verifies mark storage helpers, URL matching,
+// two-character label support with Enter confirmation, jump debounce,
+// favicon storage, improved confirmation UX, and discovery panel.
 
 import { describe, it, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { createDOM, type DOMEnvironment } from "./helpers/dom";
-import { loadMarks, saveMark, getMark, summarizeUrl, type Mark, type MarkMap } from "../src/modules/QuickMarks";
+import {
+  loadMarks, saveMark, getMark, summarizeUrl, urlOriginPath, loadSettings,
+  type Mark, type MarkMap,
+} from "../src/modules/QuickMarks";
 
 // --- Pure storage helper tests (no DOM needed) ---
 
@@ -29,10 +32,16 @@ describe("QuickMarks storage helpers", () => {
     const mark: Mark = { url: "https://test.com", scrollY: 50, title: "Test" };
     const updated = saveMark(original, "b", mark);
 
-    // Original unchanged
     assert.deepEqual(original, {});
-    // Updated has the new mark
     assert.deepEqual(updated.b, mark);
+  });
+
+  // Verifies that saveMark works with two-character labels.
+  it("saveMark supports two-character labels", () => {
+    const mark: Mark = { url: "https://gh.com", scrollY: 0, title: "GH" };
+    const updated = saveMark({}, "gh", mark);
+    assert.deepEqual(updated.gh, mark);
+    assert.deepEqual(getMark(updated, "gh"), mark);
   });
 
   // Verifies that saveMark overwrites an existing mark at the same key.
@@ -53,28 +62,36 @@ describe("QuickMarks storage helpers", () => {
     assert.deepEqual(getMark(map, "c"), mark);
     assert.equal(getMark(map, "z"), undefined);
   });
+
+  // Verifies that loadSettings returns defaults when no settings stored.
+  it("loadSettings returns defaults when empty", () => {
+    const settings = loadSettings({});
+    assert.equal(settings.reuseTab, true);
+  });
+
+  // Verifies that loadSettings merges stored values over defaults.
+  it("loadSettings merges stored values", () => {
+    const settings = loadSettings({ quickMarkSettings: { reuseTab: false } });
+    assert.equal(settings.reuseTab, false);
+  });
 });
 
 // --- URL summary tests ---
 
 describe("summarizeUrl", () => {
-  // Verifies that a URL with no path shows only the host.
   it("returns host only for root URL", () => {
     assert.equal(summarizeUrl("https://github.com/"), "github.com");
     assert.equal(summarizeUrl("https://github.com"), "github.com");
   });
 
-  // Verifies that www prefix is stripped.
   it("strips www prefix", () => {
     assert.equal(summarizeUrl("https://www.example.com/page"), "example.com/page");
   });
 
-  // Verifies single path segment shows host/segment without ellipsis.
   it("shows host/segment for single path segment", () => {
     assert.equal(summarizeUrl("https://github.com/ralph"), "github.com/ralph");
   });
 
-  // Verifies deep paths get ellipsis between host and last segment.
   it("shows host/…/last for deep paths", () => {
     assert.equal(
       summarizeUrl("https://github.com/user/repo/pulls"),
@@ -86,7 +103,6 @@ describe("summarizeUrl", () => {
     );
   });
 
-  // Verifies trailing slashes are ignored.
   it("ignores trailing slash", () => {
     assert.equal(
       summarizeUrl("https://github.com/user/repo/"),
@@ -94,9 +110,43 @@ describe("summarizeUrl", () => {
     );
   });
 
-  // Verifies invalid URLs are returned as-is.
   it("returns raw string for invalid URL", () => {
     assert.equal(summarizeUrl("not-a-url"), "not-a-url");
+  });
+});
+
+// --- URL matching tests ---
+
+describe("urlOriginPath", () => {
+  // Verifies query params and hash are stripped for URL matching
+  it("strips query params and hash", () => {
+    assert.equal(
+      urlOriginPath("https://github.com/user/repo/pulls?q=is%3Apr"),
+      "https://github.com/user/repo/pulls",
+    );
+    assert.equal(
+      urlOriginPath("https://example.com/page#section"),
+      "https://example.com/page",
+    );
+  });
+
+  // Verifies that a URL with no query/hash is returned as origin+pathname
+  it("returns origin+pathname for clean URLs", () => {
+    assert.equal(
+      urlOriginPath("https://github.com/user/repo"),
+      "https://github.com/user/repo",
+    );
+  });
+
+  // Verifies that mark URL matching works with startsWith for relaxed matching
+  it("supports startsWith matching for relaxed URL comparison", () => {
+    const markBase = urlOriginPath("https://github.com/brokenalarms/tabi/pulls");
+    const tabUrl = urlOriginPath("https://github.com/brokenalarms/tabi/pulls?q=is%3Apr+is%3Aclosed");
+    assert.equal(tabUrl.startsWith(markBase), true);
+  });
+
+  it("returns raw string for invalid URL", () => {
+    assert.equal(urlOriginPath("not-a-url"), "not-a-url");
   });
 });
 
@@ -120,6 +170,27 @@ describe("QuickMarks class", () => {
     },
     clearModeKeyDelegate() { modeKeyDelegate = null; },
   };
+
+  function pressKey(key: string, code?: string): boolean {
+    return modeKeyDelegate!(new KeyboardEvent("keydown", {
+      code: code ?? `Key${key.toUpperCase()}`,
+      key,
+      bubbles: true,
+      cancelable: true,
+    }));
+  }
+
+  function pressEnter(): boolean {
+    return modeKeyDelegate!(new KeyboardEvent("keydown", {
+      code: "Enter", key: "Enter", bubbles: true, cancelable: true,
+    }));
+  }
+
+  function pressBackspace(): boolean {
+    return modeKeyDelegate!(new KeyboardEvent("keydown", {
+      code: "Backspace", key: "Backspace", bubbles: true, cancelable: true,
+    }));
+  }
 
   beforeEach(() => {
     env = createDOM();
@@ -171,7 +242,6 @@ describe("QuickMarks class", () => {
     const { QuickMarks } = await import("../src/modules/QuickMarks");
     activeInstance = new QuickMarks(fakeKeyHandler as any);
 
-    // Trigger setMark command
     await commands.get("setMark")!();
 
     assert.equal(currentMode, "MARK");
@@ -182,73 +252,119 @@ describe("QuickMarks class", () => {
     assert.equal(bar!.textContent, "m");
   });
 
-  // Verifies that typing a letter in set mark mode saves the mark and exits.
-  it("typing a letter in set mark mode saves mark and exits", async () => {
+  // Verifies that typing a letter shows it in the status bar with save prompt.
+  it("typing a letter in set mode shows label with save prompt", async () => {
     const { QuickMarks } = await import("../src/modules/QuickMarks");
     activeInstance = new QuickMarks(fakeKeyHandler as any);
 
     await commands.get("setMark")!();
+    pressKey("a");
 
-    // Simulate typing 'a'
-    const event = new KeyboardEvent("keydown", {
-      code: "KeyA", key: "a", bubbles: true, cancelable: true,
-    });
-    const handled = modeKeyDelegate!(event);
+    const bar = document.querySelector(".tabi-mark-mode-bar");
+    assert.ok(bar);
+    assert.equal(bar!.textContent, "ma \u23ce save");
+  });
 
-    assert.equal(handled, true);
+  // Verifies that typing two letters shows the full label in status bar.
+  it("typing two letters shows both in status bar", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
 
-    // Allow async setMark to complete
+    await commands.get("setMark")!();
+    pressKey("g");
+    pressKey("h");
+
+    const bar = document.querySelector(".tabi-mark-mode-bar");
+    assert.ok(bar);
+    assert.equal(bar!.textContent, "mgh \u23ce save");
+  });
+
+  // Verifies that Enter after typing a label saves the mark.
+  it("Enter after label saves mark and shows confirmation", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    await commands.get("setMark")!();
+    pressKey("a");
+    pressEnter();
+
     await new Promise(r => setTimeout(r, 10));
 
-    // Mark should be persisted
     const marks = storedData.quickMarks as Record<string, unknown>;
     assert.ok(marks);
     const mark = marks.a as Mark;
     assert.equal(mark.url, "https://localhost/");
-
-    // Mode should return to NORMAL
     assert.equal(currentMode, "NORMAL");
   });
 
-  // Verifies that setMark confirmation shows prefix + letter + URL summary.
-  it("setMark confirmation shows key sequence and URL summary", async () => {
+  // Verifies that two-character marks can be saved with Enter.
+  it("two-character mark labels are saved correctly", async () => {
     const { QuickMarks } = await import("../src/modules/QuickMarks");
     activeInstance = new QuickMarks(fakeKeyHandler as any);
 
     await commands.get("setMark")!();
-    modeKeyDelegate!(new KeyboardEvent("keydown", {
-      code: "KeyA", key: "a", bubbles: true, cancelable: true,
-    }));
+    pressKey("g");
+    pressKey("h");
+    pressEnter();
 
     await new Promise(r => setTimeout(r, 10));
 
-    // Status bar shows "ma → localhost" (happy-dom URL is https://localhost/)
-    const bars = document.querySelectorAll(".tabi-mark-mode-bar");
-    const lastBar = bars[bars.length - 1];
-    assert.ok(lastBar);
-    assert.equal(lastBar!.textContent, "ma \u2192 localhost");
+    const marks = storedData.quickMarks as Record<string, unknown>;
+    assert.ok(marks);
+    assert.ok(marks.gh);
   });
 
-  // Verifies that jumpMark confirmation shows prefix + letter + URL summary.
-  it("jumpMark confirmation shows key sequence and URL summary", async () => {
+  // Verifies that Enter without any label does nothing.
+  it("Enter without label does nothing", async () => {
     const { QuickMarks } = await import("../src/modules/QuickMarks");
     activeInstance = new QuickMarks(fakeKeyHandler as any);
 
-    storedData.quickMarks = {
-      b: { url: "https://github.com/user/repo/pulls", scrollY: 0, title: "PRs" },
-    };
+    await commands.get("setMark")!();
+    pressEnter();
 
-    await commands.get("jumpMark")!();
-    modeKeyDelegate!(new KeyboardEvent("keydown", {
-      code: "KeyB", key: "b", bubbles: true, cancelable: true,
-    }));
+    assert.equal(currentMode, "MARK", "should still be in MARK mode");
+  });
+
+  // Verifies that Backspace removes the last character from the label buffer.
+  it("Backspace removes last character from label buffer", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    await commands.get("setMark")!();
+    pressKey("g");
+    pressKey("h");
+
+    const bar = document.querySelector(".tabi-mark-mode-bar");
+    assert.equal(bar!.textContent, "mgh \u23ce save");
+
+    pressBackspace();
+    assert.equal(bar!.textContent, "mg \u23ce save");
+
+    pressBackspace();
+    assert.equal(bar!.textContent, "m");
+  });
+
+  // Verifies that set mark confirmation shows multi-line format with glow.
+  it("setMark confirmation has multi-line format", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    await commands.get("setMark")!();
+    pressKey("a");
+    pressEnter();
 
     await new Promise(r => setTimeout(r, 10));
 
-    const bars = document.querySelectorAll(".tabi-mark-mode-bar");
-    const lastBar = bars[bars.length - 1];
+    const bar = document.querySelectorAll(".tabi-mark-mode-bar");
+    const lastBar = bar[bar.length - 1];
     assert.ok(lastBar);
-    assert.equal(lastBar!.textContent, "\'b \u2192 github.com/\u2026/pulls");
+    assert.ok(lastBar.classList.contains("tabi-mode-bar-confirm"));
+    const keyLine = lastBar.querySelector(".tabi-confirm-key");
+    assert.ok(keyLine);
+    assert.equal(keyLine!.textContent, "ma — saved");
+    const urlLine = lastBar.querySelector(".tabi-confirm-url");
+    assert.ok(urlLine);
+    assert.equal(urlLine!.textContent, "https://localhost/");
   });
 
   // Verifies that mark mode captures non-letter keys without leaking them.
@@ -258,18 +374,11 @@ describe("QuickMarks class", () => {
 
     await commands.get("setMark")!();
 
-    // Simulate pressing 't' as a key code (which is a letter — this should work)
-    const tEvent = new KeyboardEvent("keydown", {
-      code: "KeyT", key: "t", bubbles: true, cancelable: true,
-    });
-    // But first, simulate pressing a number key (should be consumed but not act)
     const numEvent = new KeyboardEvent("keydown", {
       code: "Digit1", key: "1", bubbles: true, cancelable: true,
     });
     const handled = modeKeyDelegate!(numEvent);
     assert.equal(handled, true, "non-letter keys should be consumed");
-
-    // Mode should still be MARK — no mark was set
     assert.equal(currentMode, "MARK");
   });
 
@@ -300,8 +409,8 @@ describe("QuickMarks class", () => {
     assert.equal(bar!.textContent, "'");
   });
 
-  // Verifies that typing a letter in jump mode sends jumpToMark message.
-  it("typing a letter in jump mode jumps to mark", async () => {
+  // Verifies that typing a letter in jump mode debounces then jumps.
+  it("single char jump debounces then sends jumpToMark message", async () => {
     const { QuickMarks } = await import("../src/modules/QuickMarks");
     activeInstance = new QuickMarks(fakeKeyHandler as any);
 
@@ -310,17 +419,58 @@ describe("QuickMarks class", () => {
     };
 
     await commands.get("jumpMark")!();
-    modeKeyDelegate!(new KeyboardEvent("keydown", {
-      code: "KeyB", key: "b", bubbles: true, cancelable: true,
-    }));
+    pressKey("b");
 
-    await new Promise(r => setTimeout(r, 10));
+    // Should not have sent message yet (debounce pending)
+    assert.equal(sentMessages.length, 0);
+
+    // Wait for debounce (MARK_JUMP_DEBOUNCE_MS = 300)
+    await new Promise(r => setTimeout(r, 350));
 
     assert.equal(sentMessages.length, 1);
     assert.equal(sentMessages[0].command, "jumpToMark");
     assert.equal(sentMessages[0].url, "https://target.com/page");
     assert.equal(sentMessages[0].scrollY, 300);
+    assert.equal(sentMessages[0].reuseTab, true);
     assert.equal(currentMode, "NORMAL");
+  });
+
+  // Verifies that two-char jump executes immediately without debounce.
+  it("two-char jump label executes immediately", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    storedData.quickMarks = {
+      gh: { url: "https://github.com", scrollY: 0, title: "GitHub" },
+    };
+
+    await commands.get("jumpMark")!();
+    pressKey("g");
+    pressKey("h");
+
+    await new Promise(r => setTimeout(r, 10));
+
+    assert.equal(sentMessages.length, 1);
+    assert.equal(sentMessages[0].url, "https://github.com");
+    assert.equal(currentMode, "NORMAL");
+  });
+
+  // Verifies that jumpToMark passes reuseTab setting.
+  it("jump sends reuseTab from settings", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    storedData.quickMarks = {
+      a: { url: "https://example.com", scrollY: 0, title: "Ex" },
+    };
+    storedData.quickMarkSettings = { reuseTab: false };
+
+    await commands.get("jumpMark")!();
+    pressKey("a");
+
+    await new Promise(r => setTimeout(r, 350));
+
+    assert.equal(sentMessages[0].reuseTab, false);
   });
 
   // Verifies that jumping to an unset mark shows feedback without sending message.
@@ -329,19 +479,18 @@ describe("QuickMarks class", () => {
     activeInstance = new QuickMarks(fakeKeyHandler as any);
 
     await commands.get("jumpMark")!();
-    modeKeyDelegate!(new KeyboardEvent("keydown", {
-      code: "KeyZ", key: "z", bubbles: true, cancelable: true,
-    }));
+    pressKey("z");
 
-    await new Promise(r => setTimeout(r, 10));
+    await new Promise(r => setTimeout(r, 350));
 
     assert.equal(sentMessages.length, 0);
 
-    // Status bar should show "'z — not set" feedback
     const bars = document.querySelectorAll(".tabi-mark-mode-bar");
     const lastBar = bars[bars.length - 1];
     assert.ok(lastBar);
-    assert.equal(lastBar!.textContent, "'z \u2014 not set");
+    const keyLine = lastBar.querySelector(".tabi-confirm-key");
+    assert.ok(keyLine);
+    assert.equal(keyLine!.textContent, "'z — not set");
   });
 
   // Verifies that deactivate cleans up all DOM elements and resets mode.
@@ -371,21 +520,19 @@ describe("QuickMarks class", () => {
   });
 
   // Verifies that the discovery panel appears after the delay timer.
-  it("discovery panel shows saved marks after delay", async () => {
+  it("discovery panel shows saved marks with favicons after delay", async () => {
     const { QuickMarks } = await import("../src/modules/QuickMarks");
     activeInstance = new QuickMarks(fakeKeyHandler as any);
 
     storedData.quickMarks = {
-      a: { url: "https://example.com", scrollY: 0, title: "Example" },
+      a: { url: "https://example.com", scrollY: 0, title: "Example", favicon: "https://example.com/icon.png" },
       c: { url: "https://test.com", scrollY: 100, title: "Test Page" },
     };
 
     await commands.get("jumpMark")!();
 
-    // Panel should not be visible yet
     assert.equal(document.querySelector(".tabi-mark-panel"), null);
 
-    // Wait for panel delay (MARK_PANEL_DELAY_MS = 400)
     await new Promise(r => setTimeout(r, 450));
 
     const panel = document.querySelector(".tabi-mark-panel");
@@ -397,6 +544,25 @@ describe("QuickMarks class", () => {
     const labels = panel!.querySelectorAll(".tabi-mark-label");
     assert.equal(labels[0]!.textContent, "a");
     assert.equal(labels[1]!.textContent, "c");
+
+    // First mark has a favicon
+    const favicons = panel!.querySelectorAll(".tabi-tab-search-favicon");
+    assert.equal(favicons.length, 1);
+    assert.equal((favicons[0] as HTMLImageElement).src, "https://example.com/icon.png");
+  });
+
+  // Verifies that the discovery panel header reflects two-char label support.
+  it("discovery panel header mentions label, not a-z", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    await commands.get("setMark")!();
+
+    await new Promise(r => setTimeout(r, 450));
+
+    const header = document.querySelector(".tabi-mark-panel-header");
+    assert.ok(header);
+    assert.ok(header!.textContent!.includes("label"));
   });
 
   // Verifies that fast typing (before panel delay) does not show the panel.
@@ -406,14 +572,35 @@ describe("QuickMarks class", () => {
 
     await commands.get("setMark")!();
 
-    // Type immediately
-    modeKeyDelegate!(new KeyboardEvent("keydown", {
-      code: "KeyA", key: "a", bubbles: true, cancelable: true,
-    }));
+    pressKey("a");
+    pressEnter();
 
     await new Promise(r => setTimeout(r, 10));
 
-    // Panel should never appear
     assert.equal(document.querySelector(".tabi-mark-panel"), null);
+  });
+
+  // Verifies that favicon from the current page is captured when setting a mark.
+  it("setMark captures favicon from page link element", async () => {
+    const { QuickMarks } = await import("../src/modules/QuickMarks");
+    activeInstance = new QuickMarks(fakeKeyHandler as any);
+
+    // Add a favicon link element
+    const link = document.createElement("link");
+    link.rel = "icon";
+    link.href = "https://localhost/favicon.ico";
+    document.head.appendChild(link);
+
+    await commands.get("setMark")!();
+    pressKey("a");
+    pressEnter();
+
+    await new Promise(r => setTimeout(r, 10));
+
+    const marks = storedData.quickMarks as Record<string, Mark>;
+    assert.ok(marks.a);
+    assert.equal(marks.a.favicon, "https://localhost/favicon.ico");
+
+    document.head.removeChild(link);
   });
 });
