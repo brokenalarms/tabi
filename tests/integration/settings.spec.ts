@@ -581,6 +581,43 @@ test("mini keyboard rows all have equal child count", async ({ page }) => {
   }
 });
 
+// Theme switch updates computed background styles on mode color preview tags
+test("mode color previews visually update computed styles on theme change", async ({ page }) => {
+  await setupStyledSettingsPage(page);
+
+  const clickTag = page.locator(".mode-hint-tag.click");
+  const yankTag = page.locator(".mode-hint-tag.yank");
+  const multiTag = page.locator(".mode-hint-tag.multi");
+
+  // Default theme is "auto" — click tag shows split dark/light background
+  const autoBg = await clickTag.evaluate((el: Element) => getComputedStyle(el).backgroundImage);
+  expect(autoBg).toContain("gradient");
+
+  // Auto mode: yank and multi also show split backgrounds
+  const autoYankBg = await yankTag.evaluate((el: Element) => getComputedStyle(el).backgroundImage);
+  const autoMultiBg = await multiTag.evaluate((el: Element) => getComputedStyle(el).backgroundImage);
+  expect(autoYankBg).toContain("gradient");
+  expect(autoMultiBg).toContain("gradient");
+
+  // Switch to "dark" — backgrounds should change
+  await page.locator(".segmented button", { hasText: "Dark" }).click();
+  const darkBg = await clickTag.evaluate((el: Element) => getComputedStyle(el).backgroundImage);
+  expect(darkBg).toContain("gradient");
+  expect(darkBg).not.toBe(autoBg);
+
+  // Switch to "light" — backgrounds should differ from dark
+  await page.locator(".segmented button", { hasText: "Light" }).click();
+  const lightBg = await clickTag.evaluate((el: Element) => getComputedStyle(el).backgroundImage);
+  expect(lightBg).toContain("gradient");
+  expect(lightBg).not.toBe(darkBg);
+
+  // Switch to "classic" — yellow gradient for click
+  await page.locator(".segmented button", { hasText: "Classic" }).click();
+  const classicBg = await clickTag.evaluate((el: Element) => getComputedStyle(el).backgroundImage);
+  expect(classicBg).toContain("gradient");
+  expect(classicBg).not.toBe(lightBg);
+});
+
 test("screenshot: key layouts page", async ({ page }) => {
   await setupStyledSettingsPage(page, { isPremium: true });
 

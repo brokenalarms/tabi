@@ -992,10 +992,21 @@ body {
   justify-content: center;
   font: bold 11px/1.3 "SF Mono", Menlo, monospace;
   text-transform: uppercase;
-  background: linear-gradient(to right, #eee 50%, #111 50%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+[data-tag-theme="auto"] .mode-hint-tag.click::before {
+  background: linear-gradient(to right, #eee 50%, #111 50%);
+}
+
+[data-tag-theme="auto"] .mode-hint-tag.yank::before {
+  background: linear-gradient(to right, #c5f0f5 50%, #0a2525 50%);
+}
+
+[data-tag-theme="auto"] .mode-hint-tag.multi::before {
+  background: linear-gradient(to right, #c5f5c9 50%, #0a250d 50%);
 }
 
 [data-tag-theme="auto"] .mode-hint-tag.yank {
