@@ -24,7 +24,6 @@ import { HintMode } from "./modules/HintMode";
 import { ScrollController } from "./modules/ScrollController";
 import { HelpOverlay } from "./modules/HelpOverlay";
 import { Mode } from "./commands";
-import { isLayoutPremium } from "./keybindings";
 import { setPremiumStatus } from "./premium";
 
 declare const browser: {
