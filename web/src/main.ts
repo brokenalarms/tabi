@@ -1,10 +1,9 @@
 import './style.css'
 import { createNav } from './sections/nav'
 import { createHero } from './sections/hero'
-import { createHowItWorks } from './sections/how-it-works'
 import { createFeatures } from './sections/features'
 import { createDemo } from './sections/demo'
-import { createBackstory, initBackstoryCounters } from './sections/backstory'
+import { createInterlude } from './sections/interlude'
 import { createPricing } from './sections/pricing'
 import { createDownload } from './sections/download'
 import { createFooter } from './sections/footer'
@@ -15,17 +14,15 @@ function mount(): void {
 
   app.appendChild(createNav())
   app.appendChild(createHero())
-  app.appendChild(createHowItWorks())
   app.appendChild(createFeatures())
   app.appendChild(createDemo())
-  app.appendChild(createBackstory())
+  app.appendChild(createInterlude())
   app.appendChild(createPricing())
   app.appendChild(createDownload())
   app.appendChild(createFooter())
 
   initReveal()
   initSmoothScroll()
-  initBackstoryCounters()
 }
 
 function initReveal(): void {

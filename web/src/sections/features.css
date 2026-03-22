@@ -1,6 +1,7 @@
 .features {
   padding: 100px 0;
   text-align: center;
+  background: var(--bg-alt);
 }
 
 .features-grid {
@@ -14,34 +15,87 @@
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 16px;
-  padding: 36px 28px;
+  padding: 32px 28px;
   text-align: left;
   transition: border-color 0.3s var(--ease), transform 0.3s var(--ease);
+  position: relative;
+  overflow: hidden;
 }
 .feature-card:hover {
-  border-color: var(--accent);
   transform: translateY(-4px);
 }
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  border-radius: 16px 16px 0 0;
+  background: rgb(var(--cat));
+  opacity: 0.6;
+}
+.feature-card:hover {
+  border-color: rgb(var(--cat) / 0.4);
+}
 
-.feature-icon {
-  font-size: 2rem;
+.feature-card[data-cat='hints'] { --cat: var(--cat-hints); }
+.feature-card[data-cat='scroll'] { --cat: var(--cat-scroll); }
+.feature-card[data-cat='tabs'] { --cat: var(--cat-tabs); }
+.feature-card[data-cat='actions'] { --cat: var(--cat-actions); }
+.feature-card[data-cat='marks'] { --cat: var(--cat-marks); }
+.feature-card[data-cat='go'] { --cat: var(--cat-go); }
+
+.feature-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: rgb(var(--cat) / 0.1);
+  border: 1px solid rgb(var(--cat) / 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin-bottom: 16px;
-  display: inline-block;
+  font-size: 20px;
+  color: rgb(var(--cat));
 }
 
 .feature-card h3 {
   font-family: var(--font-display);
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: var(--text-bright);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .feature-card p {
-  font-size: 0.92rem;
+  font-size: 0.9rem;
   font-weight: 500;
-  line-height: 1.65;
-  color: var(--text);
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.feature-card kbd {
+  background: rgb(var(--cat) / 0.1);
+  border: 1px solid rgb(var(--cat) / 0.25);
+  color: rgb(var(--cat));
+  box-shadow: 0 2px 0 rgb(var(--cat) / 0.15);
+}
+
+.premium-badge {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  color: #f59e0b;
+  margin-left: 8px;
+  vertical-align: 2px;
 }
 
 @media (max-width: 768px) {
