@@ -16,11 +16,20 @@ import { loadMarks, loadSettings, summarizeUrl } from "./modules/QuickMarks";
 import type { MarkMap, Mark, QuickMarkSettings } from "./modules/QuickMarks";
 import { COMMANDS, COMMAND_CATEGORIES, CATEGORY_LABELS } from "./commands";
 import type { CommandCategory } from "./commands";
-import { DEFAULTS, DEBUG, resolvePremiumStatus } from "./types";
+import { DEFAULTS, DEBUG, resolvePremiumStatus, resolveSettings } from "./types";
 import type { KeyLayout, Theme, KeyBindingMode } from "./types";
 import { PremiumPrompt, PREMIUM_FEATURES } from "./modules/PremiumPrompt";
+import { KeyHandler } from "./modules/KeyHandler";
+import { HintMode } from "./modules/HintMode";
+import { ScrollController } from "./modules/ScrollController";
+import { HelpOverlay } from "./modules/HelpOverlay";
+import { Mode } from "./commands";
+import { setPremiumStatus } from "./premium";
 
 declare const browser: {
+  runtime: {
+    sendMessage(message: { command: string; url?: string; index?: number }): Promise<unknown>;
+  };
   storage: {
     local: {
       get(keys: string[]): Promise<Record<string, unknown>>;
@@ -1113,6 +1122,88 @@ function refreshPage(): void {
   render();
 }
 
+// ── Tabi self-navigation ──────────────────────────────────────
+// Extension pages don't receive content script injection, so we
+// initialize Tabi's keyboard navigation directly in the settings bundle.
+
+function applyHintTheme(theme: Theme): void {
+  if (theme === "auto") {
+    const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    document.documentElement.setAttribute("data-tabi-theme", isDark ? "light" : "dark");
+  } else {
+    document.documentElement.setAttribute("data-tabi-theme", theme);
+  }
+}
+
+function initTabi(stored: Record<string, unknown>): void {
+  const resolved = resolveSettings(stored);
+  const keyHandler = new KeyHandler();
+
+  keyHandler.setKeyBindingMode(resolved.keyBindingMode);
+  if (!isLayoutPremium(resolved.keyLayout) || resolved.isPremium) {
+    keyHandler.setLayout(resolved.keyLayout);
+  }
+  applyHintTheme(currentTheme);
+  setPremiumStatus(resolved.isPremium);
+
+  const scrollController = new ScrollController(keyHandler);
+  const hintMode = new HintMode(keyHandler);
+  hintMode.wireCommands();
+  const helpOverlay = new HelpOverlay(keyHandler, resolved.keyLayout);
+
+  keyHandler.on("exitToNormal", () => {
+    if (keyHandler.getMode() === Mode.HINTS && hintMode.isActive()) {
+      hintMode.deactivate();
+      return;
+    }
+    keyHandler.setMode(Mode.NORMAL);
+    const active = document.activeElement;
+    if (active && active !== document.body) (active as HTMLElement).blur();
+  });
+
+  const tabCommands = [
+    "createTab", "closeTab", "restoreTab",
+    "tabLeft", "tabRight", "tabNext", "tabPrev",
+    "tabHistoryBack", "tabHistoryForward",
+  ];
+  for (const cmd of tabCommands) {
+    keyHandler.on(cmd, () => {
+      browser.runtime.sendMessage({ command: cmd });
+    });
+  }
+  for (let i = 1; i <= 9; i++) {
+    keyHandler.on("goToTab" + i, () => {
+      browser.runtime.sendMessage({ command: "goToTab", index: i });
+    });
+  }
+  keyHandler.on("goToTabFirst", () => {
+    browser.runtime.sendMessage({ command: "goToTabFirst" });
+  });
+  keyHandler.on("goToTabLast", () => {
+    browser.runtime.sendMessage({ command: "goToTabLast" });
+  });
+
+  browser.storage.onChanged.addListener((changes, areaName) => {
+    if (areaName !== "local") return;
+    if (changes.keyBindingMode?.newValue) {
+      keyHandler.setKeyBindingMode(changes.keyBindingMode.newValue as KeyBindingMode);
+    }
+    if (changes.keyLayout?.newValue) {
+      const layout = changes.keyLayout.newValue as KeyLayout;
+      if (!isLayoutPremium(layout) || resolved.isPremium) {
+        keyHandler.setLayout(layout);
+        helpOverlay.setLayout(layout);
+      }
+    }
+    if (changes.theme?.newValue) {
+      applyHintTheme(changes.theme.newValue as Theme);
+    }
+  });
+
+  void scrollController;
+  void helpOverlay;
+}
+
 // ── Init ──────────────────────────────────────────────────────
 
 async function init(): Promise<void> {
@@ -1140,6 +1231,7 @@ async function init(): Promise<void> {
   markSettings = loadSettings(stored);
 
   render();
+  initTabi(stored);
 
   // Listen for external storage changes (e.g. from popup or content script)
   browser.storage.onChanged.addListener((changes, areaName) => {
