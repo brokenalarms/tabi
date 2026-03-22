@@ -214,13 +214,26 @@ export class QuickMarks {
   }
 
   private updateStatusBarForInput(): void {
-    const modeLabel = MODE_LABELS[this.subMode];
-    if (this.labelBuffer.length === 0) {
-      this.updateStatusBar(modeLabel);
-    } else {
-      const label = this.labelBuffer;
-      const prompt = this.subMode === "set" ? " ⏎ save" : "";
-      this.updateStatusBar(`${modeLabel} ${label}${prompt}`);
+    if (!this.statusBar) return;
+    this.statusBar.textContent = "";
+
+    const modeLabel = document.createElement("span");
+    modeLabel.className = "tabi-mark-mode-label";
+    modeLabel.textContent = MODE_LABELS[this.subMode];
+    this.statusBar.appendChild(modeLabel);
+
+    if (this.labelBuffer.length > 0) {
+      const tag = document.createElement("span");
+      tag.className = "tabi-mark-key-tag";
+      tag.textContent = this.labelBuffer;
+      this.statusBar.appendChild(tag);
+
+      if (this.subMode === "set") {
+        const prompt = document.createElement("span");
+        prompt.className = "tabi-mark-prompt";
+        prompt.textContent = "⏎";
+        this.statusBar.appendChild(prompt);
+      }
     }
   }
 
@@ -273,17 +286,17 @@ export class QuickMarks {
     };
     const marks = { ...this.marks, [label]: mark };
     await browser.storage.local.set({ [STORAGE_KEY]: marks });
-    this.showConfirmation(label, mark.url, "set");
+    this.showConfirmation(label, mark.url, mark.title, "set");
   }
 
   async jumpToMark(label: string): Promise<void> {
     const mark = this.marks[label];
     if (!mark) {
-      this.showConfirmation(label, null, "notset");
+      this.showConfirmation(label, null, null, "notset");
       return;
     }
 
-    this.showConfirmation(label, mark.url, "jump");
+    this.showConfirmation(label, mark.url, mark.title, "jump");
 
     const response = await browser.runtime.sendMessage({
       command: "jumpToMark",
@@ -307,7 +320,12 @@ export class QuickMarks {
 
   // --- Confirmation display ---
 
-  private showConfirmation(label: string, url: string | null, type: "set" | "jump" | "notset"): void {
+  private showConfirmation(
+    label: string,
+    url: string | null,
+    title: string | null,
+    type: "set" | "jump" | "notset",
+  ): void {
     if (this.panelOverlay) {
       removeOverlay(this.panelOverlay);
       this.panelOverlay = null;
@@ -328,20 +346,34 @@ export class QuickMarks {
 
     const keyLine = document.createElement("div");
     keyLine.className = "tabi-confirm-key";
-    const modeLabel = MODE_LABELS[this.subMode];
-    const suffix = type === "set" ? "saved" : type === "jump" ? "jump" : "not set";
-    keyLine.textContent = `${modeLabel} ${label} — ${suffix}`;
+
+    const tag = document.createElement("span");
+    tag.className = "tabi-mark-key-tag";
+    tag.textContent = label;
+    keyLine.appendChild(tag);
+
+    const status = document.createElement("span");
+    status.className = "tabi-confirm-status";
+    status.textContent = type === "set" ? "saved" : type === "jump" ? "jump" : "not set";
+    keyLine.appendChild(status);
+
     bar.appendChild(keyLine);
+
+    if (title) {
+      const siteLine = document.createElement("div");
+      siteLine.className = "tabi-confirm-site";
+      siteLine.textContent = title;
+      bar.appendChild(siteLine);
+    }
 
     if (url) {
       const urlLine = document.createElement("div");
       urlLine.className = "tabi-confirm-url";
-      urlLine.textContent = url;
+      urlLine.textContent = summarizeUrl(url);
       bar.appendChild(urlLine);
     }
 
     bar.addEventListener("transitionend", () => bar.remove(), { once: true });
-    // Hold the confirmation visible, then fade
     setTimeout(() => {
       void bar.offsetHeight;
       bar.classList.add("tabi-mode-bar-fade");
@@ -353,13 +385,8 @@ export class QuickMarks {
   private createStatusBar(): void {
     this.statusBar = document.createElement("div");
     this.statusBar.className = "tabi-panel tabi-mode-bar tabi-mark-mode-bar";
-    this.updateStatusBar(MODE_LABELS[this.subMode]);
+    this.updateStatusBarForInput();
     document.documentElement.appendChild(this.statusBar);
-  }
-
-  private updateStatusBar(text: string): void {
-    if (!this.statusBar) return;
-    this.statusBar.textContent = text;
   }
 
   // --- Discovery panel ---
